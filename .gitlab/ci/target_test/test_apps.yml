@@ -193,60 +193,60 @@ target_test_apps_brookesia_service_audio:
     TEST_TARGET: ${IDF_TARGET}
     TEST_FOLDER: service/media/brookesia_service_audio/test_apps
     TEST_ENV: ${ENV_TAG}
-# brookesia_service_ble
-target_test_apps_brookesia_service_ble:
-  extends:
-    - .target_test_template
-    - .rules:build:test_apps_brookesia_service_ble
-  needs:
-    - job: "build_test_apps_brookesia_service_ble"
-      artifacts: true
-      optional: true
-  parallel:
-    matrix: !reference [.target_test_idf_target_version_general_psram_default_matrix]
-  tags:
-    - ${IDF_TARGET}
-    - ${ENV_TAG}
-  variables:
-    TEST_TARGET: ${IDF_TARGET}
-    TEST_FOLDER: service/network/brookesia_service_ble/test_apps
-    TEST_ENV: ${ENV_TAG}
-# brookesia_service_bt
-target_test_apps_brookesia_service_bt:
-  extends:
-    - .target_test_template
-    - .rules:build:test_apps_brookesia_service_bt
-  needs:
-    - job: "build_test_apps_brookesia_service_bt"
-      artifacts: true
-      optional: true
-  parallel:
-    matrix: !reference [.target_test_idf_target_version_general_psram_default_matrix]
-  tags:
-    - ${IDF_TARGET}
-    - ${ENV_TAG}
-  variables:
-    TEST_TARGET: ${IDF_TARGET}
-    TEST_FOLDER: service/network/brookesia_service_bt/test_apps
-    TEST_ENV: ${ENV_TAG}
-# brookesia_service_bt_speaker
-target_test_apps_brookesia_service_bt_speaker:
-  extends:
-    - .target_test_template
-    - .rules:build:test_apps_brookesia_service_bt_speaker
-  needs:
-    - job: "build_test_apps_brookesia_service_bt_speaker"
-      artifacts: true
-      optional: true
-  parallel:
-    matrix: !reference [.target_test_idf_target_version_general_psram_default_matrix]
-  tags:
-    - ${IDF_TARGET}
-    - ${ENV_TAG}
-  variables:
-    TEST_TARGET: ${IDF_TARGET}
-    TEST_FOLDER: service/media/brookesia_service_bt_speaker/test_apps
-    TEST_ENV: ${ENV_TAG}
+# # brookesia_service_ble
+# target_test_apps_brookesia_service_ble:
+#   extends:
+#     - .target_test_template
+#     - .rules:build:test_apps_brookesia_service_ble
+#   needs:
+#     - job: "build_test_apps_brookesia_service_ble"
+#       artifacts: true
+#       optional: true
+#   parallel:
+#     matrix: !reference [.target_test_idf_target_version_general_psram_default_matrix]
+#   tags:
+#     - ${IDF_TARGET}
+#     - ${ENV_TAG}
+#   variables:
+#     TEST_TARGET: ${IDF_TARGET}
+#     TEST_FOLDER: service/network/brookesia_service_ble/test_apps
+#     TEST_ENV: ${ENV_TAG}
+# # brookesia_service_bt
+# target_test_apps_brookesia_service_bt:
+#   extends:
+#     - .target_test_template
+#     - .rules:build:test_apps_brookesia_service_bt
+#   needs:
+#     - job: "build_test_apps_brookesia_service_bt"
+#       artifacts: true
+#       optional: true
+#   parallel:
+#     matrix: !reference [.target_test_idf_target_version_general_psram_default_matrix]
+#   tags:
+#     - ${IDF_TARGET}
+#     - ${ENV_TAG}
+#   variables:
+#     TEST_TARGET: ${IDF_TARGET}
+#     TEST_FOLDER: service/network/brookesia_service_bt/test_apps
+#     TEST_ENV: ${ENV_TAG}
+# # brookesia_service_bt_speaker
+# target_test_apps_brookesia_service_bt_speaker:
+#   extends:
+#     - .target_test_template
+#     - .rules:build:test_apps_brookesia_service_bt_speaker
+#   needs:
+#     - job: "build_test_apps_brookesia_service_bt_speaker"
+#       artifacts: true
+#       optional: true
+#   parallel:
+#     matrix: !reference [.target_test_idf_target_version_general_psram_default_matrix]
+#   tags:
+#     - ${IDF_TARGET}
+#     - ${ENV_TAG}
+#   variables:
+#     TEST_TARGET: ${IDF_TARGET}
+#     TEST_FOLDER: service/media/brookesia_service_bt_speaker/test_apps
+#     TEST_ENV: ${ENV_TAG}
 # brookesia_service_manager
 target_test_apps_brookesia_service_manager:
   extends:

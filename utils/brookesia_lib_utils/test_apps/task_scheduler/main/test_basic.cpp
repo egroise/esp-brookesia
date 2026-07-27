@@ -6,9 +6,11 @@
 #include <atomic>
 #include <chrono>
 #include <future>
-#include <vector>
 #include "boost/chrono.hpp"
+#include "boost/thread/lock_guard.hpp"
+#include "boost/thread/mutex.hpp"
 #include "boost/thread/thread.hpp"
+#include <vector>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"

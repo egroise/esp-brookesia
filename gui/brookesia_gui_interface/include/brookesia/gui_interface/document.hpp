@@ -386,15 +386,15 @@ struct NativeFontVariant {
 };
 
 struct RuntimeFontResource {
-    std::string id;
+    std::string id = {};
     std::string kind = "file";
-    std::string primary_src;
-    std::vector<std::string> languages;
-    std::vector<std::string> fallback_ids;
-    std::vector<NativeFontVariant> native_fonts;
+    std::string primary_src = {};
+    std::vector<std::string> languages = {};
+    std::vector<std::string> fallback_ids = {};
+    std::vector<NativeFontVariant> native_fonts = {};
     int32_t image_font_height = 0;
-    std::vector<ImageFontGlyph> image_font_glyphs;
-    std::vector<ImageFontSize> image_font_sizes;
+    std::vector<ImageFontGlyph> image_font_glyphs = {};
+    std::vector<ImageFontSize> image_font_sizes = {};
 };
 
 struct RuntimeImageResource {

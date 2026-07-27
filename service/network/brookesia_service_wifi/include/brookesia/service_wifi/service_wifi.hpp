@@ -327,6 +327,15 @@ private:
      */
     std::mutex deinit_wait_mutex_;
     std::condition_variable deinit_wait_cv_;
+
+    /* HAL backends may deliver a callback that was already queued while the service is
+     * stopping. Serialize callback execution with callback teardown and gate callbacks
+     * after the service has started releasing its HAL and state-machine resources.
+     * A recursive mutex is required because handling an event can synchronously request
+     * another HAL action, which may re-enter a service callback.
+     */
+    std::recursive_mutex hal_callback_mutex_;
+    bool hal_callbacks_enabled_ = false;
 };
 
 BROOKESIA_DESCRIBE_ENUM(Wifi::DataType, LastAp, ConnectedAps, ScanParams, SoftApParams, Max);

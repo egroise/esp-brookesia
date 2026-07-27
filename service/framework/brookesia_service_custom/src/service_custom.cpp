@@ -16,6 +16,7 @@
 #include "brookesia/lib_utils/check.hpp"
 #include "brookesia/lib_utils/describe_helpers.hpp"
 #include "brookesia/lib_utils/log.hpp"
+#include "brookesia/service_manager/event/registry.hpp"
 #include "brookesia/service_manager/service/base.hpp"
 #include "brookesia/service_manager/function/definition.hpp"
 #include "brookesia/service_manager/function/registry.hpp"

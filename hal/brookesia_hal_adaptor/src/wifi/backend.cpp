@@ -191,7 +191,10 @@ bool WifiEspBackend::configure(wifi::BasicIface::RuntimeContext runtime, wifi::B
 
     task_scheduler_ = std::move(runtime.task_scheduler);
     task_group_ = runtime.task_group;
-    basic_callbacks_ = std::move(callbacks);
+    {
+        std::lock_guard<std::mutex> lock(callbacks_mutex_);
+        basic_callbacks_ = std::move(callbacks);
+    }
 
     return true;
 }
@@ -200,7 +203,10 @@ bool WifiEspBackend::configure(wifi::StationIface::Callbacks callbacks)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
-    station_callbacks_ = std::move(callbacks);
+    {
+        std::lock_guard<std::mutex> lock(callbacks_mutex_);
+        station_callbacks_ = std::move(callbacks);
+    }
 
     return true;
 }
@@ -209,7 +215,10 @@ bool WifiEspBackend::configure(wifi::SoftApIface::Callbacks callbacks)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
-    softap_callbacks_ = std::move(callbacks);
+    {
+        std::lock_guard<std::mutex> lock(callbacks_mutex_);
+        softap_callbacks_ = std::move(callbacks);
+    }
 
     return true;
 }
@@ -227,6 +236,7 @@ void WifiEspBackend::clear_basic_callbacks()
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
+    std::lock_guard<std::mutex> lock(callbacks_mutex_);
     basic_callbacks_ = {};
 }
 
@@ -234,6 +244,7 @@ void WifiEspBackend::clear_station_callbacks()
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
+    std::lock_guard<std::mutex> lock(callbacks_mutex_);
     station_callbacks_ = {};
 }
 
@@ -241,94 +252,167 @@ void WifiEspBackend::clear_softap_callbacks()
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
+    std::lock_guard<std::mutex> lock(callbacks_mutex_);
     softap_callbacks_ = {};
 }
 
 void WifiEspBackend::notify_general_action(wifi::GeneralAction action)
 {
+    std::function<void(wifi::BasicAction)> basic_callback;
+    std::function<void(wifi::StationAction)> station_callback;
+
     if (auto basic_action = to_basic_action(action); basic_action.has_value()) {
-        if (basic_callbacks_.on_action) {
-            basic_callbacks_.on_action(basic_action.value());
+        {
+            std::lock_guard<std::mutex> lock(callbacks_mutex_);
+            basic_callback = basic_callbacks_.on_action;
+        }
+        if (basic_callback) {
+            basic_callback(basic_action.value());
         }
         return;
     }
 
-    if (auto station_action = to_station_action(action); station_action.has_value() && station_callbacks_.on_action) {
-        station_callbacks_.on_action(station_action.value());
+    if (auto station_action = to_station_action(action); station_action.has_value()) {
+        {
+            std::lock_guard<std::mutex> lock(callbacks_mutex_);
+            station_callback = station_callbacks_.on_action;
+        }
+        if (station_callback) {
+            station_callback(station_action.value());
+        }
     }
 }
 
 void WifiEspBackend::notify_general_event(wifi::GeneralEvent event, bool is_unexpected)
 {
+    std::function<void(wifi::BasicEvent, bool)> basic_callback;
+    std::function<void(wifi::StationEvent, bool)> station_callback;
+
     if (auto basic_event = to_basic_event(event); basic_event.has_value()) {
-        if (basic_callbacks_.on_event) {
-            basic_callbacks_.on_event(basic_event.value(), is_unexpected);
+        {
+            std::lock_guard<std::mutex> lock(callbacks_mutex_);
+            basic_callback = basic_callbacks_.on_event;
+        }
+        if (basic_callback) {
+            basic_callback(basic_event.value(), is_unexpected);
         }
         return;
     }
 
-    if (auto station_event = to_station_event(event); station_event.has_value() && station_callbacks_.on_event) {
-        station_callbacks_.on_event(station_event.value(), is_unexpected);
+    if (auto station_event = to_station_event(event); station_event.has_value()) {
+        {
+            std::lock_guard<std::mutex> lock(callbacks_mutex_);
+            station_callback = station_callbacks_.on_event;
+        }
+        if (station_callback) {
+            station_callback(station_event.value(), is_unexpected);
+        }
     }
 }
 
 void WifiEspBackend::notify_error_state(wifi::GeneralAction action)
 {
+    std::function<void()> callback;
+
     if (auto basic_action = to_basic_action(action); basic_action.has_value()) {
-        if (basic_callbacks_.on_error) {
-            basic_callbacks_.on_error();
+        {
+            std::lock_guard<std::mutex> lock(callbacks_mutex_);
+            callback = basic_callbacks_.on_error;
+        }
+        if (callback) {
+            callback();
         }
         return;
     }
 
-    if ((to_station_action(action).has_value()) && station_callbacks_.on_error) {
-        station_callbacks_.on_error();
+    if (to_station_action(action).has_value()) {
+        {
+            std::lock_guard<std::mutex> lock(callbacks_mutex_);
+            callback = station_callbacks_.on_error;
+        }
+        if (callback) {
+            callback();
+        }
     }
 }
 
 bool WifiEspBackend::request_station_action(wifi::StationAction action)
 {
-    if (station_callbacks_.on_action_requested) {
-        return station_callbacks_.on_action_requested(action);
+    std::function<bool(wifi::StationAction)> station_callback;
+    std::function<bool(wifi::StationAction)> softap_callback;
+    {
+        std::lock_guard<std::mutex> lock(callbacks_mutex_);
+        station_callback = station_callbacks_.on_action_requested;
+        if (!station_callback) {
+            softap_callback = softap_callbacks_.on_station_action_requested;
+        }
     }
-    if (softap_callbacks_.on_station_action_requested) {
-        return softap_callbacks_.on_station_action_requested(action);
+    if (station_callback) {
+        return station_callback(action);
+    }
+    if (softap_callback) {
+        return softap_callback(action);
     }
     return false;
 }
 
 void WifiEspBackend::notify_scan_state_changed(bool is_scanning)
 {
-    if (station_callbacks_.on_scan_state_changed) {
-        station_callbacks_.on_scan_state_changed(is_scanning);
+    std::function<void(bool)> callback;
+    {
+        std::lock_guard<std::mutex> lock(callbacks_mutex_);
+        callback = station_callbacks_.on_scan_state_changed;
+    }
+    if (callback) {
+        callback(is_scanning);
     }
 }
 
 void WifiEspBackend::notify_scan_ap_infos_updated(std::span<const wifi::ScanApInfo> ap_infos)
 {
-    if (station_callbacks_.on_scan_ap_infos_updated) {
-        station_callbacks_.on_scan_ap_infos_updated(ap_infos);
+    std::function<void(std::span<const wifi::ScanApInfo>)> callback;
+    {
+        std::lock_guard<std::mutex> lock(callbacks_mutex_);
+        callback = station_callbacks_.on_scan_ap_infos_updated;
+    }
+    if (callback) {
+        callback(ap_infos);
     }
 }
 
 void WifiEspBackend::notify_last_connected_ap_info_updated(const wifi::ConnectApInfo &ap_info)
 {
-    if (station_callbacks_.on_last_connected_ap_info_updated) {
-        station_callbacks_.on_last_connected_ap_info_updated(ap_info);
+    std::function<void(const wifi::ConnectApInfo &)> callback;
+    {
+        std::lock_guard<std::mutex> lock(callbacks_mutex_);
+        callback = station_callbacks_.on_last_connected_ap_info_updated;
+    }
+    if (callback) {
+        callback(ap_info);
     }
 }
 
 void WifiEspBackend::notify_connected_ap_infos_updated()
 {
-    if (station_callbacks_.on_connected_ap_infos_updated) {
-        station_callbacks_.on_connected_ap_infos_updated(get_connected_ap_infos());
+    std::function<void(const wifi::ConnectApInfoList &)> callback;
+    {
+        std::lock_guard<std::mutex> lock(callbacks_mutex_);
+        callback = station_callbacks_.on_connected_ap_infos_updated;
+    }
+    if (callback) {
+        callback(get_connected_ap_infos());
     }
 }
 
 void WifiEspBackend::notify_softap_event(wifi::SoftApEvent event)
 {
-    if (softap_callbacks_.on_event) {
-        softap_callbacks_.on_event(event);
+    std::function<void(wifi::SoftApEvent)> callback;
+    {
+        std::lock_guard<std::mutex> lock(callbacks_mutex_);
+        callback = softap_callbacks_.on_event;
+    }
+    if (callback) {
+        callback(event);
     }
 }
 
@@ -336,8 +420,13 @@ void WifiEspBackend::notify_softap_params_updated(const wifi::SoftApParams &para
 {
     softap_params_cache_ = params;
 
-    if (softap_callbacks_.on_params_updated) {
-        softap_callbacks_.on_params_updated(params);
+    std::function<void(const wifi::SoftApParams &)> callback;
+    {
+        std::lock_guard<std::mutex> lock(callbacks_mutex_);
+        callback = softap_callbacks_.on_params_updated;
+    }
+    if (callback) {
+        callback(params);
     }
 }
 

@@ -93,30 +93,30 @@ build_test_apps_brookesia_service_audio:
     - .rules:build:test_apps_brookesia_service_audio
   variables:
     EXAMPLE_DIR: service/media/brookesia_service_audio/test_apps
-# brookesia_service_ble
-build_test_apps_brookesia_service_ble:
-  extends:
-    - .build_template
-    - .build_idf_release_version_general
-    - .rules:build:test_apps_brookesia_service_ble
-  variables:
-    EXAMPLE_DIR: service/network/brookesia_service_ble/test_apps
-# brookesia_service_bt
-build_test_apps_brookesia_service_bt:
-  extends:
-    - .build_template
-    - .build_idf_release_version_for_bluetooth_test_apps
-    - .rules:build:test_apps_brookesia_service_bt
-  variables:
-    EXAMPLE_DIR: service/network/brookesia_service_bt/test_apps
-# brookesia_service_bt_speaker
-build_test_apps_brookesia_service_bt_speaker:
-  extends:
-    - .build_template
-    - .build_idf_release_version_for_bluetooth_test_apps
-    - .rules:build:test_apps_brookesia_service_bt_speaker
-  variables:
-    EXAMPLE_DIR: service/media/brookesia_service_bt_speaker/test_apps
+# # brookesia_service_ble
+# build_test_apps_brookesia_service_ble:
+#   extends:
+#     - .build_template
+#     - .build_idf_release_version_general
+#     - .rules:build:test_apps_brookesia_service_ble
+#   variables:
+#     EXAMPLE_DIR: service/network/brookesia_service_ble/test_apps
+# # brookesia_service_bt
+# build_test_apps_brookesia_service_bt:
+#   extends:
+#     - .build_template
+#     - .build_idf_release_version_for_bluetooth_test_apps
+#     - .rules:build:test_apps_brookesia_service_bt
+#   variables:
+#     EXAMPLE_DIR: service/network/brookesia_service_bt/test_apps
+# # brookesia_service_bt_speaker
+# build_test_apps_brookesia_service_bt_speaker:
+#   extends:
+#     - .build_template
+#     - .build_idf_release_version_for_bluetooth_test_apps
+#     - .rules:build:test_apps_brookesia_service_bt_speaker
+#   variables:
+#     EXAMPLE_DIR: service/media/brookesia_service_bt_speaker/test_apps
 # brookesia_service_custom
 build_test_apps_brookesia_service_custom:
   extends:

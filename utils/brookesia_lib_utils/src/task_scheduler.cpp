@@ -9,27 +9,27 @@
 #   define BROOKESIA_LOG_DISABLE_DEBUG_TRACE 1
 #endif
 #include "private/utils.hpp"
+#include "private/task_scheduler_impl.hpp"
 #include "brookesia/lib_utils/check.hpp"
-#include "brookesia/lib_utils/describe_helpers.hpp"
 #include "brookesia/lib_utils/function_guard.hpp"
 #include "brookesia/lib_utils/log.hpp"
-#include "brookesia/lib_utils/task_scheduler.hpp"
+#include "brookesia/lib_utils/task_scheduler_describe.hpp"
 
 namespace esp_brookesia::lib_utils {
 
 namespace {
 // Points to the scheduler whose worker loop is currently running on this thread (if any).
-thread_local const TaskScheduler *tls_current_worker_scheduler = nullptr;
-thread_local const TaskScheduler *tls_worker_wait_slot_scheduler = nullptr;
+thread_local const void *tls_current_worker_scheduler = nullptr;
+thread_local const void *tls_worker_wait_slot_scheduler = nullptr;
 thread_local size_t tls_worker_wait_slot_count = 0;
 } // namespace
 
-bool TaskScheduler::is_current_thread_worker() const
+bool TaskScheduler::Impl::is_current_thread_worker() const
 {
     return tls_current_worker_scheduler == this;
 }
 
-bool TaskScheduler::is_current_thread_in_group(const Group &group) const
+bool TaskScheduler::Impl::is_current_thread_in_group(const Group &group) const
 {
     std::shared_ptr<boost::asio::strand<boost::asio::io_context::executor_type>> strand;
     {
@@ -43,7 +43,7 @@ bool TaskScheduler::is_current_thread_in_group(const Group &group) const
     return strand->running_in_this_thread();
 }
 
-bool TaskScheduler::try_acquire_worker_wait_slot()
+bool TaskScheduler::Impl::try_acquire_worker_wait_slot()
 {
     if (!is_current_thread_worker()) {
         return true;
@@ -68,7 +68,7 @@ bool TaskScheduler::try_acquire_worker_wait_slot()
     return false;
 }
 
-void TaskScheduler::release_worker_wait_slot()
+void TaskScheduler::Impl::release_worker_wait_slot()
 {
     if (!is_current_thread_worker()) {
         return;
@@ -92,7 +92,7 @@ void TaskScheduler::release_worker_wait_slot()
     BROOKESIA_LOGE("Worker wait slot accounting is inconsistent");
 }
 
-TaskScheduler::~TaskScheduler()
+TaskScheduler::Impl::~Impl()
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -107,7 +107,7 @@ TaskScheduler::~TaskScheduler()
     }
 }
 
-bool TaskScheduler::start(const StartConfig &config)
+bool TaskScheduler::Impl::start(const StartConfig &config)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -205,7 +205,7 @@ bool TaskScheduler::start(const StartConfig &config)
     return true;
 }
 
-void TaskScheduler::stop()
+void TaskScheduler::Impl::stop()
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -263,7 +263,7 @@ void TaskScheduler::stop()
     );
 }
 
-bool TaskScheduler::post_internal(OnceTask task, TaskId *id, const Group &group, bool enable_immediate)
+bool TaskScheduler::Impl::post_internal(OnceTask task, TaskId *id, const Group &group, bool enable_immediate)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -337,17 +337,17 @@ bool TaskScheduler::post_internal(OnceTask task, TaskId *id, const Group &group,
     return true;
 }
 
-bool TaskScheduler::dispatch(OnceTask task, TaskId *id, const Group &group)
+bool TaskScheduler::Impl::dispatch(OnceTask task, TaskId *id, const Group &group)
 {
     return post_internal(std::move(task), id, group, true);
 }
 
-bool TaskScheduler::post(OnceTask task, TaskId *id, const Group &group)
+bool TaskScheduler::Impl::post(OnceTask task, TaskId *id, const Group &group)
 {
     return post_internal(std::move(task), id, group, false);
 }
 
-bool TaskScheduler::post_delayed(OnceTask task, int delay_ms, TaskId *id, const Group &group)
+bool TaskScheduler::Impl::post_delayed(OnceTask task, int delay_ms, TaskId *id, const Group &group)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -369,7 +369,7 @@ bool TaskScheduler::post_delayed(OnceTask task, int delay_ms, TaskId *id, const 
     return true;
 }
 
-bool TaskScheduler::post_periodic(PeriodicTask task, int interval_ms, TaskId *id, const Group &group)
+bool TaskScheduler::Impl::post_periodic(PeriodicTask task, int interval_ms, TaskId *id, const Group &group)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -391,7 +391,7 @@ bool TaskScheduler::post_periodic(PeriodicTask task, int interval_ms, TaskId *id
     return true;
 }
 
-bool TaskScheduler::post_batch(std::vector<OnceTask> tasks, std::vector<TaskId> *ids, const Group &group)
+bool TaskScheduler::Impl::post_batch(std::vector<OnceTask> tasks, std::vector<TaskId> *ids, const Group &group)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -419,7 +419,7 @@ bool TaskScheduler::post_batch(std::vector<OnceTask> tasks, std::vector<TaskId> 
     return true;
 }
 
-void TaskScheduler::cancel(TaskId id)
+void TaskScheduler::Impl::cancel(TaskId id)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -434,7 +434,7 @@ void TaskScheduler::cancel(TaskId id)
     cancel_internal(id);
 }
 
-void TaskScheduler::cancel_group(const Group &group)
+void TaskScheduler::Impl::cancel_group(const Group &group)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -468,7 +468,7 @@ void TaskScheduler::cancel_group(const Group &group)
     (void)canceled_count;
 }
 
-void TaskScheduler::cancel_all()
+void TaskScheduler::Impl::cancel_all()
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -494,7 +494,7 @@ void TaskScheduler::cancel_all()
     BROOKESIA_LOGD("Canceled all tasks, total: %1%", task_ids.size());
 }
 
-bool TaskScheduler::suspend(TaskId id)
+bool TaskScheduler::Impl::suspend(TaskId id)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -506,7 +506,7 @@ bool TaskScheduler::suspend(TaskId id)
     return suspend_internal(id);
 }
 
-size_t TaskScheduler::suspend_group(const Group &group)
+size_t TaskScheduler::Impl::suspend_group(const Group &group)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -537,7 +537,7 @@ size_t TaskScheduler::suspend_group(const Group &group)
     return suspended_count;
 }
 
-size_t TaskScheduler::suspend_all()
+size_t TaskScheduler::Impl::suspend_all()
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -565,7 +565,7 @@ size_t TaskScheduler::suspend_all()
     return suspended_count;
 }
 
-bool TaskScheduler::resume(TaskId id)
+bool TaskScheduler::Impl::resume(TaskId id)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -577,7 +577,7 @@ bool TaskScheduler::resume(TaskId id)
     return resume_internal(id);
 }
 
-size_t TaskScheduler::resume_group(const Group &group)
+size_t TaskScheduler::Impl::resume_group(const Group &group)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -608,7 +608,7 @@ size_t TaskScheduler::resume_group(const Group &group)
     return resumed_count;
 }
 
-size_t TaskScheduler::resume_all()
+size_t TaskScheduler::Impl::resume_all()
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -636,7 +636,7 @@ size_t TaskScheduler::resume_all()
     return resumed_count;
 }
 
-bool TaskScheduler::wait(TaskId id, int timeout_ms)
+bool TaskScheduler::Impl::wait(TaskId id, int timeout_ms)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -674,7 +674,7 @@ bool TaskScheduler::wait(TaskId id, int timeout_ms)
     return true;
 }
 
-bool TaskScheduler::wait_group(const Group &group, int timeout_ms)
+bool TaskScheduler::Impl::wait_group(const Group &group, int timeout_ms)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -704,7 +704,7 @@ bool TaskScheduler::wait_group(const Group &group, int timeout_ms)
     return result;
 }
 
-bool TaskScheduler::wait_all(int timeout_ms)
+bool TaskScheduler::Impl::wait_all(int timeout_ms)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -736,7 +736,7 @@ bool TaskScheduler::wait_all(int timeout_ms)
     return result;
 }
 
-bool TaskScheduler::restart_timer(TaskId id)
+bool TaskScheduler::Impl::restart_timer(TaskId id)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -799,7 +799,7 @@ bool TaskScheduler::restart_timer(TaskId id)
     return true;
 }
 
-TaskScheduler::TaskType TaskScheduler::get_type(TaskId id) const
+TaskScheduler::TaskType TaskScheduler::Impl::get_type(TaskId id) const
 {
     boost::lock_guard<boost::mutex> lock(mutex_);
     auto it = tasks_.find(id);
@@ -809,7 +809,7 @@ TaskScheduler::TaskType TaskScheduler::get_type(TaskId id) const
     return it->second->type;
 }
 
-TaskScheduler::TaskState TaskScheduler::get_state(TaskId id) const
+TaskScheduler::TaskState TaskScheduler::Impl::get_state(TaskId id) const
 {
     boost::lock_guard<boost::mutex> lock(mutex_);
     auto it = tasks_.find(id);
@@ -820,7 +820,7 @@ TaskScheduler::TaskState TaskScheduler::get_state(TaskId id) const
     return it->second->state.load();
 }
 
-TaskScheduler::Group TaskScheduler::get_group(TaskId id) const
+TaskScheduler::Group TaskScheduler::Impl::get_group(TaskId id) const
 {
     boost::lock_guard<boost::mutex> lock(mutex_);
     auto it = tasks_.find(id);
@@ -830,7 +830,7 @@ TaskScheduler::Group TaskScheduler::get_group(TaskId id) const
     return it->second->group;
 }
 
-size_t TaskScheduler::get_group_task_count(const Group &group) const
+size_t TaskScheduler::Impl::get_group_task_count(const Group &group) const
 {
     boost::lock_guard<boost::mutex> lock(mutex_);
     auto it = groups_.find(group);
@@ -838,7 +838,7 @@ size_t TaskScheduler::get_group_task_count(const Group &group) const
     return (it != groups_.end()) ? it->second.size() : 0;
 }
 
-std::vector<TaskScheduler::Group> TaskScheduler::get_active_groups() const
+std::vector<TaskScheduler::Group> TaskScheduler::Impl::get_active_groups() const
 {
     boost::lock_guard<boost::mutex> lock(mutex_);
     std::vector<Group> result;
@@ -850,7 +850,7 @@ std::vector<TaskScheduler::Group> TaskScheduler::get_active_groups() const
     return result;
 }
 
-TaskScheduler::Statistics TaskScheduler::get_statistics() const
+TaskScheduler::Statistics TaskScheduler::Impl::get_statistics() const
 {
     Statistics stats;
     stats.total_tasks = total_tasks_.load();
@@ -862,7 +862,7 @@ TaskScheduler::Statistics TaskScheduler::get_statistics() const
     return stats;
 }
 
-void TaskScheduler::reset_statistics()
+void TaskScheduler::Impl::reset_statistics()
 {
     total_tasks_ = 0;
     completed_tasks_ = 0;
@@ -871,7 +871,7 @@ void TaskScheduler::reset_statistics()
     suspended_tasks_ = 0;
 }
 
-bool TaskScheduler::configure_group(const Group &group, const GroupConfig &config)
+bool TaskScheduler::Impl::configure_group(const Group &group, const GroupConfig &config)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -913,7 +913,7 @@ bool TaskScheduler::configure_group(const Group &group, const GroupConfig &confi
     return true;
 }
 
-bool TaskScheduler::wait_tasks_internal(const std::vector<TaskId> &task_ids, int timeout_ms)
+bool TaskScheduler::Impl::wait_tasks_internal(const std::vector<TaskId> &task_ids, int timeout_ms)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -948,7 +948,7 @@ bool TaskScheduler::wait_tasks_internal(const std::vector<TaskId> &task_ids, int
     return true;
 }
 
-std::shared_ptr<TaskScheduler::TaskHandle> TaskScheduler::create_handle(
+std::shared_ptr<TaskScheduler::Impl::TaskHandle> TaskScheduler::Impl::create_handle(
     TaskType type, bool repeat, int interval_ms, const Group &group)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
@@ -1000,7 +1000,7 @@ std::shared_ptr<TaskScheduler::TaskHandle> TaskScheduler::create_handle(
     return handle;
 }
 
-void TaskScheduler::schedule_once(std::shared_ptr<TaskHandle> handle, OnceTask task)
+void TaskScheduler::Impl::schedule_once(std::shared_ptr<TaskHandle> handle, OnceTask task)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -1053,7 +1053,7 @@ void TaskScheduler::schedule_once(std::shared_ptr<TaskHandle> handle, OnceTask t
     });
 }
 
-void TaskScheduler::schedule_periodic(std::shared_ptr<TaskHandle> handle, PeriodicTask task)
+void TaskScheduler::Impl::schedule_periodic(std::shared_ptr<TaskHandle> handle, PeriodicTask task)
 {
     // BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -1130,7 +1130,7 @@ void TaskScheduler::schedule_periodic(std::shared_ptr<TaskHandle> handle, Period
     });
 }
 
-void TaskScheduler::cancel_internal(TaskId task_id)
+void TaskScheduler::Impl::cancel_internal(TaskId task_id)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -1163,7 +1163,7 @@ void TaskScheduler::cancel_internal(TaskId task_id)
     BROOKESIA_LOGD("Task[%1%] canceled", task_id);
 }
 
-bool TaskScheduler::suspend_internal(TaskId task_id)
+bool TaskScheduler::Impl::suspend_internal(TaskId task_id)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -1208,7 +1208,7 @@ bool TaskScheduler::suspend_internal(TaskId task_id)
     return true;
 }
 
-bool TaskScheduler::resume_internal(TaskId task_id)
+bool TaskScheduler::Impl::resume_internal(TaskId task_id)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -1356,7 +1356,7 @@ bool TaskScheduler::resume_internal(TaskId task_id)
     return true;
 }
 
-void TaskScheduler::remove_task_internal(TaskId task_id, const Group &group)
+void TaskScheduler::Impl::remove_task_internal(TaskId task_id, const Group &group)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -1385,7 +1385,7 @@ void TaskScheduler::remove_task_internal(TaskId task_id, const Group &group)
     }
 }
 
-void TaskScheduler::mark_finished(std::shared_ptr<TaskHandle> handle, bool success)
+void TaskScheduler::Impl::mark_finished(std::shared_ptr<TaskHandle> handle, bool success)
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
@@ -1415,20 +1415,7 @@ void TaskScheduler::mark_finished(std::shared_ptr<TaskHandle> handle, bool succe
     BROOKESIA_LOGD("Task[%1%] finished (success: %2%)", handle->id, success);
 }
 
-boost::shared_future<bool> TaskScheduler::get_future(TaskId id)
-{
-    BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
-
-    BROOKESIA_LOGD("Params: id(Task[%1%])", id);
-
-    boost::lock_guard<boost::mutex> lock(mutex_);
-    auto it = tasks_.find(id);
-    BROOKESIA_CHECK_FALSE_RETURN(it != tasks_.end(), boost::shared_future<bool>(), "Task[%1%] not found", id);
-
-    return it->second->future;
-}
-
-void TaskScheduler::invoke_pre_execute_callback(TaskId task_id, TaskType task_type, const Group &group)
+void TaskScheduler::Impl::invoke_pre_execute_callback(TaskId task_id, TaskType task_type, const Group &group)
 {
     PreExecuteCallback global_cb;
     PreExecuteCallback group_cb;
@@ -1458,7 +1445,7 @@ void TaskScheduler::invoke_pre_execute_callback(TaskId task_id, TaskType task_ty
     }
 }
 
-void TaskScheduler::invoke_post_execute_callback(TaskId task_id, TaskType task_type, bool success,
+void TaskScheduler::Impl::invoke_post_execute_callback(TaskId task_id, TaskType task_type, bool success,
         const Group &group)
 {
     PostExecuteCallback global_cb;

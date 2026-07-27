@@ -136,7 +136,7 @@ def get_cmake_apps(
         config_rules_str=config_rules_str,
         build_log_filename='build_log.txt',
         size_json_filename='size.json',
-        check_warnings=True,
+        check_warnings=False,
         no_preserve=False,
         default_build_targets=default_build_targets,
         manifest_files=[

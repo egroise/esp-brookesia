@@ -15,3 +15,20 @@ else()
     project(test_brookesia_service_picodet LANGUAGES CXX)
     include(${CMAKE_CURRENT_LIST_DIR}/cmake/pc_platform.cmake)
 endif()
+
+# esp-dl contains large C++ translation units. Keep its compile edges within
+# the shared pool to avoid exhausting the CI runner memory.
+brookesia_compile_tuning_apply_current_project(
+    EXTERNAL_COMPONENTS espressif__esp-dl
+)
+
+if(COMMAND idf_build_get_property AND TARGET __idf_espressif__esp-dl)
+    # esp-dl 3.3.6 uses a C++ anonymous typedef with a default member
+    # initializer. Suppress only this external warning; the negative form is
+    # accepted by toolchains that do not expose the warning name.
+    target_compile_options(
+        __idf_espressif__esp-dl
+        PRIVATE
+            $<$<COMPILE_LANGUAGE:CXX>:-Wno-non-c-typedef-for-linkage>
+    )
+endif()

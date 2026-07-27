@@ -12,7 +12,6 @@ variables:
     BATCH_BUILD: "1"
     V: "0"
     WARNING_STR: ""
-  allow_failure: true
 
 .build_template:
   <<: *build_template

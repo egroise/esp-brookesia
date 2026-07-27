@@ -481,37 +481,4 @@ void AudioEncoder::on_wake_end_timeout(uint32_t session_id)
 }
 
 
-AudioDecoder::AudioDecoder(int id)
-    : ServiceBase({
-    .name = std::string(helper::Audio::DECODER_NAME_PREFIX) + std::to_string(id),
-    .description = "Decode and play audio for one configured output instance.",
-    .version = make_version(
-        BROOKESIA_SERVICE_AUDIO_VER_MAJOR, BROOKESIA_SERVICE_AUDIO_VER_MINOR, BROOKESIA_SERVICE_AUDIO_VER_PATCH
-    ),
-#if BROOKESIA_SERVICE_AUDIO_ENABLE_WORKER
-    .task_scheduler_config = lib_utils::TaskScheduler::StartConfig{
-        .worker_configs = {
-            lib_utils::ThreadConfig{
-                .name = BROOKESIA_SERVICE_AUDIO_WORKER_NAME,
-                .core_id = BROOKESIA_SERVICE_AUDIO_WORKER_CORE_ID,
-                .priority = BROOKESIA_SERVICE_AUDIO_WORKER_PRIORITY,
-                .stack_size = BROOKESIA_SERVICE_AUDIO_WORKER_STACK_SIZE,
-                .stack_in_ext = BROOKESIA_SERVICE_AUDIO_WORKER_STACK_IN_EXT,
-            }
-        },
-        .worker_poll_interval_ms = BROOKESIA_SERVICE_AUDIO_WORKER_POLL_INTERVAL_MS,
-    }
-#endif
-})
-, id_(id)
-{
-    std::lock_guard lock(get_decoder_registry_mutex());
-    auto &registry = get_decoder_registry();
-    if (id_ >= 0 && static_cast<size_t>(id_) >= registry.size()) {
-        registry.resize(static_cast<size_t>(id_) + 1, nullptr);
-    }
-    if (id_ >= 0) {
-        registry[static_cast<size_t>(id_)] = this;
-    }
-}
 }

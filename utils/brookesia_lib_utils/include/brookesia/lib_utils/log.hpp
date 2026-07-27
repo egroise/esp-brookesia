@@ -19,7 +19,7 @@
 #include <utility>
 #include <string>
 #include <source_location>
-#include "boost/format.hpp"
+#include "brookesia/lib_utils/log_formatter.hpp"
 #include "brookesia/lib_utils/macro_configs.h"
 #define _BROOKESIA_LOG_OPTIONAL_ARGS(...) __VA_OPT__(,) __VA_ARGS__
 #if defined(__GNUC__) && !defined(__clang__)
@@ -32,10 +32,16 @@
 #else
 #   include "log_impl_std.h"
 #endif
-#include "brookesia/lib_utils/describe_helpers.hpp"
 #include "brookesia/lib_utils/thread_config.hpp"
 
 namespace esp_brookesia::lib_utils {
+
+namespace detail {
+
+template<typename>
+inline constexpr bool is_log_argument_formattable_v = false;
+
+} // namespace detail
 
 /**
  * Helper macros to assemble format string and arguments based on enabled macros
@@ -193,7 +199,7 @@ template<typename T>
         a.s = arg.c_str();
     } else if constexpr (std::is_same_v<D, std::string_view>) {
         a.type = FormatArg::Type::Str;
-        a.s = arg.data();
+        a.owned_str.assign(arg.data(), arg.size());
     } else if constexpr (std::is_same_v<D, char>) {
         a.type = FormatArg::Type::Char;
         a.i = static_cast<int64_t>(arg);
@@ -209,8 +215,19 @@ template<typename T>
     } else if constexpr (std::is_pointer_v<D>) {
         a.type = FormatArg::Type::Ptr;
         a.p = reinterpret_cast<const void *>(arg);
-    } else if constexpr (std::is_enum_v<D> &&
-                         !detail::is_described_enum_v<D>) {
+    } else if constexpr (requires(const D & value) {
+    value.c_str();
+    }) {
+        a.type = FormatArg::Type::Str;
+        a.s = arg.c_str();
+    } else if constexpr (requires(const D & value) {
+    LogArgumentFormatter<D>::format(value);
+    }) {
+        a.type = FormatArg::Type::Str;
+        a.owned_str = LogArgumentFormatter<D>::format(arg);
+    } else if constexpr (std::is_enum_v<D>) {
+        // The optional describe formatter intentionally excludes plain enums,
+        // keeping this branch stable across translation units and include order.
         using U = std::underlying_type_t<D>;
         if constexpr (std::is_signed_v<U>) {
             a.type = FormatArg::Type::Int;
@@ -219,12 +236,11 @@ template<typename T>
             a.type = FormatArg::Type::Uint;
             a.u = static_cast<uint64_t>(static_cast<U>(arg));
         }
-    } else if constexpr (std::is_same_v<D, boost::json::string>) {
-        a.type = FormatArg::Type::Str;
-        a.s = arg.c_str();
     } else {
-        a.type = FormatArg::Type::Str;
-        a.owned_str = describe_to_string(arg);
+        static_assert(
+            detail::is_log_argument_formattable_v<D>,
+            "Unsupported log argument; include brookesia/lib_utils/log_describe.hpp or specialize LogArgumentFormatter"
+        );
     }
     return a;
 }

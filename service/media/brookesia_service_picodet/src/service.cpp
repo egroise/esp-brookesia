@@ -9,6 +9,7 @@
 #include <cctype>
 #include <functional>
 #include <optional>
+#include <span>
 #include <utility>
 
 #include "boost/thread.hpp"
@@ -26,7 +27,7 @@
 #include "dl_image_define.hpp"
 #include "dl_image_draw.hpp"
 #include "dl_image_jpeg.hpp"
-#include "brookesia/service_display.hpp"
+#include "brookesia/service_manager/dataflow/registry.hpp"
 #include "brookesia/service_manager/service/manager.hpp"
 #endif
 
@@ -78,36 +79,36 @@ constexpr uint32_t PIPELINE_PRESENT_TIMEOUT_MS = 100;
 
 struct PipelineFrameFormat {
     picodet::PixelFormat detector_pixel_format;
-    Display::PixelFormat display_pixel_format;
+    dataflow::VisualPixelFormat visual_pixel_format;
     dl::image::pix_type_t draw_pixel_format;
     const std::vector<uint8_t> *box_color;
 };
 
-std::optional<Display::PixelFormat> to_display_pixel_format(std::string_view format)
+std::optional<dataflow::VisualPixelFormat> to_visual_pixel_format(std::string_view format)
 {
     if ((format == "RGB565") || (format == "RGB565LE") || (format == "RGB565_LE")) {
-        return Display::PixelFormat::RGB565;
+        return dataflow::VisualPixelFormat::RGB565;
     }
     if (format == "RGB888") {
-        return Display::PixelFormat::RGB888;
+        return dataflow::VisualPixelFormat::RGB888;
     }
     return std::nullopt;
 }
 
-std::optional<PipelineFrameFormat> to_pipeline_frame_format(Display::PixelFormat format)
+std::optional<PipelineFrameFormat> to_pipeline_frame_format(dataflow::VisualPixelFormat format)
 {
     switch (format) {
-    case Display::PixelFormat::RGB565:
+    case dataflow::VisualPixelFormat::RGB565:
         return PipelineFrameFormat{
             .detector_pixel_format = picodet::PixelFormat::RGB565LE,
-            .display_pixel_format = Display::PixelFormat::RGB565,
+            .visual_pixel_format = dataflow::VisualPixelFormat::RGB565,
             .draw_pixel_format = dl::image::DL_IMAGE_PIX_TYPE_RGB565LE,
             .box_color = &PIPELINE_BOX_COLOR_RGB565,
         };
-    case Display::PixelFormat::RGB888:
+    case dataflow::VisualPixelFormat::RGB888:
         return PipelineFrameFormat{
             .detector_pixel_format = picodet::PixelFormat::RGB888,
-            .display_pixel_format = Display::PixelFormat::RGB888,
+            .visual_pixel_format = dataflow::VisualPixelFormat::RGB888,
             .draw_pixel_format = dl::image::DL_IMAGE_PIX_TYPE_RGB888,
             .box_color = &PIPELINE_BOX_COLOR_RGB888,
         };
@@ -121,38 +122,34 @@ std::optional<PipelineFrameFormat> to_pipeline_frame_format(Display::PixelFormat
 
 #if BROOKESIA_SERVICE_PICODET_ENABLE_INFERENCE
 
-// Frame-event subscription plus optional display presentation state.
+// Frame-event subscription plus optional visual output presentation state.
 struct PicoDet::Pipeline {
-    static constexpr const char *DISPLAY_SOURCE_NAME = "PicoDet";
+    static constexpr const char *VISUAL_SOURCE_NAME = "PicoDet";
 
-    ServiceBinding display_binding;
-    uint32_t source_id = 0;
+    std::shared_ptr<dataflow::VisualOperation> visual_operation;
     std::string output_name;
-    Display::PixelFormat output_pixel_format = Display::PixelFormat::RGB565;
+    dataflow::VisualPixelFormat output_pixel_format = dataflow::VisualPixelFormat::Unknown;
     uint32_t output_width = 0;
     uint32_t output_height = 0;
-    uint32_t display_present_warning_count = 0;
+    uint32_t present_warning_count = 0;
 
     uint32_t detect_every_n_frames = 1;
     uint32_t frame_count = 0;
     std::vector<picodet::Box> cached_boxes;
     bool warned_bad_format = false;
 
-    // Destroyed first, before display teardown.
+    // Disconnect frame delivery before releasing the visual operation.
     lib_utils::scoped_connection frame_connection;
 
     ~Pipeline()
     {
         frame_connection.disconnect();
-        if (source_id != 0) {
-            auto &display_service = Display::get_instance();
+        if (visual_operation != nullptr) {
             if (!output_name.empty()) {
-                (void)display_service.release_output(source_id, output_name);
+                (void)visual_operation->release_output(output_name);
             }
-            (void)display_service.unregister_source(source_id);
-            source_id = 0;
+            visual_operation->close();
         }
-        display_binding.release();
     }
 };
 
@@ -404,51 +401,58 @@ std::expected<void, std::string> PicoDet::function_attach(const boost::json::obj
     pipeline->detect_every_n_frames = static_cast<uint32_t>(attach_config.detect_every_n_frames);
 
     if (!attach_config.display_output.empty()) {
-        auto &display_service = Display::get_instance();
-        auto display_binding = ServiceManager::get_instance().bind(Display::Helper::get_name().data());
-        if (!display_binding.is_valid()) {
-            return std::unexpected(std::string("Failed to bind Display service"));
+        dataflow::VisualOperationConfig operation_config;
+        operation_config.owner = std::string(Helper::get_name());
+        operation_config.source = {
+            .name = Pipeline::VISUAL_SOURCE_NAME,
+            .role = "video",
+            .preferred_outputs = {attach_config.display_output},
+            .priority = 0,
+        };
+        operation_config.output_name = attach_config.display_output;
+        auto operation_result = ServiceManager::get_instance().get_dataflow_registry().open_visual_operation(
+                                    std::move(operation_config)
+                                );
+        if (!operation_result) {
+            return std::unexpected("Failed to open PicoDet visual operation: " + operation_result.error());
         }
-        pipeline->display_binding = std::move(display_binding);
-
-        const auto outputs = display_service.get_outputs();
+        auto visual_operation = std::move(operation_result.value());
+        const auto outputs = visual_operation->get_outputs();
+        if (outputs.empty()) {
+            visual_operation->close();
+            return std::unexpected("No visual output is available");
+        }
         const auto output_it = std::find_if(outputs.begin(), outputs.end(), [&](const auto & output) {
-            return output.name == attach_config.display_output;
+            return output.output.name == attach_config.display_output;
         });
         if (output_it == outputs.end()) {
-            return std::unexpected("Display output is not available: " + attach_config.display_output);
+            visual_operation->close();
+            return std::unexpected("Visual output is not available: " + attach_config.display_output);
         }
         if (!to_pipeline_frame_format(output_it->pixel_format)) {
+            visual_operation->close();
             return std::unexpected(
-                       "Display output pixel format is not supported: " +
+                       "Visual output pixel format is not supported: " +
                        std::string(BROOKESIA_DESCRIBE_ENUM_TO_STR(output_it->pixel_format))
                    );
         }
 
-        Display::SourceInfo source_info = {
-            .name = Pipeline::DISPLAY_SOURCE_NAME,
-            .role = "video",
-            .preferred_outputs = {output_it->name},
-            .priority = 0,
-        };
-        auto source_result = display_service.register_source(std::move(source_info));
-        if (!source_result) {
-            return std::unexpected("Failed to register display source: " + source_result.error());
-        }
-        pipeline->source_id = source_result.value();
-        pipeline->output_name = output_it->name;
+        pipeline->output_name = output_it->output.name;
         pipeline->output_pixel_format = output_it->pixel_format;
-        pipeline->output_width = output_it->width;
-        pipeline->output_height = output_it->height;
+        pipeline->output_width = output_it->output.width;
+        pipeline->output_height = output_it->output.height;
 
-        auto request_result = display_service.request_output(pipeline->source_id, output_it->name);
+        auto request_result = visual_operation->request_output(pipeline->output_name);
         if (!request_result) {
-            return std::unexpected("Failed to request display output: " + request_result.error());
+            visual_operation->close();
+            return std::unexpected("Failed to request visual output: " + request_result.error());
         }
-        auto active_result = display_service.set_active_source(output_it->name, Pipeline::DISPLAY_SOURCE_NAME);
+        auto active_result = visual_operation->set_active_source(pipeline->output_name);
         if (!active_result) {
-            return std::unexpected("Failed to activate display source: " + active_result.error());
+            visual_operation->close();
+            return std::unexpected("Failed to activate visual source: " + active_result.error());
         }
+        pipeline->visual_operation = std::move(visual_operation);
     }
 
     auto frame_source_service = ServiceManager::get_instance().get_service(attach_config.frame_source);
@@ -475,7 +479,7 @@ std::expected<void, std::string> PicoDet::function_attach(const boost::json::obj
 
     pipeline_ = std::move(pipeline);
     BROOKESIA_LOGI(
-        "Pipeline attached: display_output='%1%', detect every %2% frame(s)",
+        "Pipeline attached: visual_output='%1%', detect every %2% frame(s)",
         attach_config.display_output, attach_config.detect_every_n_frames
     );
     return {};
@@ -532,9 +536,9 @@ void PicoDet::on_pipeline_frame(Pipeline &pipeline, const EventItemMap &items)
     }
     if (const auto *format = info->if_contains("format"); (format != nullptr) && format->is_string()) {
         const std::string format_name(format->as_string());
-        auto display_format = to_display_pixel_format(format_name);
-        if (display_format) {
-            frame_format = to_pipeline_frame_format(display_format.value());
+        auto visual_format = to_visual_pixel_format(format_name);
+        if (visual_format) {
+            frame_format = to_pipeline_frame_format(visual_format.value());
         }
         if (!frame_format) {
             if (!pipeline.warned_bad_format) {
@@ -582,15 +586,15 @@ void PicoDet::on_pipeline_frame(Pipeline &pipeline, const EventItemMap &items)
         }
     }
 
-    if (pipeline.source_id == 0) {
+    if (pipeline.visual_operation == nullptr) {
         return;
     }
-    if (pipeline.output_pixel_format != frame_format->display_pixel_format) {
+    if (pipeline.output_pixel_format != frame_format->visual_pixel_format) {
         if (!pipeline.warned_bad_format) {
             pipeline.warned_bad_format = true;
             BROOKESIA_LOGW(
-                "Frame format does not match display output: frame=%1%, output=%2%",
-                BROOKESIA_DESCRIBE_ENUM_TO_STR(frame_format->display_pixel_format),
+                "Frame format does not match visual output: frame=%1%, output=%2%",
+                BROOKESIA_DESCRIBE_ENUM_TO_STR(frame_format->visual_pixel_format),
                 BROOKESIA_DESCRIBE_ENUM_TO_STR(pipeline.output_pixel_format)
             );
         }
@@ -616,22 +620,23 @@ void PicoDet::on_pipeline_frame(Pipeline &pipeline, const EventItemMap &items)
     if ((pipeline.output_width < width) || (pipeline.output_height < height)) {
         return;
     }
-    const Display::FrameInfo display_frame = {
+    const dataflow::VisualFrameInfo visual_frame = {
         .x = (pipeline.output_width - width) / 2,
         .y = (pipeline.output_height - height) / 2,
         .width = width,
         .height = height,
-        .pixel_format = frame_format->display_pixel_format,
+        .pixel_format = frame_format->visual_pixel_format,
     };
-    const auto present_result = Display::get_instance().present_frame_sync(
-                                    pipeline.source_id, pipeline.output_name, display_frame,
-                                    RawBuffer(frame.data_ptr, frame.data_size), PIPELINE_PRESENT_TIMEOUT_MS
+    const auto present_result = pipeline.visual_operation->present_frame_sync(
+                                    pipeline.output_name, visual_frame,
+                                    std::span<const uint8_t>(frame.data_ptr, frame.data_size),
+                                    PIPELINE_PRESENT_TIMEOUT_MS
                                 );
-    if ((present_result != Display::PresentResult::Presented) &&
-            (present_result != Display::PresentResult::DroppedNotActive) &&
-            ((pipeline.display_present_warning_count++ % 30) == 0)) {
+    if ((present_result != dataflow::VisualPresentResult::Presented) &&
+            (present_result != dataflow::VisualPresentResult::DroppedNotActive) &&
+            ((pipeline.present_warning_count++ % 30) == 0)) {
         BROOKESIA_LOGW(
-            "Failed to present PicoDet frame to Display: %1%",
+            "Failed to present PicoDet frame to visual output: %1%",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(present_result)
         );
     }

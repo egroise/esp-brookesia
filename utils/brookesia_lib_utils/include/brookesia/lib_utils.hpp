@@ -19,6 +19,8 @@
 #include "lib_utils/state_base.hpp"
 #include "lib_utils/state_machine.hpp"
 #include "lib_utils/task_scheduler.hpp"
+#include "lib_utils/task_scheduler_describe.hpp"
 #include "lib_utils/thread_config.hpp"
+#include "lib_utils/thread_config_describe.hpp"
 #include "lib_utils/thread_profiler.hpp"
 #include "lib_utils/time_profiler.hpp"

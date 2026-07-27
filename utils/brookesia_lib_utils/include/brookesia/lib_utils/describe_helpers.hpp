@@ -23,6 +23,7 @@
 #include "boost/describe.hpp"
 #include "boost/mp11.hpp"
 #include "boost/json.hpp"
+#include "brookesia/lib_utils/log_formatter.hpp"
 #include "brookesia/lib_utils/macro_configs.h"
 
 namespace esp_brookesia::lib_utils {
@@ -1551,3 +1552,21 @@ std::string describe_to_string(const T &value)
  */
 #define BROOKESIA_DESCRIBE_TO_STR_WITH_FMT(value, fmt) \
     esp_brookesia::lib_utils::describe_to_string_with_fmt(value, fmt)
+
+
+namespace esp_brookesia::lib_utils {
+
+// Preserve the historical behavior where including the describe helpers also
+// enables described values as log arguments, without making log.hpp pull in
+// the full reflection and JSON implementation. Plain enums are deliberately
+// excluded so their numeric formatting cannot change with include order.
+template<typename T>
+requires (!std::is_enum_v<T> || detail::is_described_enum_v<T>)
+struct LogArgumentFormatter<T> {
+    static std::string format(const T &value)
+    {
+        return describe_to_string(value);
+    }
+};
+
+} // namespace esp_brookesia::lib_utils

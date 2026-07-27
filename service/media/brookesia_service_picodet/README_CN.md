@@ -6,6 +6,8 @@
 
 `brookesia_service_picodet` 是用于端侧目标检测、图片推理和帧流处理的媒体服务组件。
 
+可选的标注帧显示通过 ServiceManager 的视觉 DataFlow 接口实现，因此本组件不会直接链接 `brookesia_service_display`。
+
 更多信息请参考 [ESP-Brookesia 编程指南](https://docs.espressif.com/projects/esp-brookesia/zh_CN/latest/service/picodet.html)。
 
 ## 如何使用

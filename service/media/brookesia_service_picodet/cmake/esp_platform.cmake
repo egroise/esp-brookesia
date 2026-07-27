@@ -6,6 +6,13 @@ idf_component_register(
     PRIV_REQUIRES ${COMPONENT_PRIV_REQUIRES}
 )
 
+# esp-dl 3.3.6 exposes a C++ anonymous typedef with a default member
+# initializer. Suppress this external warning for PicoDet sources only.
+target_compile_options(${COMPONENT_LIB}
+    PRIVATE
+        $<$<COMPILE_LANGUAGE:CXX>:-Wno-non-c-typedef-for-linkage>
+)
+
 #
 # Service auto-registration: export the plugin symbol so the linker keeps the registrar.
 #

@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <mutex>
 #include <span>
 #include <string>
 #include "brookesia/hal_adaptor/macro_configs.h"
@@ -192,6 +193,7 @@ private:
 
     std::shared_ptr<lib_utils::TaskScheduler> task_scheduler_;
     lib_utils::TaskSchedulerGroup task_group_;
+    mutable std::mutex callbacks_mutex_;
     wifi::BasicIface::Callbacks basic_callbacks_;
     wifi::StationIface::Callbacks station_callbacks_;
     wifi::SoftApIface::Callbacks softap_callbacks_;
