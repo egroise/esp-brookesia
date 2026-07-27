@@ -12,6 +12,9 @@ option(BROOKESIA_BUILD_SERVICE_HELPER "Build brookesia_service_helper for PC" ON
 option(BROOKESIA_BUILD_SERVICE_STORAGE "Build brookesia_service_storage for PC" OFF)
 option(BROOKESIA_BUILD_SERVICE_SNTP "Build brookesia_service_sntp for PC" OFF)
 option(BROOKESIA_BUILD_SERVICE_HTTP "Build brookesia_service_http for PC" OFF)
+option(BROOKESIA_BUILD_SERVICE_BLE "Build brookesia_service_ble for PC" OFF)
+option(BROOKESIA_BUILD_SERVICE_BT "Build brookesia_service_bt for PC" OFF)
+option(BROOKESIA_BUILD_SERVICE_BT_SPEAKER "Build brookesia_service_bt_speaker for PC" OFF)
 option(BROOKESIA_BUILD_SERVICE_OTA "Build brookesia_service_ota for PC" OFF)
 option(BROOKESIA_BUILD_SERVICE_DEVICE "Build brookesia_service_device for PC" OFF)
 option(BROOKESIA_BUILD_SERVICE_AUDIO "Build brookesia_service_audio for PC" OFF)
@@ -64,6 +67,9 @@ set(BROOKESIA_SUPPORTED_COMPONENTS
     brookesia_service_storage
     brookesia_service_sntp
     brookesia_service_http
+    brookesia_service_ble
+    brookesia_service_bt
+    brookesia_service_bt_speaker
     brookesia_service_ota
     brookesia_service_device
     brookesia_service_audio
@@ -176,6 +182,41 @@ if(BROOKESIA_BUILD_SERVICE_HTTP)
     add_subdirectory(service/network/brookesia_service_http)
 endif()
 
+if(BROOKESIA_BUILD_SERVICE_BLE)
+    if(NOT TARGET brookesia::service_helper)
+        message(FATAL_ERROR "brookesia_service_ble requires brookesia_service_helper to be enabled")
+    endif()
+    if(NOT TARGET brookesia::hal_interface)
+        message(FATAL_ERROR "brookesia_service_ble requires brookesia_hal_interface to be enabled")
+    endif()
+
+    message(STATUS "Brookesia: enabling brookesia::service_ble")
+    add_subdirectory(service/network/brookesia_service_ble)
+endif()
+
+if(BROOKESIA_BUILD_SERVICE_BT)
+    if(NOT TARGET brookesia::service_helper)
+        message(FATAL_ERROR "brookesia_service_bt requires brookesia_service_helper to be enabled")
+    endif()
+    if(NOT TARGET brookesia::hal_interface)
+        message(FATAL_ERROR "brookesia_service_bt requires brookesia_hal_interface to be enabled")
+    endif()
+    message(STATUS "Brookesia: enabling brookesia::service_bt")
+    add_subdirectory(service/network/brookesia_service_bt)
+endif()
+
+if(BROOKESIA_BUILD_SERVICE_BT_SPEAKER)
+    if(NOT TARGET brookesia::service_helper)
+        message(FATAL_ERROR "brookesia_service_bt_speaker requires brookesia_service_helper to be enabled")
+    endif()
+    if(NOT TARGET brookesia::service_bt)
+        message(FATAL_ERROR "brookesia_service_bt_speaker requires brookesia_service_bt to be enabled")
+    endif()
+
+    message(STATUS "Brookesia: enabling brookesia::service_bt_speaker")
+    add_subdirectory(service/media/brookesia_service_bt_speaker)
+endif()
+
 if(BROOKESIA_BUILD_SERVICE_OTA)
     if(NOT TARGET brookesia::service_http)
         message(FATAL_ERROR "brookesia_service_ota requires brookesia_service_http to be enabled")
@@ -231,8 +272,14 @@ if(BROOKESIA_BUILD_SERVICE_PICODET)
 endif()
 
 if(BROOKESIA_BUILD_SERVICE_VIDEO)
-    if(NOT TARGET brookesia::service_display)
-        message(FATAL_ERROR "brookesia_service_video requires brookesia_service_display to be enabled")
+    if(NOT TARGET brookesia::service_manager)
+        message(FATAL_ERROR "brookesia_service_video requires brookesia_service_manager to be enabled")
+    endif()
+    if(NOT TARGET brookesia::service_helper)
+        message(FATAL_ERROR "brookesia_service_video requires brookesia_service_helper to be enabled")
+    endif()
+    if(NOT TARGET brookesia::hal_interface)
+        message(FATAL_ERROR "brookesia_service_video requires brookesia_hal_interface to be enabled")
     endif()
 
     message(STATUS "Brookesia: enabling brookesia::service_video")
@@ -240,13 +287,6 @@ if(BROOKESIA_BUILD_SERVICE_VIDEO)
 endif()
 
 if(BROOKESIA_BUILD_EMULATION_NES)
-    if(NOT TARGET brookesia::service_display)
-        message(FATAL_ERROR "brookesia_emulation_nes requires brookesia_service_display to be enabled")
-    endif()
-    if(NOT TARGET brookesia::service_audio)
-        message(FATAL_ERROR "brookesia_emulation_nes requires brookesia_service_audio to be enabled")
-    endif()
-
     message(STATUS "Brookesia: enabling brookesia::emulation_nes")
     add_subdirectory(service/emulation/brookesia_emulation_nes)
 endif()
@@ -379,6 +419,10 @@ foreach(app_component IN LISTS BROOKESIA_SUPPORTED_APP_COMPONENTS)
             message(WARNING "${app_component} requires brookesia_service_video; skipping")
             continue()
         endif()
+        if(app_component STREQUAL "brookesia_app_camera" AND NOT TARGET brookesia::service_manager)
+            message(WARNING "${app_component} requires brookesia_service_manager; skipping")
+            continue()
+        endif()
         if(app_component STREQUAL "brookesia_app_music_player" AND NOT TARGET brookesia::runtime_js)
             message(WARNING "${app_component} requires brookesia_runtime_js; skipping")
             continue()
@@ -395,11 +439,6 @@ foreach(app_component IN LISTS BROOKESIA_SUPPORTED_APP_COMPONENTS)
             message(WARNING "${app_component} requires brookesia_emulation_nes; skipping")
             continue()
         endif()
-        if(app_component STREQUAL "brookesia_app_nes_emulator" AND NOT TARGET brookesia::service_display)
-            message(WARNING "${app_component} requires brookesia_service_display; skipping")
-            continue()
-        endif()
-
         message(STATUS "Brookesia: enabling brookesia::app_${app_name}")
         add_subdirectory(app/${app_component})
     endif()
@@ -438,6 +477,18 @@ endif()
 
 if(TARGET brookesia::service_http)
     target_link_libraries(${BROOKESIA_ALL_TARGET} INTERFACE brookesia::service_http)
+endif()
+
+if(TARGET brookesia::service_ble)
+    target_link_libraries(${BROOKESIA_ALL_TARGET} INTERFACE brookesia::service_ble)
+endif()
+
+if(TARGET brookesia::service_bt)
+    target_link_libraries(${BROOKESIA_ALL_TARGET} INTERFACE brookesia::service_bt)
+endif()
+
+if(TARGET brookesia::service_bt_speaker)
+    target_link_libraries(${BROOKESIA_ALL_TARGET} INTERFACE brookesia::service_bt_speaker)
 endif()
 
 if(TARGET brookesia::service_ota)

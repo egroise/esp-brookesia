@@ -102,6 +102,12 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: check-public-header-hygiene
+        name: Check public header dependency hygiene
+        entry: python .gitlab/tools/check_public_header_hygiene.py
+        language: python
+        pass_filenames: false
+        always_run: true
   - repo: https://github.com/espressif/conventional-precommit-linter
     rev: v1.8.0
     hooks:

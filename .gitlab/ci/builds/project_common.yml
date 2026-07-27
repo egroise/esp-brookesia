@@ -117,6 +117,16 @@ variables:
         EXAMPLE_TARGET: "esp32s31"
         EXAMPLE_CONFIG: "sdkconfig.ci.board.*="
 
+.build_idf_release_version_for_bluetooth_test_apps:
+  parallel:
+    matrix:
+      - IMAGE: "espressif/idf:release-v6.0"
+        EXAMPLE_TARGET: "esp32s3"
+      - IMAGE: "espressif/idf:release-v6.0"
+        EXAMPLE_TARGET: "esp32p4"
+      - IMAGE: "espressif/idf:latest"
+        EXAMPLE_TARGET: "esp32s31"
+
 .build_idf_release_version_for_super:
   parallel:
     matrix:

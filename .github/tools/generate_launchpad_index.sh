@@ -121,6 +121,12 @@ cat <<EOF > $OUT_FILE
       <p>Interactive console for testing ESP-Brookesia services. Supports multiple development boards.</p>
       <a class="button blue" href="${launchpad_base}${base_url}service/console/launchpad.toml">Flash Service Console</a>
     </div>
+
+    <div class="card">
+      <h2>🖥️ System Super</h2>
+      <p>ESP-Brookesia system shell and core services for supported development boards.</p>
+      <a class="button blue" href="${launchpad_base}${base_url}system/super/launchpad.toml">Flash System Super</a>
+    </div>
   </div>
 
   <div class="footer">
