@@ -19,7 +19,7 @@
 #include "brookesia/lib_utils/task_scheduler.hpp"
 #include "brookesia/runtime_manager/detail/native_utils.hpp"
 #include "brookesia/runtime_js/macro_configs.h"
-#include "brookesia/service_helper.hpp"
+#include "brookesia/service_helper/system/storage.hpp"
 #if !BROOKESIA_RUNTIME_JS_BACKEND_ENABLE_DEBUG_LOG
 #   define BROOKESIA_LOG_DISABLE_DEBUG_TRACE 1
 #endif
@@ -727,8 +727,10 @@ std::expected<void, std::string> Backend::start_app(AppId id)
     const int eval_type =
         qjs_source_looks_like_es_module(reinterpret_cast<const uint8_t *>(ep), elen) ? JS_EVAL_TYPE_MODULE :
         JS_EVAL_TYPE_GLOBAL;
+
     JSValue result =
         JS_Eval(it->second.context, ep, elen, entry_path.c_str(), eval_type);
+
     if (JS_IsException(result)) {
         std::string error = get_exception_string(it->second.context);
         JS_FreeValue(it->second.context, result);

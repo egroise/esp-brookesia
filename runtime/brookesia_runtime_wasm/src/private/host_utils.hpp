@@ -14,7 +14,7 @@
 #include <vector>
 
 #include "brookesia/runtime_manager/types.hpp"
-#include "brookesia/service_helper.hpp"
+#include "brookesia/service_helper/system/storage.hpp"
 
 namespace esp_brookesia::runtime::wasm {
 

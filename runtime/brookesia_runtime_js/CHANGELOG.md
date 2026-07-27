@@ -1,5 +1,11 @@
 # ChangeLog
 
+## v0.8.2 - 2026-07-27
+
+### Enhancements:
+
+- chore(build): align the JavaScript backend and test project with the lightweight runtime build APIs.
+
 ## v0.8.1 - 2026-07-13
 
 ### Enhancements:
