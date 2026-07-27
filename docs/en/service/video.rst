@@ -97,4 +97,11 @@ Output (Pixel)
    * - **O_UYY_E_VYY**
      - Packed layout (hardware/pipeline dependent)
 
+.. _service-video-sec-07:
+
+Display Dataflow Integration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When a display sink is configured, the encoder and decoder open a provider-neutral visual DataFlow operation for output discovery, source selection, and frame presentation. This keeps the video service independent of the concrete display provider.
+
 .. include-build-file:: contract_guides/service/video.inc

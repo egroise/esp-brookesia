@@ -25,6 +25,7 @@ Features
 - **Unified model**: Function definitions, registries, events, and subscriptions.
 - **Thread safety**: Local runners and schedulers for safe execution.
 - **Decoupling**: Apps call through a stable API without depending on provider details.
+- **DataFlow**: Discover provider outputs and manage visual or audio operations through one control-plane service.
 
 .. _service-manager-index-sec-03:
 
@@ -76,6 +77,13 @@ Event definitions, validation, and dispatch to local subscribers.
 :doc:`API reference </service/framework/manager/event>`
 
 .. _service-manager-index-sec-08:
+
+Dataflow
+~~~~~~~~
+
+The built-in ``DataFlow`` service discovers provider outputs and creates owner-scoped visual, audio playback, or audio capture operations. Typed C++ operations carry native frame and audio-buffer access, while the ``DataFlow`` helper exposes control-plane schemas and routing functions.
+
+.. _service-manager-index-sec-09:
 
 Common
 ~~~~~~

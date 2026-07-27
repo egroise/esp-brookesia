@@ -96,4 +96,11 @@ Audio Service 支持以下音频编解码格式：
 - **编码器事件**：编码器事件发生时触发。
 - **编码数据就绪**：编码数据准备好时触发。
 
+.. _service-audio-sec-08:
+
+数据流集成
+^^^^^^^^^^
+
+音频 provider 会向 Service Manager 注册播放和采集操作。应用可以通过类型安全的 DataFlow 接口或 ``DataFlow`` helper 发现 provider 并创建绑定到自身的操作，使编解码器和设备实现可以替换。
+
 .. include-build-file:: contract_guides/service/audio.inc

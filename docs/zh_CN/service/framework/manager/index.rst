@@ -25,6 +25,7 @@
 - 统一函数与事件模型：提供函数定义、注册、分发与事件订阅机制。
 - 线程安全调度：可通过本地运行器与任务调度机制实现并发安全执行。
 - 解耦集成：应用代码通过统一 API 调用服务，不依赖具体服务实现细节。
+- 数据流：通过统一控制面发现 provider 输出，并管理显示或音频操作。
 
 .. _service-manager-index-sec-03:
 
@@ -76,6 +77,13 @@
 :doc:`API 参考 </service/framework/manager/event>`
 
 .. _service-manager-index-sec-08:
+
+数据流
+~~~~~~
+
+内置 ``DataFlow`` 服务用于发现 provider 输出，并创建绑定到应用的显示、音频播放或音频采集操作。类型安全的 C++ 操作负责原生帧和音频缓冲区访问，``DataFlow`` helper 提供控制面 schema 与路由函数。
+
+.. _service-manager-index-sec-09:
 
 通用
 ~~~~

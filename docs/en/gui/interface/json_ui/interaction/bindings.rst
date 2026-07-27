@@ -130,7 +130,7 @@ Not supported: ``stateStyles.<state>.font``, ``stateStyles.<state>.fontSize``, a
 Public API
 --------------------
 
-- ``Runtime::set_binding_value(document_id, absolute_path, key, value)`` writes a single binding store; nodes that have declared the binding reapply the corresponding field through their registered listener.
+- ``Runtime::set_binding_value(document_id, absolute_path, key, value)`` writes one binding value; Runtime directly reapplies the corresponding field on nodes that declared the binding, then notifies explicit public subscribers.
 - ``Runtime::set_binding_values(document_id, updates)`` writes multiple bindings in batch, explicitly merging each node's dirty mask before a single apply, reducing backend applies during high-frequency updates.
 - ``Runtime::get_binding_value(document_id, absolute_path, key)`` reads the current scoped binding value.
 - ``Runtime::subscribe_binding_value(document_id, absolute_path, key, listener)`` listens for writes to a scoped binding; the listener signature is ``(absolute_path, key, value)``.

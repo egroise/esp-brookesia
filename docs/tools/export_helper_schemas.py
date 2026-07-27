@@ -97,6 +97,15 @@ def _compile_exporter(repo_root: Path, cpp_path: Path, binary_path: Path, contex
     include_and_link_args = [
         str(cpp_path),
         str(repo_root / "utils" / "brookesia_lib_utils" / "src" / "describe_helpers.cpp"),
+        str(
+            repo_root
+            / "service"
+            / "framework"
+            / "brookesia_service_manager"
+            / "src"
+            / "private"
+            / "static_schema.cpp"
+        ),
         "-I",
         "/usr/local/include",
         "-I",
