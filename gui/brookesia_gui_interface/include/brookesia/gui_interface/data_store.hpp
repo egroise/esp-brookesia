@@ -92,6 +92,23 @@ public:
     void unsubscribe(SubscriptionId id) override;
     void forget_document(DocumentId document_id) override;
 
+    // Runtime writes values before backend application, then conditionally notifies after the
+    // backend is coherent. If a reentrant write changes the value, the older notification is skipped.
+    void set_string_silent(std::string_view key, std::string value);
+    void set_string_silent(
+        DocumentId document_id,
+        std::string_view absolute_path,
+        std::string_view key,
+        std::string value
+    );
+    void notify_string_if_value(std::string_view key, std::string_view expected_value);
+    void notify_string_if_value(
+        DocumentId document_id,
+        std::string_view absolute_path,
+        std::string_view key,
+        std::string_view expected_value
+    );
+
     std::size_t debug_connection_count() const override;
     std::size_t debug_signal_count() const override;
 

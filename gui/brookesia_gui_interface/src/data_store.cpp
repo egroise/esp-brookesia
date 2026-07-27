@@ -10,10 +10,12 @@
 #endif
 #include "private/utils.hpp"
 
+#include <algorithm>
+#include <atomic>
 #include <memory>
 #include <utility>
+#include <vector>
 
-#include "brookesia/lib_utils/signal.hpp"
 #include "boost/thread/lock_guard.hpp"
 #include "boost/thread/mutex.hpp"
 #include "boost/unordered/unordered_flat_map.hpp"
@@ -32,13 +34,29 @@ std::string make_scoped_store_key(DocumentId document_id, std::string_view absol
 
 class MemoryDataStore::Impl {
 public:
-    using Signal = esp_brookesia::lib_utils::signal<void(std::string_view, std::string_view)>;
+    struct ListenerControl {
+        explicit ListenerControl(Listener callback)
+            : listener(std::move(callback))
+        {
+        }
+
+        std::atomic_bool active {true};
+        Listener listener;
+    };
+
+    struct ListenerRecord {
+        SubscriptionId id = 0;
+        std::shared_ptr<ListenerControl> control;
+    };
 
     mutable boost::mutex mutex;
+    // Runtime bindings overwhelmingly retain only a value. Keep listeners in a sparse side table so
+    // value-only entries do not pay for an empty vector/optional, while still avoiding the former
+    // per-key generic signal, mutex, slot graph, and global connection map.
     boost::unordered_flat_map<std::string, std::string> values;
-    boost::unordered_flat_map<std::string, std::shared_ptr<Signal>> signals;
-    boost::unordered_flat_map<SubscriptionId, esp_brookesia::lib_utils::connection> connections;
+    boost::unordered_flat_map<std::string, std::vector<ListenerRecord>> listener_buckets;
     SubscriptionId next_subscription_id = 1;
+    std::size_t listener_count = 0;
 };
 
 MemoryDataStore::MemoryDataStore()
@@ -81,23 +99,70 @@ void MemoryDataStore::set_string(std::string_view key, std::string value)
 
     BROOKESIA_LOGD("Params: key(%1%), value(%2%)", key, value);
 
+    const std::string expected_value = value;
+    set_string_silent(key, std::move(value));
+    notify_string_if_value(key, expected_value);
+}
+
+void MemoryDataStore::set_string_silent(std::string_view key, std::string value)
+{
+    boost::lock_guard lock(impl_->mutex);
+    impl_->values[std::string(key)] = std::move(value);
+}
+
+void MemoryDataStore::set_string_silent(
+    DocumentId document_id,
+    std::string_view absolute_path,
+    std::string_view key,
+    std::string value)
+{
+    set_string_silent(make_scoped_store_key(document_id, absolute_path, key), std::move(value));
+}
+
+void MemoryDataStore::notify_string_if_value(std::string_view key, std::string_view expected_value)
+{
     const std::string key_string(key);
     std::string stored_value;
-    std::shared_ptr<Impl::Signal> signal;
+    std::vector<std::shared_ptr<Impl::ListenerControl>> listeners;
     {
         boost::lock_guard lock(impl_->mutex);
-        impl_->values[key_string] = std::move(value);
-        stored_value = impl_->values.at(key_string);
-
-        auto signal_it = impl_->signals.find(key_string);
-        if (signal_it != impl_->signals.end()) {
-            signal = signal_it->second;
+        auto value_it = impl_->values.find(key_string);
+        if (value_it == impl_->values.end() || value_it->second != expected_value) {
+            return;
+        }
+        stored_value = value_it->second;
+        auto bucket_it = impl_->listener_buckets.find(key_string);
+        if (bucket_it != impl_->listener_buckets.end()) {
+            listeners.reserve(bucket_it->second.size());
+            for (const auto &record : bucket_it->second) {
+                listeners.push_back(record.control);
+            }
         }
     }
 
-    if (signal != nullptr) {
-        (*signal)(key_string, stored_value);
+    // Controls are shared with the snapshot so unsubscribe/forget_document may invalidate pending
+    // callbacks without holding the store mutex while user code executes.
+    for (const auto &control : listeners) {
+        {
+            boost::lock_guard lock(impl_->mutex);
+            auto value_it = impl_->values.find(key_string);
+            if (value_it == impl_->values.end() || value_it->second != expected_value) {
+                break;
+            }
+        }
+        if (control->active.load(std::memory_order_acquire)) {
+            control->listener(key_string, stored_value);
+        }
     }
+}
+
+void MemoryDataStore::notify_string_if_value(
+    DocumentId document_id,
+    std::string_view absolute_path,
+    std::string_view key,
+    std::string_view expected_value)
+{
+    notify_string_if_value(make_scoped_store_key(document_id, absolute_path, key), expected_value);
 }
 
 void MemoryDataStore::set_string(
@@ -126,11 +191,12 @@ IDataStore::SubscriptionId MemoryDataStore::subscribe(std::string_view key, List
 
     boost::lock_guard lock(impl_->mutex);
     const SubscriptionId id = impl_->next_subscription_id++;
-    auto &signal = impl_->signals[std::string(key)];
-    if (signal == nullptr) {
-        signal = std::make_shared<Impl::Signal>();
-    }
-    impl_->connections.emplace(id, signal->connect(listener));
+    auto &listeners = impl_->listener_buckets[std::string(key)];
+    listeners.push_back(Impl::ListenerRecord{
+        .id = id,
+        .control = std::make_shared<Impl::ListenerControl>(std::move(listener)),
+    });
+    ++impl_->listener_count;
     return id;
 }
 
@@ -154,13 +220,24 @@ void MemoryDataStore::unsubscribe(SubscriptionId id)
     BROOKESIA_LOGD("Params: id(%1%)", id);
 
     boost::lock_guard lock(impl_->mutex);
-    auto it = impl_->connections.find(id);
-    if (it == impl_->connections.end()) {
+    for (auto bucket_it = impl_->listener_buckets.begin(); bucket_it != impl_->listener_buckets.end(); ++bucket_it) {
+        auto &listeners = bucket_it->second;
+        auto matches_id = [id](const Impl::ListenerRecord & record) {
+            return record.id == id;
+        };
+        auto listener_it = std::find_if(listeners.begin(), listeners.end(), matches_id);
+        if (listener_it == listeners.end()) {
+            continue;
+        }
+
+        listener_it->control->active.store(false, std::memory_order_release);
+        listeners.erase(listener_it);
+        --impl_->listener_count;
+        if (listeners.empty()) {
+            impl_->listener_buckets.erase(bucket_it);
+        }
         return;
     }
-
-    it->second.disconnect();
-    impl_->connections.erase(it);
 }
 
 void MemoryDataStore::forget_document(DocumentId document_id)
@@ -178,9 +255,13 @@ void MemoryDataStore::forget_document(DocumentId document_id)
             ++it;
         }
     }
-    for (auto it = impl_->signals.begin(); it != impl_->signals.end(); ) {
+    for (auto it = impl_->listener_buckets.begin(); it != impl_->listener_buckets.end(); ) {
         if (it->first.compare(0, prefix.size(), prefix) == 0) {
-            it = impl_->signals.erase(it);
+            for (const auto &record : it->second) {
+                record.control->active.store(false, std::memory_order_release);
+            }
+            impl_->listener_count -= it->second.size();
+            it = impl_->listener_buckets.erase(it);
         } else {
             ++it;
         }
@@ -192,13 +273,13 @@ void MemoryDataStore::forget_document(DocumentId document_id)
 std::size_t MemoryDataStore::debug_connection_count() const
 {
     boost::lock_guard lock(impl_->mutex);
-    return impl_->connections.size();
+    return impl_->listener_count;
 }
 
 std::size_t MemoryDataStore::debug_signal_count() const
 {
     boost::lock_guard lock(impl_->mutex);
-    return impl_->signals.size();
+    return impl_->listener_buckets.size();
 }
 
 } // namespace esp_brookesia::gui

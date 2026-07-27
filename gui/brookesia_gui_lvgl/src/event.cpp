@@ -126,17 +126,22 @@ static std::optional<lv_event_code_t> to_lvgl_event_code(EventType type)
     }
 }
 
-static bool event_bindings_equal(const std::vector<std::unique_ptr<EventContext>> &contexts,
-                                 const std::vector<EventBinding> &events)
+static bool event_bindings_equal(
+    const std::unique_ptr<std::vector<std::unique_ptr<EventContext>>> &contexts,
+    const std::vector<EventBinding> &events
+)
 {
-    if (contexts.size() != events.size()) {
+    if (contexts == nullptr) {
+        return events.empty();
+    }
+    if (contexts->size() != events.size()) {
         return false;
     }
 
     for (size_t i = 0; i < events.size(); ++i) {
-        if (contexts[i] == nullptr ||
-                contexts[i]->type != events[i].type ||
-                contexts[i]->action != events[i].action) {
+        if ((*contexts)[i] == nullptr ||
+                (*contexts)[i]->type != events[i].type ||
+                (*contexts)[i]->action != events[i].action) {
             return false;
         }
     }
@@ -145,18 +150,19 @@ static bool event_bindings_equal(const std::vector<std::unique_ptr<EventContext>
 
 static void unbind_events(Record &record)
 {
-    if (record.object == nullptr) {
-        record.event_contexts.clear();
+    if (record.event_contexts == nullptr) {
         return;
     }
 
-    for (const auto &context : record.event_contexts) {
-        if (context == nullptr) {
-            continue;
+    if (record.object != nullptr) {
+        for (const auto &context : *record.event_contexts) {
+            if (context == nullptr) {
+                continue;
+            }
+            lv_obj_remove_event_cb_with_user_data(record.object, on_lvgl_event, context.get());
         }
-        lv_obj_remove_event_cb_with_user_data(record.object, on_lvgl_event, context.get());
     }
-    record.event_contexts.clear();
+    record.event_contexts.reset();
 }
 
 } // namespace
@@ -187,7 +193,10 @@ void bind_events(BackendImpl &impl, Record &record, const std::vector<EventBindi
         context->type = event.type;
         context->action = event.action;
         lv_obj_add_event_cb(record.object, on_lvgl_event, *lvgl_event, context.get());
-        record.event_contexts.push_back(std::move(context));
+        if (record.event_contexts == nullptr) {
+            record.event_contexts = std::make_unique<std::vector<std::unique_ptr<EventContext>>>();
+        }
+        record.event_contexts->push_back(std::move(context));
     }
 }
 

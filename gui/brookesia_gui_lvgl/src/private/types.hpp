@@ -15,6 +15,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <variant>
 #include <vector>
 
 #include "boost/unordered/unordered_flat_map.hpp"
@@ -55,6 +56,7 @@ struct EnumHash {
 };
 
 class BackendImpl;
+struct FontCacheEntry;
 
 struct EventContext {
     BackendImpl *impl = nullptr;
@@ -88,91 +90,171 @@ struct DisplayRegistration {
 
 BROOKESIA_DESCRIBE_STRUCT(DisplayRegistration, (), (id, display, is_default))
 
+struct PlacementCacheEntry {
+    Placement value;
+    std::size_t ref_count = 0;
+};
+
 struct Record {
     BackendHandle handle;
     BackendHandle parent;
+    // The backend can reconstruct an absolute path from the stable parent chain and node_id.
+    // Retain only the scope root handle so ordinary nodes do not own two duplicate path strings.
+    BackendHandle scope_root;
     std::string node_id;
     NodeType type = NodeType::Container;
     lv_obj_t *object = nullptr;
-    std::string absolute_path;
-    std::string scope_root_absolute_path;
-    std::string font_cache_key;
+    // Borrowed from BackendImpl::font_cache while this Record contributes one ref_count.
+    FontCacheEntry *font_cache_entry = nullptr;
     uint32_t depth = 0;
-    Layout layout;
-    Placement placement;
+    std::size_t mount_refresh_subtree_count = 0;
+    // Most nodes share one of a small number of placements. Shared entries stay immutable, while an
+    // exclusively owned entry may be updated in place. BackendImpl owns and reference-counts them.
+    PlacementCacheEntry *placement_cache_entry = nullptr;
     lv_style_t style {};
-    bool style_initialized = false;
     struct StateStyleRecord {
         lv_style_t style {};
         uint32_t selector = 0;
     };
-    std::unordered_map<std::string, StateStyleRecord> state_styles;
     struct PartStyleRecord {
         lv_style_t style {};
         uint32_t selector = 0;
         std::unordered_map<std::string, StateStyleRecord> state_styles;
     };
-    std::unordered_map<std::string, PartStyleRecord> part_styles;
     struct ArcGradientRecord {
         bool enabled = false;
         uint32_t start_color = 0;
         uint32_t end_color = 0;
         int32_t segments = 32;
     };
-    std::unordered_map<std::string, ArcGradientRecord> arc_gradients;
-    std::unique_ptr<ArcGradientContext> arc_gradient_context;
-    bool arc_gradient_event_registered = false;
-    lv_style_t debug_style {};
-    bool debug_style_initialized = false;
-    std::string image_src;
-    std::shared_ptr<BinaryImageSource> image_binary_src;
-    uintptr_t image_native_src = 0;
-    int32_t image_width = 0;
-    int32_t image_height = 0;
-    bool hidden = false;
-    std::vector<Animation> animations;
-    std::vector<lv_point_precise_t> line_points;
-    std::vector<int32_t> grid_columns;
-    std::vector<int32_t> grid_rows;
-    std::vector<lv_color_t> canvas_buffer;
-    FrameViewProps frame_view_props;
-    std::string frame_view_output_name;
-    std::vector<uint8_t> frame_view_buffer;
-    std::vector<uint8_t> frame_view_shadow_buffer;
-    lv_image_dsc_t frame_view_descriptor {};
-    int32_t frame_view_width = 0;
-    int32_t frame_view_height = 0;
-    bool frame_view_ready = false;
-    bool frame_view_registered_output = false;
-    esp_brookesia::lib_utils::connection frame_view_frame_connection;
-    esp_brookesia::lib_utils::connection frame_view_output_registered_connection;
-    esp_brookesia::lib_utils::connection frame_view_output_unregistered_connection;
+    struct StyleExtrasPayload {
+        std::unordered_map<std::string, StateStyleRecord> state_styles;
+        std::unordered_map<std::string, PartStyleRecord> part_styles;
+        std::unordered_map<std::string, ArcGradientRecord> arc_gradients;
+        std::unique_ptr<ArcGradientContext> arc_gradient_context;
+        bool arc_gradient_event_registered = false;
+    };
+    // State/part styles and Arc gradients are uncommon, so keep their maps and callback context
+    // out of the common Record footprint until a node actually needs one.
+    std::unique_ptr<StyleExtrasPayload> style_extras_payload;
+    struct DebugStylePayload {
+        lv_style_t style {};
+    };
+    // View debugging is normally disabled. Avoid embedding an unused LVGL style in every node.
+    std::unique_ptr<DebugStylePayload> debug_style_payload;
+    struct ImagePayload {
+        std::string src;
+        std::shared_ptr<BinaryImageSource> binary_src;
+        uintptr_t native_src = 0;
+        int32_t width = 0;
+        int32_t height = 0;
+    };
+    // These retain data handed to LVGL. Allocate them only for the node or layout feature
+    // that uses them so the common Record footprint stays small.
+    struct AnimationPayload {
+        std::vector<Animation> values;
+    };
+    std::unique_ptr<AnimationPayload> animation_payload;
+    struct LinePayload {
+        std::vector<lv_point_precise_t> points;
+    };
+    struct GridPayload {
+        std::vector<int32_t> columns;
+        std::vector<int32_t> rows;
+    };
+    std::unique_ptr<GridPayload> grid_payload;
+    struct CanvasPayload {
+        std::vector<lv_color_t> buffer;
+    };
+    struct FrameViewPayload {
+        FrameViewProps props;
+        std::string output_name;
+        std::vector<uint8_t> buffer;
+        std::vector<uint8_t> shadow_buffer;
+        lv_image_dsc_t descriptor {};
+        int32_t width = 0;
+        int32_t height = 0;
+        bool ready = false;
+        bool registered_output = false;
+        esp_brookesia::lib_utils::connection frame_connection;
+        esp_brookesia::lib_utils::connection output_registered_connection;
+        esp_brookesia::lib_utils::connection output_unregistered_connection;
+    };
     struct KeyboardLayoutStorage {
         std::vector<std::string> labels;
         std::vector<KeyboardKey> keys;
         std::vector<const char *> map;
         std::vector<lv_buttonmatrix_ctrl_t> controls;
     };
-    std::array<KeyboardLayoutStorage, 4> keyboard_layouts;
-    std::vector<std::string> keyboard_allowed_modes;
-    std::unordered_map<std::string, KeyboardKeyStyle> keyboard_key_styles;
-    std::unordered_map<uint32_t, lv_area_t> keyboard_key_fill_areas;
-    int32_t keyboard_icon_size = 0;
-    std::string keyboard_target_path;
-    lv_obj_t *keyboard_target_object = nullptr;
-    std::string keyboard_current_mode = "text";
-    bool keyboard_event_registered = false;
-    bool keyboard_draw_event_registered = false;
-    std::unique_ptr<EventContext> keyboard_value_event_context;
-    std::unique_ptr<EventContext> keyboard_draw_event_context;
-    std::vector<std::unique_ptr<EventContext>> event_contexts;
+    struct KeyboardPayload {
+        std::array<KeyboardLayoutStorage, 4> layouts;
+        std::vector<std::string> allowed_modes;
+        std::unordered_map<std::string, KeyboardKeyStyle> key_styles;
+        std::unordered_map<uint32_t, lv_area_t> key_fill_areas;
+        int32_t icon_size = 0;
+        std::string target_path;
+        lv_obj_t *target_object = nullptr;
+        std::string current_mode = "text";
+        bool event_registered = false;
+        bool draw_event_registered = false;
+        std::unique_ptr<EventContext> value_event_context;
+        std::unique_ptr<EventContext> draw_event_context;
+    };
+    // Keyboard layouts alone contain sixteen vectors. Keep all keyboard-only bookkeeping in
+    // one payload because the overwhelming majority of GUI nodes are not keyboards.
+    using TypePayload = std::variant <
+                        std::monostate,
+                        std::unique_ptr<ImagePayload>,
+                        std::unique_ptr<LinePayload>,
+                        std::unique_ptr<CanvasPayload>,
+                        std::unique_ptr<FrameViewPayload>,
+                        std::unique_ptr<KeyboardPayload>
+                        >;
+    // A node has exactly one immutable NodeType, so these five view-only payloads are mutually
+    // exclusive. Keep one tagged owner instead of reserving five pointers in every Record.
+    TypePayload type_payload;
+
+    template <typename T>
+    T *get_type_payload()
+    {
+        auto *payload = std::get_if<std::unique_ptr<T>>(&type_payload);
+        return payload != nullptr ? payload->get() : nullptr;
+    }
+
+    template <typename T>
+    const T *get_type_payload() const
+    {
+        const auto *payload = std::get_if<std::unique_ptr<T>>(&type_payload);
+        return payload != nullptr ? payload->get() : nullptr;
+    }
+
+    template <typename T>
+    T &ensure_type_payload()
+    {
+        auto *payload = std::get_if<std::unique_ptr<T>>(&type_payload);
+        if (payload == nullptr) {
+            type_payload.template emplace<std::unique_ptr<T>>(std::make_unique<T>());
+            payload = std::get_if<std::unique_ptr<T>>(&type_payload);
+        } else if (*payload == nullptr) {
+            *payload = std::make_unique<T>();
+        }
+        return **payload;
+    }
+    // Static nodes without event bindings should not retain an empty vector.
+    std::unique_ptr<std::vector<std::unique_ptr<EventContext>>> event_contexts;
+    // Only the previous layout type is needed to decide whether a partial update must become a
+    // full apply. Store its small enum value with the common flags; Grid tracks retained by LVGL
+    // live in the type-specific payload above.
+    uint8_t layout_type = static_cast<uint8_t>(LayoutType::None);
+    // Keep common flags together so they do not each introduce pointer-alignment padding.
+    bool style_initialized = false;
+    bool hidden = false;
     bool is_top_level_screen = false;
 };
 
 BROOKESIA_DESCRIBE_STRUCT(
     Record, (),
-    (handle, parent, node_id, type, object, absolute_path, scope_root_absolute_path, font_cache_key, style_initialized, image_src,
-     image_native_src, image_width, image_height, is_top_level_screen)
+    (handle, parent, scope_root, node_id, type, object, style_initialized, is_top_level_screen)
 )
 
 struct FontCacheEntry {
@@ -281,16 +363,33 @@ public:
 
     Record *find_record(BackendHandle handle);
     const Record *find_record(BackendHandle handle) const;
+    Record *find_record_by_absolute_path(std::string_view absolute_path);
+    std::string build_absolute_path(const Record &record) const;
+    std::string build_scope_root_absolute_path(const Record &record) const;
     void collect_subtree_handles(BackendHandle root, std::vector<BackendHandle::Value> &handles);
+    void collect_mount_refresh_handles(BackendHandle root, std::vector<BackendHandle::Value> &handles);
+    void adjust_mount_refresh_ancestors(BackendHandle handle, bool add, std::size_t count = 1);
 
     boost::unordered_flat_map<NodeType, Creator, EnumHash> creators;
     std::unordered_map<BackendHandle::Value, Record> records;
+    // Keep tree traversal proportional to the visited subtree. Storing child lists only for
+    // parents avoids adding a vector to every Record, including leaf-heavy JSON documents.
+    std::unordered_map<BackendHandle::Value, std::vector<BackendHandle::Value>> child_handles;
+    // Record borrows pointers to values in this node-based container. Rehashing preserves those
+    // pointers; any future erase/clear path must first release every borrowing Record.
     std::unordered_map<std::string, FontCacheEntry> font_cache;
     std::unordered_map<std::string, std::weak_ptr<FontCacheEntry::FontSource>> font_source_cache;
     std::unordered_set<std::string> failed_font_cache;
     std::unordered_map<std::string, RuntimeFontResource> font_resources;
     std::unordered_map<std::string, BinaryImageCacheEntry> binary_image_cache;
     std::unordered_map<std::string, BinaryImageCacheEntry> decoded_image_cache;
+    // The pointees stay stable when the vector grows. Entries are erased as soon as the last Record
+    // releases them so unloading a document does not retain app-specific placement values.
+    std::vector<std::unique_ptr<PlacementCacheEntry>> placement_cache;
+#if BROOKESIA_GUI_INTERFACE_ENABLE_MEMORY_TRACE
+    std::size_t placement_cache_hits = 0;
+    std::size_t placement_cache_misses = 0;
+#endif
     std::vector<std::shared_ptr<Record::KeyboardLayoutStorage>> keyboard_layout_backing_store;
     std::unordered_map<char, FontAssetsMountRecord> font_asset_mounts;
     std::unordered_map<char, ImageAssetsMountRecord> image_asset_mounts;
@@ -318,7 +417,15 @@ void apply_props(BackendImpl &impl, Record &record, const Node &node, PropsApply
 void refresh_frame_view(BackendImpl &impl, Record &record, FrameViewProps props);
 void release_frame_view(Record &record);
 void apply_layout(Record &record, const Layout &layout, LayoutApplyMask mask);
-void apply_placement(BackendImpl &impl, Record &record, const Placement &placement, PlacementApplyMask mask);
+const Placement &get_record_placement(const Record &record);
+void release_record_placement(BackendImpl &impl, Record &record);
+void apply_placement(
+    BackendImpl &impl,
+    Record &record,
+    const Placement &placement,
+    PlacementApplyMask mask,
+    bool refresh_frame = true
+);
 void refresh_relative_placements(BackendImpl &impl);
 void apply_image_sizing(Record &record, const Placement &placement);
 void apply_style(BackendImpl &impl, Record &record, const ResolvedStyle &style, StyleApplyMask mask);

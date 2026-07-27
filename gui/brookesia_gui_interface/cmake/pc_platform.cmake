@@ -162,44 +162,46 @@ if(GUI_INTERFACE_EXAMPLES_CPP)
 
     option(BROOKESIA_GUI_INTERFACE_PC_ENABLE_EXAMPLES "Compile the JSON-UI example suite on PC" ON)
 
-    set(examples_pc_compile_definitions
-        EXAMPLES_ASSETS_DIR="${EXAMPLES_ASSETS_DIR_PC}"
-        ${component_pc_config_compile_definitions}
-    )
-    foreach(example_id ${BROOKESIA_GUI_INTERFACE_EXAMPLE_IDS})
-        option(BROOKESIA_GUI_INTERFACE_PC_EXAMPLE_${example_id}
-            "Compile example ${example_id} on PC" ON)
-        if(BROOKESIA_GUI_INTERFACE_PC_ENABLE_EXAMPLES AND BROOKESIA_GUI_INTERFACE_PC_EXAMPLE_${example_id})
-            list(APPEND examples_pc_compile_definitions
-                CONFIG_BROOKESIA_GUI_INTERFACE_EXAMPLE_${example_id}=1)
-        else()
-            list(APPEND examples_pc_compile_definitions
-                CONFIG_BROOKESIA_GUI_INTERFACE_EXAMPLE_${example_id}=0)
-        endif()
-    endforeach()
+    if(BROOKESIA_GUI_INTERFACE_PC_ENABLE_EXAMPLES)
+        set(examples_pc_compile_definitions
+            EXAMPLES_ASSETS_DIR="${EXAMPLES_ASSETS_DIR_PC}"
+            ${component_pc_config_compile_definitions}
+        )
+        foreach(example_id ${BROOKESIA_GUI_INTERFACE_EXAMPLE_IDS})
+            option(BROOKESIA_GUI_INTERFACE_PC_EXAMPLE_${example_id}
+                "Compile example ${example_id} on PC" ON)
+            if(BROOKESIA_GUI_INTERFACE_PC_EXAMPLE_${example_id})
+                list(APPEND examples_pc_compile_definitions
+                    CONFIG_BROOKESIA_GUI_INTERFACE_EXAMPLE_${example_id}=1)
+            else()
+                list(APPEND examples_pc_compile_definitions
+                    CONFIG_BROOKESIA_GUI_INTERFACE_EXAMPLE_${example_id}=0)
+            endif()
+        endforeach()
 
-    add_library(${EXAMPLES_LIB} STATIC ${GUI_INTERFACE_EXAMPLES_CPP})
-    target_compile_features(${EXAMPLES_LIB} PUBLIC cxx_std_23)
-    target_include_directories(${EXAMPLES_LIB}
-        PUBLIC
-            ${COMPONENT_INCLUDE_DIRS}
-        PRIVATE
-            ${COMPONENT_EXAMPLES_DIR}
-    )
-    if(Boost_INCLUDE_DIRS)
-        target_include_directories(${EXAMPLES_LIB} PUBLIC ${Boost_INCLUDE_DIRS})
+        add_library(${EXAMPLES_LIB} STATIC ${GUI_INTERFACE_EXAMPLES_CPP})
+        target_compile_features(${EXAMPLES_LIB} PUBLIC cxx_std_23)
+        target_include_directories(${EXAMPLES_LIB}
+            PUBLIC
+                ${COMPONENT_INCLUDE_DIRS}
+            PRIVATE
+                ${COMPONENT_EXAMPLES_DIR}
+        )
+        if(Boost_INCLUDE_DIRS)
+            target_include_directories(${EXAMPLES_LIB} PUBLIC ${Boost_INCLUDE_DIRS})
+        endif()
+        target_link_libraries(${EXAMPLES_LIB}
+            PUBLIC
+                brookesia::gui_interface
+                brookesia::lib_utils
+        )
+        if(NOT EMSCRIPTEN)
+            target_link_libraries(${EXAMPLES_LIB} PUBLIC Boost::json)
+        endif()
+        target_compile_definitions(${EXAMPLES_LIB}
+            PRIVATE
+                ${examples_pc_compile_definitions}
+        )
+        add_library(brookesia::gui_interface_examples ALIAS ${EXAMPLES_LIB})
     endif()
-    target_link_libraries(${EXAMPLES_LIB}
-        PUBLIC
-            brookesia::gui_interface
-            brookesia::lib_utils
-    )
-    if(NOT EMSCRIPTEN)
-        target_link_libraries(${EXAMPLES_LIB} PUBLIC Boost::json)
-    endif()
-    target_compile_definitions(${EXAMPLES_LIB}
-        PRIVATE
-            ${examples_pc_compile_definitions}
-    )
-    add_library(brookesia::gui_interface_examples ALIAS ${EXAMPLES_LIB})
 endif()

@@ -37,8 +37,8 @@ BROOKESIA_DESCRIBE_STRUCT(BindingValueUpdate, (), (absolute_path, key, value))
 
 struct RuntimeTaskConfig {
     std::shared_ptr<lib_utils::TaskScheduler> task_scheduler;
-    lib_utils::TaskScheduler::Group gui_group;
-    lib_utils::TaskScheduler::Group event_group;
+    lib_utils::TaskSchedulerGroup gui_group;
+    lib_utils::TaskSchedulerGroup event_group;
     bool enable_fast_action_dispatch = false;
 };
 BROOKESIA_DESCRIBE_STRUCT(RuntimeTaskConfig, (), (gui_group, event_group))
@@ -73,7 +73,9 @@ public:
     std::expected<void, std::string> load_theme_json(std::string_view json, std::string_view base_dir = {});
     std::expected<void, std::string> load_theme_file(std::string_view path);
     std::vector<std::string> list_supported_themes() const;
+    /** Configure the default theme used by documents loaded after this call. */
     std::expected<void, std::string> set_theme(std::string_view theme_id);
+    /** @deprecated Loaded documents are never reapplied; the argument is retained for source compatibility. */
     std::expected<void, std::string> set_theme(std::string_view theme_id, bool reapply_loaded_documents);
     std::string get_theme() const;
     std::expected<void, std::string> register_font(const RuntimeFontResource &resource);
@@ -83,7 +85,9 @@ public:
     std::vector<std::string> list_supported_fonts(std::string_view language = {}) const;
     std::vector<std::string> list_supported_languages() const;
     std::vector<std::string> list_supported_languages(std::string_view font_id) const;
+    /** Configure the default language used by documents loaded after this call. */
     std::expected<void, std::string> set_language(std::string_view language);
+    /** @deprecated Loaded documents are never reapplied; the argument is retained for source compatibility. */
     std::expected<void, std::string> set_language(std::string_view language, bool reapply_loaded_documents);
     std::string get_language() const;
     std::expected<void, std::string> set_default_font_for_language(

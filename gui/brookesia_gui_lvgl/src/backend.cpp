@@ -48,6 +48,23 @@ public:
     ThreadLockGuard &operator=(const ThreadLockGuard &) = delete;
 };
 
+bool requires_mount_placement_reapply(const Record &record)
+{
+    const auto &placement = lvgl::get_record_placement(record);
+    return placement.mode == PlacementMode::Relative ||
+           placement.x.mode == PlacementOffsetMode::Percent ||
+           placement.y.mode == PlacementOffsetMode::Percent ||
+           placement.aspect_ratio.has_value() ||
+           record.type == NodeType::TextInput;
+}
+
+bool requires_mount_refresh(const Record &record)
+{
+    // FrameView output creation may be deferred while its screen is attached to the zero-sized
+    // staging root. Retry every FrameView after the mounted flex/grid tree has reached final size.
+    return record.type == NodeType::FrameView || requires_mount_placement_reapply(record);
+}
+
 void detach_keyboard_globals(Record &record)
 {
     if (record.type != NodeType::Keyboard || record.object == nullptr || !lv_obj_is_valid(record.object)) {
@@ -224,17 +241,44 @@ BackendHandle BackendImpl::create_node(
     record.node_id = node.id;
     record.type = node.type;
     record.object = object;
-    record.absolute_path = parent_path.empty() ? "/" + node.id : std::string(parent_path) + node.id;
-    record.scope_root_absolute_path = std::string(scope_root_absolute_path);
     record.is_top_level_screen = is_top_level && node.type == NodeType::Screen;
+    record.scope_root = handle;
     if (!is_top_level) {
         auto *parent_record = find_record(parent);
         if (parent_record != nullptr) {
             record.depth = parent_record->depth + 1;
+            const bool is_scope_root = parent_path.empty() ?
+                                       scope_root_absolute_path.size() == node.id.size() + 1 &&
+                                       scope_root_absolute_path.front() == '/' &&
+                                       scope_root_absolute_path.substr(1) == node.id :
+                                       scope_root_absolute_path.size() == parent_path.size() + node.id.size() &&
+                                       scope_root_absolute_path.starts_with(parent_path) &&
+                                       scope_root_absolute_path.substr(parent_path.size()) == node.id;
+            if (!is_scope_root) {
+                record.scope_root = parent_record->scope_root;
+            }
         }
     }
 
     records.emplace(handle.value(), std::move(record));
+    if (parent.is_valid()) {
+        child_handles[parent.value()].push_back(handle.value());
+    }
+    auto *created_record = find_record(handle);
+    if (created_record != nullptr && requires_mount_refresh(*created_record)) {
+        adjust_mount_refresh_ancestors(handle, true);
+    }
+#if BROOKESIA_GUI_INTERFACE_ENABLE_MEMORY_TRACE
+    BROOKESIA_LOGI(
+        "[HeapTrace][gui.lvgl_record] action(create) type(%1%) record_size(%2%) "
+        "placement_entries(%3%) placement_hits(%4%) placement_misses(%5%)",
+        BROOKESIA_DESCRIBE_TO_STR(node.type),
+        sizeof(Record),
+        placement_cache.size(),
+        placement_cache_hits,
+        placement_cache_misses
+    );
+#endif
     return handle;
 }
 
@@ -251,8 +295,24 @@ void BackendImpl::destroy_node(BackendHandle handle)
         return;
     }
 
+    const auto parent = it->second.parent;
+    const auto removed_refresh_count = it->second.mount_refresh_subtree_count;
+    if (removed_refresh_count > 0) {
+        adjust_mount_refresh_ancestors(parent, false, removed_refresh_count);
+    }
+
     std::vector<BackendHandle::Value> subtree_handles;
     collect_subtree_handles(handle, subtree_handles);
+
+    if (parent.is_valid()) {
+        auto children_it = child_handles.find(parent.value());
+        if (children_it != child_handles.end()) {
+            std::erase(children_it->second, handle.value());
+            if (children_it->second.empty()) {
+                child_handles.erase(children_it);
+            }
+        }
+    }
 
     mounted_targets.erase(handle.value());
 
@@ -278,23 +338,27 @@ void BackendImpl::destroy_node(BackendHandle handle)
             if (record_it->second.style_initialized) {
                 lv_style_reset(&record_it->second.style);
             }
-            for (auto &[unused_state, state_style] : record_it->second.state_styles) {
-                (void)unused_state;
-                lv_style_reset(&state_style.style);
-            }
-            for (auto &[unused_part, part_style] : record_it->second.part_styles) {
-                (void)unused_part;
-                lv_style_reset(&part_style.style);
-                for (auto &[unused_state, state_style] : part_style.state_styles) {
+            if (auto *style_extras = record_it->second.style_extras_payload.get(); style_extras != nullptr) {
+                for (auto &[unused_state, state_style] : style_extras->state_styles) {
                     (void)unused_state;
                     lv_style_reset(&state_style.style);
                 }
+                for (auto &[unused_part, part_style] : style_extras->part_styles) {
+                    (void)unused_part;
+                    lv_style_reset(&part_style.style);
+                    for (auto &[unused_state, state_style] : part_style.state_styles) {
+                        (void)unused_state;
+                        lv_style_reset(&state_style.style);
+                    }
+                }
             }
-            if (record_it->second.debug_style_initialized) {
-                lv_style_reset(&record_it->second.debug_style);
+            if (record_it->second.debug_style_payload != nullptr) {
+                lv_style_reset(&record_it->second.debug_style_payload->style);
             }
+            release_record_placement(*this, record_it->second);
             records.erase(record_it);
         }
+        child_handles.erase(handle_value);
     }
 }
 
@@ -401,7 +465,12 @@ void BackendImpl::apply_placement(BackendHandle handle, const Placement &placeme
         return;
     }
 
+    const bool refresh_was_required = requires_mount_refresh(*record);
     lvgl::apply_placement(*this, *record, placement, mask);
+    const bool refresh_is_required = requires_mount_refresh(*record);
+    if (refresh_was_required != refresh_is_required) {
+        adjust_mount_refresh_ancestors(handle, refresh_is_required);
+    }
     if (mask == PlacementApplyMask::All || has_mask(mask, PlacementApplyMask::Size) ||
             has_mask(mask, PlacementApplyMask::Align) || has_mask(mask, PlacementApplyMask::RelativeTo)) {
         lvgl::refresh_relative_placements(*this);
@@ -586,14 +655,36 @@ bool BackendImpl::mount_screen(BackendHandle handle, const MountTarget &target)
     lv_obj_move_foreground(record->object);
     lv_obj_update_layout(layer_parent);
 
-    std::vector<BackendHandle::Value> subtree_handles;
-    collect_subtree_handles(handle, subtree_handles);
-    for (auto handle_value : subtree_handles) {
+    std::vector<BackendHandle::Value> refresh_handles;
+    refresh_handles.reserve(record->mount_refresh_subtree_count);
+    if (record->mount_refresh_subtree_count > 0) {
+        collect_mount_refresh_handles(handle, refresh_handles);
+    }
+    for (auto handle_value : refresh_handles) {
         auto *subtree_record = find_record(BackendHandle(handle_value));
-        if (subtree_record == nullptr || subtree_record->object == nullptr || !lv_obj_is_valid(subtree_record->object)) {
+        if (subtree_record == nullptr || subtree_record->object == nullptr ||
+                !lv_obj_is_valid(subtree_record->object)) {
             continue;
         }
-        lvgl::apply_placement(*this, *subtree_record, subtree_record->placement, PlacementApplyMask::All);
+        if (!requires_mount_placement_reapply(*subtree_record)) {
+            continue;
+        }
+        const auto &placement = lvgl::get_record_placement(*subtree_record);
+        // FrameView registration happens after the whole mounted tree reaches its final layout.
+        lvgl::apply_placement(*this, *subtree_record, placement, PlacementApplyMask::All, false);
+    }
+
+    lv_obj_update_layout(layer_parent);
+    for (auto handle_value : refresh_handles) {
+        auto *subtree_record = find_record(BackendHandle(handle_value));
+        if (subtree_record == nullptr || subtree_record->object == nullptr ||
+                !lv_obj_is_valid(subtree_record->object)) {
+            continue;
+        }
+        auto *frame_view = subtree_record->get_type_payload<Record::FrameViewPayload>();
+        if (frame_view != nullptr) {
+            refresh_frame_view(*this, *subtree_record, frame_view->props);
+        }
     }
 
     mounted_targets.insert_or_assign(handle.value(), MountTarget{
@@ -1210,10 +1301,11 @@ bool BackendImpl::unmount_image_assets(char fs_letter)
     const std::string path_prefix = std::string(1, fs_letter) + ":";
     for (const auto &[unused_handle, record] : records) {
         (void)unused_handle;
-        if (record.image_src.rfind(path_prefix, 0) == 0) {
+        const auto *image = record.get_type_payload<Record::ImagePayload>();
+        if (image != nullptr && image->src.rfind(path_prefix, 0) == 0) {
             BROOKESIA_LOGE("Cannot unmount image drive '%1%' while image view '%2%' still references it",
                            fs_letter,
-                           record.absolute_path);
+                           build_absolute_path(record));
             return false;
         }
     }
@@ -1252,14 +1344,126 @@ const Record *BackendImpl::find_record(BackendHandle handle) const
     return &it->second;
 }
 
+Record *BackendImpl::find_record_by_absolute_path(std::string_view absolute_path)
+{
+    if (absolute_path.size() < 2 || absolute_path.front() != '/' || absolute_path.back() == '/') {
+        return nullptr;
+    }
+
+    for (auto &[unused_handle, record] : records) {
+        (void)unused_handle;
+        const Record *current = &record;
+        size_t path_end = absolute_path.size();
+        while (current != nullptr) {
+            const auto separator = absolute_path.rfind('/', path_end - 1);
+            if (separator == std::string_view::npos ||
+                    absolute_path.substr(separator + 1, path_end - separator - 1) != current->node_id) {
+                break;
+            }
+            if (!current->parent.is_valid()) {
+                if (separator == 0) {
+                    return &record;
+                }
+                break;
+            }
+            if (separator == 0) {
+                break;
+            }
+            path_end = separator;
+            current = find_record(current->parent);
+        }
+    }
+    return nullptr;
+}
+
+std::string BackendImpl::build_absolute_path(const Record &record) const
+{
+    const Record *current = &record;
+    size_t path_size = 0;
+    while (current != nullptr) {
+        path_size += current->node_id.size() + 1;
+        if (!current->parent.is_valid()) {
+            break;
+        }
+        current = find_record(current->parent);
+    }
+
+    std::string absolute_path(path_size, '\0');
+    size_t write_offset = path_size;
+    current = &record;
+    while (current != nullptr) {
+        write_offset -= current->node_id.size();
+        std::copy(current->node_id.begin(), current->node_id.end(), absolute_path.begin() + write_offset);
+        absolute_path[--write_offset] = '/';
+        if (!current->parent.is_valid()) {
+            break;
+        }
+        current = find_record(current->parent);
+    }
+    return absolute_path;
+}
+
+std::string BackendImpl::build_scope_root_absolute_path(const Record &record) const
+{
+    const auto *scope_root_record = find_record(record.scope_root);
+    return build_absolute_path(scope_root_record == nullptr ? record : *scope_root_record);
+}
+
 void BackendImpl::collect_subtree_handles(BackendHandle root, std::vector<BackendHandle::Value> &handles)
 {
     handles.push_back(root.value());
 
-    for (const auto &[handle_value, record] : records) {
-        if (record.parent == root) {
-            collect_subtree_handles(BackendHandle(handle_value), handles);
+    auto children_it = child_handles.find(root.value());
+    if (children_it == child_handles.end()) {
+        return;
+    }
+    for (auto handle_value : children_it->second) {
+        collect_subtree_handles(BackendHandle(handle_value), handles);
+    }
+}
+
+void BackendImpl::collect_mount_refresh_handles(
+    BackendHandle root, std::vector<BackendHandle::Value> &handles
+)
+{
+    auto *record = find_record(root);
+    if (record == nullptr || record->mount_refresh_subtree_count == 0) {
+        return;
+    }
+    if (requires_mount_refresh(*record)) {
+        handles.push_back(root.value());
+    }
+
+    auto children_it = child_handles.find(root.value());
+    if (children_it == child_handles.end()) {
+        return;
+    }
+    for (auto handle_value : children_it->second) {
+        collect_mount_refresh_handles(BackendHandle(handle_value), handles);
+    }
+}
+
+void BackendImpl::adjust_mount_refresh_ancestors(BackendHandle handle, bool add, std::size_t count)
+{
+    while (handle.is_valid()) {
+        auto *record = find_record(handle);
+        if (record == nullptr) {
+            break;
         }
+        if (add) {
+            record->mount_refresh_subtree_count += count;
+        } else if (record->mount_refresh_subtree_count >= count) {
+            record->mount_refresh_subtree_count -= count;
+        } else {
+            BROOKESIA_LOGE(
+                "Mount refresh count underflow: handle(%1%), count(%2%), remove(%3%)",
+                handle,
+                record->mount_refresh_subtree_count,
+                count
+            );
+            record->mount_refresh_subtree_count = 0;
+        }
+        handle = record->parent;
     }
 }
 
