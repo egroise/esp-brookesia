@@ -17,7 +17,7 @@
 #include "brookesia/app_settings/macro_configs.h"
 #include "brookesia/lib_utils/signal.hpp"
 
-#include "brookesia/service_manager.hpp"
+#include "brookesia/service_manager/service/base.hpp"
 #include "brookesia/system_core.hpp"
 
 namespace esp_brookesia::app::settings {
@@ -224,36 +224,50 @@ private:
         system::core::AppContext &context,
         std::string_view locale
     );
-    std::expected<void, std::string> commit_language_switch(
-        system::core::AppContext &context,
-        std::string_view locale
-    );
     std::expected<void, std::string> schedule_theme_switch(
         system::core::AppContext &context,
         std::string_view theme_id
     );
-    std::expected<void, std::string> commit_theme_switch(
+    enum class RestartPromptKind {
+        None,
+        Language,
+        Theme,
+        Failure,
+    };
+    std::expected<void, std::string> show_restart_prompt(
         system::core::AppContext &context,
-        std::string_view theme_id
+        RestartPromptKind kind
     );
-    void hide_language_loading_if_visible(system::core::AppContext &context);
-    void hide_theme_loading_if_visible(system::core::AppContext &context);
+    void handle_restart_dialog_result(
+        system::core::AppContext &context,
+        RestartPromptKind kind,
+        const system::core::MessageDialogResult &result
+    );
+    void show_restart_failure(system::core::AppContext &context, std::string reason);
+    void show_preference_save_failure(
+        system::core::AppContext &context,
+        bool language,
+        std::string reason
+    );
     system::core::MessageDialogOptions make_message_dialog_options(
         std::string text,
         system::core::MessageDialogIcon icon,
-        int32_t auto_close_ms
+        int32_t auto_close_ms,
+        std::vector<system::core::MessageDialogButton> buttons = {}
     ) const;
     void ensure_message_dialog(
         system::core::AppContext &context,
         std::string text,
         system::core::MessageDialogIcon icon,
-        int32_t auto_close_ms
+        int32_t auto_close_ms,
+        std::vector<system::core::MessageDialogButton> buttons = {}
     );
     void update_message_dialog_if_visible(
         system::core::AppContext &context,
         std::string text,
         system::core::MessageDialogIcon icon,
-        int32_t auto_close_ms
+        int32_t auto_close_ms,
+        std::vector<system::core::MessageDialogButton> buttons = {}
     );
     void hide_message_dialog_if_visible(system::core::AppContext &context);
     void clamp_wifi_list_pages();

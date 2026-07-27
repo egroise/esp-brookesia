@@ -31,7 +31,9 @@ std::expected<void, std::string> SettingsApp::populate_language_options(system::
             gui::BindingValueUpdate{
                 .absolute_path = instance_path + "/value_box/value",
                 .key = "labelProps.text",
-                .value = locale == current_locale_ ? localized_text(current_locale_, "current") : "",
+                .value = locale == pending_language_locale_ ?
+                         localized_text(current_locale_, "restart_required") :
+                         locale == current_locale_ ? localized_text(current_locale_, "current") : "",
             },
         };
         auto result = context.gui().set_binding_values(updates);
@@ -89,173 +91,36 @@ std::expected<void, std::string> SettingsApp::schedule_language_switch(
 )
 {
     const auto normalized_locale = normalize_locale(locale);
-    if (language_switch_in_progress_ || theme_switch_in_progress_ ||
-            pending_theme_timer_id_ != system::core::INVALID_TIMER_ID) {
-        BROOKESIA_LOGW(
-            "Ignore Settings language switch while another switch is pending or running: %1%",
-            normalized_locale
-        );
+    if (restart_in_progress_) {
+        BROOKESIA_LOGW("Ignore Settings language selection while restart is in progress");
         return {};
     }
     if (normalized_locale == current_locale_) {
-        if (pending_language_timer_id_ != system::core::INVALID_TIMER_ID) {
-            if (!context.timer().stop(pending_language_timer_id_)) {
-                BROOKESIA_LOGW(
-                    "Failed to stop pending Settings language switch timer: %1%",
-                    pending_language_timer_id_
-                );
-            }
-            pending_language_timer_id_ = system::core::INVALID_TIMER_ID;
-        }
-        pending_language_locale_.clear();
-        hide_language_loading_if_visible(context);
-        return refresh_language_state(context);
-    }
-
-    if (pending_language_timer_id_ != system::core::INVALID_TIMER_ID) {
-        if (!context.timer().stop(pending_language_timer_id_)) {
-            BROOKESIA_LOGW(
-                "Failed to stop previous Settings language switch timer: %1%",
-                pending_language_timer_id_
-            );
-        }
-        pending_language_timer_id_ = system::core::INVALID_TIMER_ID;
-    }
-    pending_language_locale_ = normalized_locale;
-
-    if (!language_loading_visible_) {
-        ensure_message_dialog(
-            context,
-            localized_text(current_locale_, "language.switching"),
-            system::core::MessageDialogIcon::Information,
-            0
-        );
-        language_loading_visible_ = true;
-    }
-
-    auto timer_result = context.timer().start_delayed(LANGUAGE_SWITCH_TIMER_NAME, SETTINGS_SWITCH_DEFER_MS);
-    if (!timer_result) {
-        BROOKESIA_LOGW("Failed to defer Settings language switch: %1%", timer_result.error());
-        const auto target_locale = pending_language_locale_;
-        pending_language_locale_.clear();
-        return commit_language_switch(context, target_locale);
-    }
-    pending_language_timer_id_ = *timer_result;
-    return {};
-}
-
-std::expected<void, std::string> SettingsApp::commit_language_switch(
-    system::core::AppContext &context,
-    std::string_view locale
-)
-{
-    const auto normalized_locale = normalize_locale(locale);
-    if (normalized_locale == current_locale_) {
-        hide_language_loading_if_visible(context);
-        return refresh_language_state(context);
-    }
-
-    language_switch_in_progress_ = true;
-    bool switch_succeeded = false;
-    lib_utils::FunctionGuard finish_language_switch_guard([this, &context, &switch_succeeded]() {
-        language_switch_in_progress_ = false;
-        if (!language_loading_visible_) {
-            return;
-        }
-        update_message_dialog_if_visible(
-            context,
-            switch_succeeded ?
-            localized_text(current_locale_, "language.switch.success") :
-            localized_text(current_locale_, "language.switch.failed"),
-            switch_succeeded ?
-            system::core::MessageDialogIcon::Information :
-            system::core::MessageDialogIcon::Warning,
-            switch_succeeded ? MESSAGE_DIALOG_SUCCESS_AUTO_CLOSE_MS : MESSAGE_DIALOG_FAILED_AUTO_CLOSE_MS
-        );
-        language_loading_visible_ = false;
-    });
-
-    const auto previous_locale = current_locale_;
-    current_locale_ = normalized_locale;
-    const auto runtime_language = make_runtime_language(current_locale_);
-    // Settings applies its own i18n bindings below; avoid reloading other preloaded app DOMs on every language switch.
-    auto language_result = context.gui().set_language(runtime_language, false);
-    if (!language_result) {
-        BROOKESIA_LOGW("Failed to set Settings runtime language: %1%", language_result.error());
-        current_locale_ = previous_locale;
-        const auto rollback_language = make_runtime_language(current_locale_);
-        if (auto rollback_result = context.gui().set_language(rollback_language, false);
-                !rollback_result) {
-            BROOKESIA_LOGW("Failed to roll back Settings runtime language: %1%", rollback_result.error());
-        }
-        return std::unexpected(language_result.error());
-    }
-
-    auto result = apply_locale(context);
-    if (!result) {
-        current_locale_ = previous_locale;
-        if (auto rollback_result = context.gui().set_language(make_runtime_language(current_locale_), false);
-                !rollback_result) {
-            BROOKESIA_LOGW("Failed to roll back Settings runtime language: %1%", rollback_result.error());
-        }
-        if (auto locale_result = apply_locale(context); !locale_result) {
-            BROOKESIA_LOGW("Failed to restore Settings locale text: %1%", locale_result.error());
-        }
-        if (auto header_result = refresh_header(context); !header_result) {
-            BROOKESIA_LOGW("Failed to restore Settings header: %1%", header_result.error());
-        }
-        if (auto theme_state_result = refresh_theme_state(context); !theme_state_result) {
-            BROOKESIA_LOGW("Failed to restore Settings theme state: %1%", theme_state_result.error());
-        }
-        if (auto language_state_result = refresh_language_state(context); !language_state_result) {
-            BROOKESIA_LOGW("Failed to restore Settings language state: %1%", language_state_result.error());
-        }
-        return result;
-    }
-    result = refresh_header(context);
-    if (!result) {
-        return result;
-    }
-    result = refresh_theme_state(context);
-    if (!result) {
-        return result;
-    }
-    result = populate_language_options(context);
-    if (!result) {
-        return result;
-    }
-    result = refresh_language_state(context);
-    if (!result) {
-        return result;
-    }
-    result = refresh_time_zone_page_state(context);
-    if (!result) {
-        return result;
-    }
-    result = refresh_device_state(context);
-    if (!result) {
-        return result;
-    }
-    result = refresh_wifi_summary_state(context);
-    if (!result) {
-        return result;
-    }
-    result = refresh_wifi_page_state(context);
-    if (!result) {
-        return result;
-    }
-    result = refresh_wifi_lists(context);
-    if (!result) {
-        return result;
-    }
-    if (current_page_ == PAGE_WIFI_CONNECT) {
-        result = refresh_wifi_connect_state(context);
-        if (!result) {
+        if (auto result = context.gui().save_language_preference(make_runtime_language(current_locale_)); !result) {
+            show_preference_save_failure(context, true, result.error());
             return result;
         }
+        pending_language_locale_.clear();
+        restart_prompt_kind_ = RestartPromptKind::None;
+        hide_message_dialog_if_visible(context);
+        return refresh_language_state(context);
     }
-    switch_succeeded = true;
-    return {};
+
+    const auto supported_languages = normalize_language_list(context.gui().list_supported_languages());
+    if (std::find(supported_languages.begin(), supported_languages.end(), normalized_locale) ==
+            supported_languages.end()) {
+        return std::unexpected("Unsupported language: " + normalized_locale);
+    }
+    if (auto result = context.gui().save_language_preference(make_runtime_language(normalized_locale)); !result) {
+        show_preference_save_failure(context, true, result.error());
+        return result;
+    }
+    pending_language_locale_ = normalized_locale;
+    auto result = refresh_language_state(context);
+    if (!result) {
+        return result;
+    }
+    return show_restart_prompt(context, RestartPromptKind::Language);
 }
 
 std::expected<void, std::string> SettingsApp::schedule_theme_switch(
@@ -263,124 +128,143 @@ std::expected<void, std::string> SettingsApp::schedule_theme_switch(
     std::string_view theme_id
 )
 {
-    if (language_switch_in_progress_ || theme_switch_in_progress_ ||
-            pending_language_timer_id_ != system::core::INVALID_TIMER_ID) {
-        BROOKESIA_LOGW("Ignore Settings theme switch while another switch is pending or running: %1%", theme_id);
+    if (restart_in_progress_) {
+        BROOKESIA_LOGW("Ignore Settings theme selection while restart is in progress");
         return {};
     }
+    if (theme_id != THEME_LIGHT && theme_id != THEME_DARK) {
+        return std::unexpected("Unsupported theme: " + std::string(theme_id));
+    }
     if (theme_id == current_theme_id_) {
-        if (pending_theme_timer_id_ != system::core::INVALID_TIMER_ID) {
-            if (!context.timer().stop(pending_theme_timer_id_)) {
-                BROOKESIA_LOGW(
-                    "Failed to stop pending Settings theme switch timer: %1%",
-                    pending_theme_timer_id_
-                );
-            }
-            pending_theme_timer_id_ = system::core::INVALID_TIMER_ID;
+        if (auto result = context.gui().save_theme_preference(current_theme_id_); !result) {
+            show_preference_save_failure(context, false, result.error());
+            return result;
         }
         pending_theme_id_.clear();
-        hide_theme_loading_if_visible(context);
+        restart_prompt_kind_ = RestartPromptKind::None;
+        hide_message_dialog_if_visible(context);
         return refresh_theme_state(context);
     }
-
-    if (pending_theme_timer_id_ != system::core::INVALID_TIMER_ID) {
-        if (!context.timer().stop(pending_theme_timer_id_)) {
-            BROOKESIA_LOGW(
-                "Failed to stop previous Settings theme switch timer: %1%",
-                pending_theme_timer_id_
-            );
-        }
-        pending_theme_timer_id_ = system::core::INVALID_TIMER_ID;
+    if (auto result = context.gui().save_theme_preference(theme_id); !result) {
+        show_preference_save_failure(context, false, result.error());
+        return result;
     }
-    pending_theme_id_ = theme_id;
-
-    if (!theme_loading_visible_) {
-        ensure_message_dialog(
-            context,
-            localized_text(current_locale_, "theme.switching"),
-            system::core::MessageDialogIcon::Information,
-            0
-        );
-        theme_loading_visible_ = true;
-    }
-
-    auto timer_result = context.timer().start_delayed(THEME_SWITCH_TIMER_NAME, SETTINGS_SWITCH_DEFER_MS);
-    if (!timer_result) {
-        BROOKESIA_LOGW("Failed to defer Settings theme switch: %1%", timer_result.error());
-        const auto target_theme_id = pending_theme_id_;
-        pending_theme_id_.clear();
-        return commit_theme_switch(context, target_theme_id);
-    }
-    pending_theme_timer_id_ = *timer_result;
-    return {};
-}
-
-std::expected<void, std::string> SettingsApp::commit_theme_switch(
-    system::core::AppContext &context,
-    std::string_view theme_id
-)
-{
-    if (theme_id == current_theme_id_) {
-        hide_theme_loading_if_visible(context);
-        return refresh_theme_state(context);
-    }
-
-    theme_switch_in_progress_ = true;
-    bool switch_succeeded = false;
-    lib_utils::FunctionGuard finish_theme_switch_guard([this, &context, &switch_succeeded]() {
-        theme_switch_in_progress_ = false;
-        if (!theme_loading_visible_) {
-            return;
-        }
-        update_message_dialog_if_visible(
-            context,
-            switch_succeeded ?
-            localized_text(current_locale_, "theme.switch.success") :
-            localized_text(current_locale_, "theme.switch.failed"),
-            switch_succeeded ?
-            system::core::MessageDialogIcon::Information :
-            system::core::MessageDialogIcon::Warning,
-            switch_succeeded ? MESSAGE_DIALOG_SUCCESS_AUTO_CLOSE_MS : MESSAGE_DIALOG_FAILED_AUTO_CLOSE_MS
-        );
-        theme_loading_visible_ = false;
-    });
-
-    const auto previous_theme_id = current_theme_id_;
-    current_theme_id_ = theme_id;
-    auto theme_result = context.gui().set_theme(current_theme_id_, true);
-    if (!theme_result) {
-        current_theme_id_ = previous_theme_id;
-        BROOKESIA_LOGW("Failed to switch Settings theme: %1%", theme_result.error());
-        if (auto rollback_result = context.gui().set_theme(current_theme_id_, true); !rollback_result) {
-            BROOKESIA_LOGW("Failed to roll back Settings theme: %1%", rollback_result.error());
-        }
-        if (auto refresh_result = refresh_theme_state(context); !refresh_result) {
-            BROOKESIA_LOGW("Failed to refresh Settings theme state after rollback: %1%", refresh_result.error());
-        }
-        return std::unexpected(theme_result.error());
-    }
+    pending_theme_id_ = std::string(theme_id);
     auto result = refresh_theme_state(context);
     if (!result) {
         return result;
     }
-    switch_succeeded = true;
+    return show_restart_prompt(context, RestartPromptKind::Theme);
+}
+
+std::expected<void, std::string> SettingsApp::show_restart_prompt(
+    system::core::AppContext &context,
+    RestartPromptKind kind
+)
+{
+    const auto text_key = kind == RestartPromptKind::Language ?
+                          "language.restart_required" : "theme.restart_required";
+    const auto text = localized_text(current_locale_, text_key);
+    restart_prompt_kind_ = kind;
+    ensure_message_dialog(
+        context,
+        text,
+        system::core::MessageDialogIcon::Question,
+        0,
+        {
+            system::core::MessageDialogButton{
+                .text = localized_text(current_locale_, "restart_now"),
+                .role = system::core::MessageDialogButtonRole::Accept,
+            },
+            system::core::MessageDialogButton{
+                .text = localized_text(current_locale_, "later"),
+                .role = system::core::MessageDialogButtonRole::Reject,
+            },
+        }
+    );
+    if (message_dialog_request_id_ == system::core::INVALID_MESSAGE_DIALOG_REQUEST_ID) {
+        restart_prompt_kind_ = RestartPromptKind::None;
+        return std::unexpected("Failed to show restart confirmation dialog");
+    }
     return {};
 }
 
-void SettingsApp::hide_language_loading_if_visible(system::core::AppContext &context)
+void SettingsApp::handle_restart_dialog_result(
+    system::core::AppContext &context,
+    RestartPromptKind kind,
+    const system::core::MessageDialogResult &result
+)
 {
-    if (!language_loading_visible_) {
+    if (kind == RestartPromptKind::None) {
         return;
     }
-    hide_message_dialog_if_visible(context);
-    language_loading_visible_ = false;
+    if (kind == RestartPromptKind::Failure) {
+        restart_prompt_kind_ = RestartPromptKind::None;
+        return;
+    }
+    if (result.reason != system::core::MessageDialogCloseReason::Button || result.button_index != 0) {
+        restart_prompt_kind_ = RestartPromptKind::None;
+        if (kind == RestartPromptKind::Language) {
+            (void)refresh_language_state(context);
+        } else {
+            (void)refresh_theme_state(context);
+        }
+        return;
+    }
+    if (restart_in_progress_) {
+        return;
+    }
+    restart_in_progress_ = true;
+    restart_prompt_kind_ = RestartPromptKind::None;
+    if (restart_iface_ == nullptr) {
+        restart_in_progress_ = false;
+        show_restart_failure(context, "Restart interface is unavailable");
+        return;
+    }
+    auto restart_result = restart_iface_->restart();
+    if (!restart_result) {
+        restart_in_progress_ = false;
+        show_restart_failure(context, restart_result.error());
+        return;
+    }
+    BROOKESIA_LOGI("Settings restart request accepted");
 }
 
-void SettingsApp::hide_theme_loading_if_visible(system::core::AppContext &context)
+void SettingsApp::show_restart_failure(system::core::AppContext &context, std::string reason)
 {
-    if (!theme_loading_visible_) {
-        return;
-    }
-    hide_message_dialog_if_visible(context);
-    theme_loading_visible_ = false;
+    restart_prompt_kind_ = RestartPromptKind::Failure;
+    ensure_message_dialog(
+        context,
+        localized_text(current_locale_, "restart_failed") + ": " + std::move(reason),
+        system::core::MessageDialogIcon::Warning,
+        0,
+        {
+            system::core::MessageDialogButton{
+                .text = localized_text(current_locale_, "close"),
+                .role = system::core::MessageDialogButtonRole::Accept,
+            },
+        }
+    );
+}
+
+void SettingsApp::show_preference_save_failure(
+    system::core::AppContext &context,
+    bool language,
+    std::string reason
+)
+{
+    restart_prompt_kind_ = RestartPromptKind::Failure;
+    ensure_message_dialog(
+        context,
+        localized_text(current_locale_, language ? "language.save_failed" : "theme.save_failed") +
+        ": " + std::move(reason),
+        system::core::MessageDialogIcon::Warning,
+        0,
+        {
+            system::core::MessageDialogButton{
+                .text = localized_text(current_locale_, "close"),
+                .role = system::core::MessageDialogButtonRole::Accept,
+            },
+        }
+    );
 }

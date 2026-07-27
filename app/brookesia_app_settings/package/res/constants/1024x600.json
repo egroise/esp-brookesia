@@ -16,6 +16,7 @@
                 "iconSize": "46dp",
                 "navIconColumn": "58dp",
                 "navValueColumn": "150dp",
+                "menuValueColumn": "180dp",
                 "chevronWidth": "28dp",
                 "sliderHeight": "34dp",
                 "debugSliderRowHeight": "136dp",

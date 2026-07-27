@@ -368,20 +368,22 @@ void SettingsApp::subscribe_device_events()
     }
 
     if (device_ui_state_.display_backlight_supported) {
-        const auto brightness_callback = [this](
-                                             const std::string &,
-                                             double output_id,
-                                             const std::string &,
-                                             double brightness
-        ) {
+        const service::EventRegistry::SignalSlot brightness_callback =
+            [this](const std::string &, const service::EventItemMap &items) {
+            const auto *output_id = std::get_if<double>(find_event_item(items, "OutputId"));
+            const auto *output_name = std::get_if<std::string>(find_event_item(items, "OutputName"));
+            const auto *brightness = std::get_if<double>(find_event_item(items, "Brightness"));
+            if (!output_id || !output_name || !brightness) {
+                return;
+            }
             if (context_ == nullptr) {
                 return;
             }
             if (device_ui_state_.backlight_output_id.has_value() &&
-                    *device_ui_state_.backlight_output_id != static_cast<uint32_t>(std::lround(output_id))) {
+                    *device_ui_state_.backlight_output_id != static_cast<uint32_t>(std::lround(*output_id))) {
                 return;
             }
-            device_ui_state_.brightness = clamp_percent(brightness);
+            device_ui_state_.brightness = clamp_percent(*brightness);
             if (auto result = refresh_display_state(*context_); !result) {
                 BROOKESIA_LOGW("Failed to refresh display after brightness event: %1%", result.error());
             }
@@ -398,11 +400,16 @@ void SettingsApp::subscribe_device_events()
     }
 
     if (device_ui_state_.audio_player_supported) {
-        const auto volume_callback = [this](const std::string &, double volume) {
+        const service::EventRegistry::SignalSlot volume_callback =
+            [this](const std::string &, const service::EventItemMap &items) {
+            const auto *volume = std::get_if<double>(find_event_item(items, "Volume"));
+            if (!volume) {
+                return;
+            }
             if (context_ == nullptr) {
                 return;
             }
-            device_ui_state_.volume = clamp_percent(volume);
+            device_ui_state_.volume = clamp_percent(*volume);
             if (auto result = refresh_sound_state(*context_); !result) {
                 BROOKESIA_LOGW("Failed to refresh sound after volume event: %1%", result.error());
             }
@@ -417,11 +424,16 @@ void SettingsApp::subscribe_device_events()
             BROOKESIA_LOGW("Failed to subscribe Device volume event");
         }
 
-        const auto mute_callback = [this](const std::string &, bool muted) {
+        const service::EventRegistry::SignalSlot mute_callback =
+            [this](const std::string &, const service::EventItemMap &items) {
+            const auto *muted = std::get_if<bool>(find_event_item(items, "IsMuted"));
+            if (!muted) {
+                return;
+            }
             if (context_ == nullptr) {
                 return;
             }
-            device_ui_state_.muted = muted;
+            device_ui_state_.muted = *muted;
             if (auto result = refresh_sound_state(*context_); !result) {
                 BROOKESIA_LOGW("Failed to refresh sound after mute event: %1%", result.error());
             }
