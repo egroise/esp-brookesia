@@ -2,7 +2,7 @@
 
 [中文版本](./README_CN.md)
 
-This example demonstrates how to start a complete ESP-Brookesia System Super product shell. It integrates HAL, Display/Audio/Wi-Fi/HTTP/Storage/SNTP/Video/Device services, the GUI LVGL backend, the JavaScript runtime, and the built-in Settings, App Store, and Files apps to validate app lifecycle, resource packaging, system overlay, and launcher flows.
+This example demonstrates how to start a complete ESP-Brookesia System Super product shell. The default build integrates HAL, Display/Audio/Wi-Fi/HTTP/Storage/SNTP/Video/Device services, NES emulation, Coze and Xiaozhi agents, the GUI LVGL backend, the JavaScript runtime, and the built-in Settings, App Store, and Files apps.
 
 ## 📑 Table of Contents
 
@@ -13,6 +13,8 @@ This example demonstrates how to start a complete ESP-Brookesia System Super pro
     - [Hardware Requirements](#hardware-requirements)
     - [Development Environment](#development-environment)
   - [🔨 How to Use](#-how-to-use)
+  - [⚡ Build Performance](#-build-performance)
+  - [📊 Build Analysis](#-build-analysis)
   - [🚀 Quick Start](#-quick-start)
   - [🔍 Troubleshooting](#-troubleshooting)
   - [💬 Technical Support and Feedback](#-technical-support-and-feedback)
@@ -53,6 +55,35 @@ Please refer to the following documentation:
 </a>
 
 Please refer to [ESP-Brookesia Programming Guide - How to Use Example Projects](https://docs.espressif.com/projects/esp-brookesia/en/latest/getting_started.html#getting-started-example-projects).
+
+## ⚡ Build Performance
+
+The example builds the complete dependency set by default. It enables ccache and limits simultaneous compile edges for first-party Brookesia C++ targets and `esp-boost`, whose template-heavy translation units have the highest peak compiler memory use. The same tuning is available to all first-party examples and test apps.
+
+| CMake option | Default | Description |
+| --- | --- | --- |
+| `CCACHE_ENABLE` | `ON` | Reuses compiler results in repeat builds |
+| `BROOKESIA_CXX_JOBS` | `6` | Ninja job-pool size for C++-bearing Brookesia and `esp-boost` targets; set to `0` to disable |
+| `BROOKESIA_FAST_COMPILE` | `OFF` | Uses `-g1` for Brookesia C++ sources to reduce debug-information generation during local development |
+| `BROOKESIA_COMPILE_TUNING_INCLUDE_ESP_BOOST` | `ON` | Include `esp-boost` in the shared C++ job pool when the target exists |
+
+For a memory-constrained workstation, reduce `BROOKESIA_CXX_JOBS`, for example:
+
+```bash
+idf.py -B build -D BROOKESIA_CXX_JOBS=3 build
+```
+
+The existing GCC IPA-clone compile options remain enabled independently of the job-pool setting. The old `BROOKESIA_SUPER_CXX_JOBS` and `BROOKESIA_SUPER_FAST_COMPILE` names remain accepted as deprecated aliases.
+
+## 📊 Build Analysis
+
+After configuration or compilation, generate a report from the build metadata:
+
+```bash
+python3 tools/analyze_build.py build
+```
+
+The tool reads `project_description.json`, `compile_commands.json`, `.ninja_log`, and Ninja dependency metadata. It writes only `brookesia_build_analysis.json` and `brookesia_build_analysis.md` inside the selected build directory. Use `--skip-deps` when only translation-unit and Ninja timing statistics are needed.
 
 ## 🚀 Quick Start
 

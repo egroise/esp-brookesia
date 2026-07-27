@@ -18,3 +18,5 @@ project(example_agent_chatbot)
 
 # Temporary workaround for `espressif__mcp-c-sdk` stringop-truncation warning
 idf_build_set_property(COMPILE_OPTIONS -Wno-error=stringop-truncation APPEND)
+
+brookesia_compile_tuning_apply_current_project()

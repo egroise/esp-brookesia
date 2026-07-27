@@ -26,6 +26,7 @@ public:
 
     void init_audio();
     void start_device();
+    void start_bt_speaker();
 
 private:
     GeneralServices() = default;

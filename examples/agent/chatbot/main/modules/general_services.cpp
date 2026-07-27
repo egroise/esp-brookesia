@@ -14,6 +14,7 @@
 using namespace esp_brookesia;
 
 using AudioPlaybackHelper = esp_brookesia::service::helper::AudioPlayback;
+using BtSpeakerHelper = esp_brookesia::service::helper::BtSpeaker;
 using DeviceHelper = esp_brookesia::service::helper::Device;
 
 constexpr const char *AUDIO_WAKEUP_WORD_MODEL_PARTITION_LABEL = "model";
@@ -100,5 +101,50 @@ void GeneralServices::start_device()
         BROOKESIA_LOGE("Failed to bind Device service");
     } else {
         service_bindings_.push_back(std::move(binding));
+    }
+}
+
+void GeneralServices::start_bt_speaker()
+{
+    BROOKESIA_CHECK_FALSE_EXIT(is_initialized(), "General services is not initialized");
+
+    if (!BtSpeakerHelper::is_available()) {
+        BROOKESIA_LOGW("BtSpeaker service is not available; chatbot continues without A2DP");
+        return;
+    }
+
+    auto &service_manager = service::ServiceManager::get_instance();
+    auto binding = service_manager.bind(BtSpeakerHelper::get_name().data());
+    if (!binding.is_valid()) {
+        BROOKESIA_LOGW("Failed to bind BtSpeaker service; chatbot continues without A2DP");
+        return;
+    }
+    service_bindings_.push_back(std::move(binding));
+
+    BtSpeakerHelper::Config config{
+        .device = {
+            .device_name = "ESP-Brookesia",
+            .discoverable = true,
+            .connectable = true,
+        },
+        .stop_local_playback_on_connect = true,
+    };
+    auto config_json = BROOKESIA_DESCRIBE_TO_JSON(config);
+    if (!config_json.is_object()) {
+        BROOKESIA_LOGW("Failed to serialize BtSpeaker configuration; chatbot continues without A2DP");
+        return;
+    }
+
+    auto config_result = BtSpeakerHelper::call_function_sync(
+                             BtSpeakerHelper::FunctionId::SetConfig, config_json.as_object()
+                         );
+    if (!config_result) {
+        BROOKESIA_LOGW("BtSpeaker SetConfig failed: %1%", config_result.error());
+        return;
+    }
+
+    auto start_result = BtSpeakerHelper::call_function_sync(BtSpeakerHelper::FunctionId::Start);
+    if (!start_result) {
+        BROOKESIA_LOGW("BtSpeaker Start failed: %1%", start_result.error());
     }
 }
