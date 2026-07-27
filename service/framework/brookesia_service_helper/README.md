@@ -8,6 +8,10 @@
 
 For more information, see the [ESP-Brookesia Programming Guide](https://docs.espressif.com/projects/esp-brookesia/en/latest/service/framework/helper/index.html).
 
+## DataFlow Helper
+
+The `DataFlow` helper provides typed control-plane access to provider discovery, operation ownership, lifecycle, and source routing. Native frame and audio-buffer access remains available through the typed C++ operation interfaces.
+
 ## How to Use
 
 ### Environment Requirements

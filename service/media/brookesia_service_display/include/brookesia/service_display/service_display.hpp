@@ -30,6 +30,7 @@
 #include "brookesia/service_helper/media/display.hpp"
 #include "brookesia/service_helper/system/storage.hpp"
 #include "brookesia/service_manager/common.hpp"
+#include "brookesia/service_manager/dataflow/registration.hpp"
 #include "brookesia/service_manager/service/base.hpp"
 
 namespace esp_brookesia::service {
@@ -228,7 +229,7 @@ private:
         uint32_t active_source_id = 0;
         uint32_t touch_id = 0;
         TouchGestureConfig gesture_config;
-        lib_utils::TaskScheduler::TaskId gesture_task_id = 0;
+        lib_utils::TaskSchedulerTaskId gesture_task_id = 0;
         TouchGestureInfo gesture_info;
         uint64_t gesture_touch_start_time_ms = 0;
         uint64_t gesture_release_start_time_ms = 0;
@@ -259,7 +260,7 @@ private:
         hal::InterfaceHandle<hal::display::TouchIface> touch;
         TouchSnapshot snapshot;
         std::shared_ptr<TouchInterruptBridge> interrupt_bridge;
-        lib_utils::TaskScheduler::TaskId poll_task_id = 0;
+        lib_utils::TaskSchedulerTaskId poll_task_id = 0;
         bool read_scheduled = false;
         std::optional<std::vector<TouchPoint>> injected_points; ///< Active synthetic touch override.
         uint32_t injected_sequence = 0; ///< Monotonic sequence so each injection is observed once.
@@ -492,6 +493,7 @@ private:
     FramePresentedSignal frame_presented_signal_;
     TouchUpdatedSignal touch_updated_signal_;
     TouchGestureSignal touch_gesture_signal_;
+    dataflow::ProviderRegistration dataflow_provider_registration_;
 };
 
 } // namespace esp_brookesia::service

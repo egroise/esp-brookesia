@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <chrono>
 #include <limits>
+#include <span>
+#include <string_view>
 #include <utility>
 
 #include "boost/format.hpp"
@@ -18,13 +20,16 @@
 #include "brookesia/lib_utils/plugin.hpp"
 #include "brookesia/hal_interface/interface.hpp"
 #include "brookesia/hal_interface/interfaces/video/processor.hpp"
+#include "brookesia/service_manager/dataflow/registry.hpp"
+#include "brookesia/service_manager/service/manager.hpp"
 #include "brookesia/service_video/encoder.hpp"
 
 namespace esp_brookesia::service {
 
 namespace {
 
-constexpr uint32_t DISPLAY_DRAW_TIMEOUT_MS_DEFAULT = BROOKESIA_SERVICE_DISPLAY_DRAW_TIMEOUT_MS;
+constexpr uint32_t VISUAL_DRAW_TIMEOUT_MS_DEFAULT = 5000;
+constexpr std::string_view VISUAL_DATAFLOW_PROVIDER_ID_DEFAULT{};
 constexpr uint32_t OPERATION_CLOSE_TIMEOUT_MS = 1000;
 constexpr uint32_t OPERATION_STOP_TIMEOUT_MS = 1000;
 
@@ -297,31 +302,52 @@ std::expected<void, std::string> VideoEncoder::setup_display_output(BaseHelper::
         return std::unexpected("Video encoder Display sink index is out of range");
     }
 
-    auto &display_service = Display::get_instance();
-    auto binding = ServiceManager::get_instance().bind(Display::Helper::get_name().data());
-    if (!binding.is_valid()) {
-        return std::unexpected("Failed to bind Display service");
+    const auto source_name = display_config->source_name.empty() ?
+                             std::string(BaseHelper::DISPLAY_SOURCE_NAME) : display_config->source_name;
+    const auto source_role = display_config->source_role.empty() ?
+                             std::string(BaseHelper::DISPLAY_SOURCE_ROLE) : display_config->source_role;
+    dataflow::VisualOperationConfig operation_config;
+    operation_config.owner = get_attributes().name;
+    operation_config.provider_id = std::string(VISUAL_DATAFLOW_PROVIDER_ID_DEFAULT);
+    operation_config.model = dataflow::Model::Visual;
+    operation_config.source = {
+        .name = source_name,
+        .role = source_role,
+        .preferred_outputs = {},
+        .priority = 0,
+    };
+    auto operation_result = ServiceManager::get_instance().get_dataflow_registry().open_visual_operation(
+                                std::move(operation_config)
+                            );
+    if (!operation_result) {
+        return std::unexpected("Failed to open visual data-flow operation: " + operation_result.error());
     }
+    auto display_operation = std::move(operation_result.value());
+    auto operation_cleanup_guard = lib_utils::FunctionGuard([&display_operation]() {
+        if (display_operation) {
+            display_operation->close();
+        }
+    });
 
-    const auto outputs = display_service.get_outputs();
+    const auto outputs = display_operation->get_outputs();
     if (outputs.empty()) {
-        return std::unexpected("No Display output is available");
+        return std::unexpected("No visual data-flow output is available");
     }
 
     const auto output_it = display_config->output_name.empty() ?
                            outputs.begin() :
     std::find_if(outputs.begin(), outputs.end(), [&](const auto & output) {
-        return output.name == display_config->output_name;
+        return output.output.name == display_config->output_name;
     });
     if (output_it == outputs.end()) {
-        return std::unexpected("Requested Display output is not available");
+        return std::unexpected("Requested visual data-flow output is not available");
     }
-    if ((output_it->width > std::numeric_limits<uint16_t>::max()) ||
-            (output_it->height > std::numeric_limits<uint16_t>::max())) {
-        return std::unexpected("Display output size exceeds video encoder config range");
+    if ((output_it->output.width > std::numeric_limits<uint16_t>::max()) ||
+            (output_it->output.height > std::numeric_limits<uint16_t>::max())) {
+        return std::unexpected("Visual output size exceeds video encoder config range");
     }
-    if ((display_config->x >= output_it->width) || (display_config->y >= output_it->height)) {
-        return std::unexpected("Video encoder Display origin is outside the output area");
+    if ((display_config->x >= output_it->output.width) || (display_config->y >= output_it->output.height)) {
+        return std::unexpected("Video encoder visual origin is outside the output area");
     }
 
     auto sink_format_result = to_encoder_sink_format(output_it->pixel_format);
@@ -336,8 +362,8 @@ std::expected<void, std::string> VideoEncoder::setup_display_output(BaseHelper::
         return std::unexpected("Video encoder Display sink format does not match the Display output");
     }
 
-    const uint32_t max_width = output_it->width - display_config->x;
-    const uint32_t max_height = output_it->height - display_config->y;
+    const uint32_t max_width = output_it->output.width - display_config->x;
+    const uint32_t max_height = output_it->output.height - display_config->y;
     if (sink.width == 0) {
         sink.width = static_cast<uint16_t>(max_width);
     }
@@ -351,48 +377,28 @@ std::expected<void, std::string> VideoEncoder::setup_display_output(BaseHelper::
         return std::unexpected("Video encoder Display frame size exceeds the output area");
     }
 
-    auto source_name = display_config->source_name.empty() ?
-                       std::string(BaseHelper::DISPLAY_SOURCE_NAME) : display_config->source_name;
-    auto source_role = display_config->source_role.empty() ?
-                       std::string(BaseHelper::DISPLAY_SOURCE_ROLE) : display_config->source_role;
-    Display::SourceInfo source_info = {
-        .name = source_name,
-        .role = source_role,
-        .preferred_outputs = {output_it->name},
-        .priority = 0,
-    };
-    auto source_result = display_service.register_source(std::move(source_info));
-    if (!source_result) {
-        return std::unexpected("Failed to register Display video source: " + source_result.error());
-    }
-
-    const auto source_id = source_result.value();
-    auto source_cleanup_guard = lib_utils::FunctionGuard([&display_service, source_id]() {
-        (void)display_service.unregister_source(source_id);
-    });
-    auto request_result = display_service.request_output(source_id, output_it->name);
+    auto request_result = display_operation->request_output(output_it->output.name);
     if (!request_result) {
-        return std::unexpected("Failed to request Display output: " + request_result.error());
+        return std::unexpected("Failed to request visual data-flow output: " + request_result.error());
     }
     if (display_config->activate_source) {
-        auto active_result = display_service.set_active_source(output_it->name, source_name);
+        auto active_result = display_operation->set_active_source(output_it->output.name);
         if (!active_result) {
-            return std::unexpected("Failed to activate Display video source: " + active_result.error());
+            return std::unexpected("Failed to activate visual data-flow source: " + active_result.error());
         }
     }
 
-    display_binding_ = std::move(binding);
-    display_source_id_ = source_id;
-    display_output_name_ = output_it->name;
+    display_operation_ = std::move(display_operation);
+    display_output_name_ = output_it->output.name;
     display_pixel_format_ = output_it->pixel_format;
     display_x_ = display_config->x;
     display_y_ = display_config->y;
     display_draw_timeout_ms_ = display_config->draw_timeout_ms == 0 ?
-                               DISPLAY_DRAW_TIMEOUT_MS_DEFAULT : display_config->draw_timeout_ms;
+                               VISUAL_DRAW_TIMEOUT_MS_DEFAULT : display_config->draw_timeout_ms;
     display_sink_index_ = display_config->sink_index;
     display_present_warning_count_ = 0;
     publish_sink_event_ = display_config->publish_sink_event;
-    source_cleanup_guard.release();
+    operation_cleanup_guard.release();
 
     BROOKESIA_LOGI(
         "Video encoder Display preview enabled: source(%1%), output(%2%), origin(%3%,%4%), "
@@ -406,23 +412,18 @@ std::expected<void, std::string> VideoEncoder::setup_display_output(BaseHelper::
 
 void VideoEncoder::clear_display_output()
 {
-    if (display_source_id_ != 0) {
-        auto &display_service = Display::get_instance();
-        if (!display_output_name_.empty()) {
-            (void)display_service.release_output(display_source_id_, display_output_name_);
-        }
-        (void)display_service.unregister_source(display_source_id_);
+    if (display_operation_) {
+        display_operation_->close();
+        display_operation_.reset();
     }
 
-    display_source_id_ = 0;
     display_output_name_.clear();
-    display_pixel_format_ = Display::PixelFormat::Max;
+    display_pixel_format_ = dataflow::VisualPixelFormat::Unknown;
     display_x_ = 0;
     display_y_ = 0;
     display_draw_timeout_ms_ = 0;
     display_sink_index_ = 0;
     display_present_warning_count_ = 0;
-    display_binding_.release();
     publish_sink_event_ = true;
 }
 
@@ -431,20 +432,20 @@ void VideoEncoder::on_encoder_frame(
     size_t size
 )
 {
-    if ((display_source_id_ != 0) && (sink_index == display_sink_index_) && (data != nullptr) && (size > 0)) {
-        Display::FrameInfo frame = {
+    if (display_operation_ && display_operation_->is_available() && (sink_index == display_sink_index_) &&
+            (data != nullptr) && (size > 0)) {
+        dataflow::VisualFrameInfo frame = {
             .x = display_x_,
             .y = display_y_,
             .width = sink_info.width,
             .height = sink_info.height,
             .pixel_format = display_pixel_format_,
         };
-        auto result = Display::get_instance().present_frame_sync(
-                          display_source_id_, display_output_name_, frame, RawBuffer(data, size),
-                          display_draw_timeout_ms_
+        auto result = display_operation_->present_frame_sync(
+                          display_output_name_, frame, std::span<const uint8_t>(data, size), display_draw_timeout_ms_
                       );
-        if ((result != Display::PresentResult::Presented) &&
-                (result != Display::PresentResult::DroppedNotActive)) {
+        if ((result != dataflow::VisualPresentResult::Presented) &&
+                (result != dataflow::VisualPresentResult::DroppedNotActive)) {
             if ((display_present_warning_count_++ % 30) == 0) {
                 BROOKESIA_LOGW("Failed to present encoded video frame to Display: %1%",
                                BROOKESIA_DESCRIBE_ENUM_TO_STR(result));
@@ -477,16 +478,16 @@ hal::video::EncoderConfig VideoEncoder::to_hal_config(const BaseHelper::EncoderC
 }
 
 std::expected<helper::Video::EncoderSinkFormat, std::string> VideoEncoder::to_encoder_sink_format(
-    Display::PixelFormat pixel_format
+    dataflow::VisualPixelFormat pixel_format
 ) const
 {
     switch (pixel_format) {
-    case Display::PixelFormat::RGB565:
+    case dataflow::VisualPixelFormat::RGB565:
         return BaseHelper::EncoderSinkFormat::RGB565;
-    case Display::PixelFormat::RGB888:
+    case dataflow::VisualPixelFormat::RGB888:
         return BaseHelper::EncoderSinkFormat::RGB888;
     default:
-        return std::unexpected("Display output pixel format is not supported by Video encoder preview");
+        return std::unexpected("Visual output pixel format is not supported by Video encoder preview");
     }
 }
 

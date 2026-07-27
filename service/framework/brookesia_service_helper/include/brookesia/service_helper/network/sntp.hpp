@@ -6,9 +6,10 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <span>
-#include <vector>
 #include "brookesia/lib_utils/describe_helpers.hpp"
+#include "brookesia/service_manager/detail/static_schema.hpp"
 #include "brookesia/service_manager/helper/base.hpp"
 
 namespace esp_brookesia::service::helper {
@@ -61,197 +62,158 @@ public:
         Max,
     };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the function parameter types ////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /**
      * @brief Parameter keys for `FunctionId::SetServers`.
      */
-    enum class FunctionSetServersParam {
-        Servers,
-    };
 
     /**
      * @brief Parameter keys for `FunctionId::SetTimezone`.
      */
-    enum class FunctionSetTimezoneParam {
-        Timezone,
-    };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the event parameter types ///////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /**
      * @brief Event keys for `EventId::StateChanged`.
      */
-    enum class EventStateChangedParam {
-        State,
-    };
 
     /**
      * @brief Event keys for `EventId::TimezoneChanged`.
      */
-    enum class EventTimezoneChangedParam {
-        Timezone,
-    };
 
 private:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the function schemas /////////////////////////////////////////////////////
+/////////////////////////// The following are the static schema specifications ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    static FunctionSchema function_schema_set_servers()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(FunctionId::SetServers),
-            .description = "Set NTP servers.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionSetServersParam::Servers),
-                    .description = (boost::format("NTP servers as JSON array<string>. Example: %1%")
-                    % BROOKESIA_DESCRIBE_JSON_SERIALIZE(std::vector<std::string>({
-                        "pool.ntp.org",
-                        "cn.pool.ntp.org"
-                    }))).str(),
-                    .type = FunctionValueType::Array
-                }
-            },
-            .require_scheduler = false
-        };
-    }
+    using EventItemSpec = detail::static_schema::EventItemSpec;
+    using EventSpec = detail::static_schema::EventSpec;
+    using FunctionParameterSpec = detail::static_schema::FunctionParameterSpec;
+    using FunctionReturnSpec = detail::static_schema::FunctionReturnSpec;
+    using FunctionSpec = detail::static_schema::FunctionSpec;
 
-    static FunctionSchema function_schema_set_timezone()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(FunctionId::SetTimezone),
-            .description = "Set timezone.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionSetTimezoneParam::Timezone),
-                    .description = "Timezone string.",
-                    .type = FunctionValueType::String
-                }
-            },
-            .require_scheduler = false
-        };
-    }
+    inline static constexpr std::span<const FunctionParameterSpec> EMPTY_PARAMETERS = {};
 
-    static FunctionSchema function_schema_start()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(FunctionId::Start),
-            .description = "Start SNTP service.",
-        };
-    }
-
-    static FunctionSchema function_schema_stop()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(FunctionId::Stop),
-            .description = "Stop SNTP service.",
-        };
-    }
-
-    static FunctionSchema function_schema_get_servers()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(FunctionId::GetServers),
-            .description = "Get NTP servers.",
-            .return_value = FunctionReturnSchema{
+    inline static constexpr std::array<FunctionParameterSpec, 1> SET_SERVERS_PARAMETERS = {{
+            {
+                .name = "Servers",
+                .description = R"(NTP servers as JSON array<string>. Example: ["pool.ntp.org","cn.pool.ntp.org"])",
                 .type = FunctionValueType::Array,
-                .description = (boost::format("Example: %1%")
-                % BROOKESIA_DESCRIBE_JSON_SERIALIZE(std::vector<std::string>({
-                    "pool.ntp.org",
-                    "cn.pool.ntp.org"
-                }))).str(),
             },
-        };
-    }
+        }
+    };
 
-    static FunctionSchema function_schema_get_timezone()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(FunctionId::GetTimezone),
-            .description = "Get timezone.",
-            .return_value = FunctionReturnSchema{
+    inline static constexpr std::array<FunctionParameterSpec, 1> SET_TIMEZONE_PARAMETERS = {{
+            {
+                .name = "Timezone",
+                .description = "Timezone string.",
                 .type = FunctionValueType::String,
-                .description = "Example: \"CST-8\"",
             },
-        };
-    }
+        }
+    };
 
-    static FunctionSchema function_schema_get_state()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(FunctionId::GetState),
-            .description = "Get SNTP synchronization state.",
-            .return_value = FunctionReturnSchema{
-                .type = FunctionValueType::String,
-                .description = (boost::format("Example: \"%1%\"")
-                                % BROOKESIA_DESCRIBE_ENUM_TO_STR(State::CheckingNetwork)).str(),
+    inline static constexpr std::array<FunctionSpec, static_cast<std::size_t>(FunctionId::Max)> FUNCTION_SPECS = {{
+            {
+                .name = "SetServers",
+                .description = "Set NTP servers.",
+                .parameters = SET_SERVERS_PARAMETERS,
+                .require_scheduler = false,
             },
-        };
-    }
-
-    static FunctionSchema function_schema_is_time_synced()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(FunctionId::IsTimeSynced),
-            .description = "Check whether time is synced.",
-            .return_value = FunctionReturnSchema{
-                .type = FunctionValueType::Boolean,
-                .description = "Example: true",
+            {
+                .name = "SetTimezone",
+                .description = "Set timezone.",
+                .parameters = SET_TIMEZONE_PARAMETERS,
+                .require_scheduler = false,
             },
-        };
-    }
-
-    static FunctionSchema function_schema_reset_data()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(FunctionId::ResetData),
-            .description = "Reset NTP servers, timezone, and sync status.",
-        };
-    }
-
-    static FunctionSchema function_schema_load_data()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(FunctionId::LoadData),
-            .description = "Load persisted NTP servers and timezone.",
-        };
-    }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the event schemas /////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    static EventSchema event_schema_state_changed()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(EventId::StateChanged),
-            .description = "Published when the SNTP synchronization state changes.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventStateChangedParam::State),
-                    .description = "Current SNTP synchronization state.",
-                    .type = EventItemType::String,
+            {
+                .name = "Start",
+                .description = "Start SNTP service.",
+                .parameters = EMPTY_PARAMETERS,
+            },
+            {
+                .name = "Stop",
+                .description = "Stop SNTP service.",
+                .parameters = EMPTY_PARAMETERS,
+            },
+            {
+                .name = "GetServers",
+                .description = "Get NTP servers.",
+                .parameters = EMPTY_PARAMETERS,
+                .return_value = FunctionReturnSpec{
+                    .type = FunctionValueType::Array,
+                    .description = R"(Example: ["pool.ntp.org","cn.pool.ntp.org"])",
                 },
             },
-        };
-    }
-
-    static EventSchema event_schema_timezone_changed()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(EventId::TimezoneChanged),
-            .description = "Published when the SNTP timezone changes.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventTimezoneChangedParam::Timezone),
-                    .description = "Current timezone string.",
-                    .type = EventItemType::String,
+            {
+                .name = "GetTimezone",
+                .description = "Get timezone.",
+                .parameters = EMPTY_PARAMETERS,
+                .return_value = FunctionReturnSpec{
+                    .type = FunctionValueType::String,
+                    .description = R"(Example: "CST-8")",
                 },
             },
-        };
-    }
+            {
+                .name = "GetState",
+                .description = "Get SNTP synchronization state.",
+                .parameters = EMPTY_PARAMETERS,
+                .return_value = FunctionReturnSpec{
+                    .type = FunctionValueType::String,
+                    .description = R"(Example: "CheckingNetwork")",
+                },
+            },
+            {
+                .name = "IsTimeSynced",
+                .description = "Check whether time is synced.",
+                .parameters = EMPTY_PARAMETERS,
+                .return_value = FunctionReturnSpec{
+                    .type = FunctionValueType::Boolean,
+                    .description = "Example: true",
+                },
+            },
+            {
+                .name = "LoadData",
+                .description = "Load persisted NTP servers and timezone.",
+                .parameters = EMPTY_PARAMETERS,
+            },
+            {
+                .name = "ResetData",
+                .description = "Reset NTP servers, timezone, and sync status.",
+                .parameters = EMPTY_PARAMETERS,
+            },
+        }
+    };
+
+    inline static constexpr std::array<EventItemSpec, 1> STATE_CHANGED_ITEMS = {{
+            {
+                .name = "State",
+                .description = "Current SNTP synchronization state.",
+                .type = EventItemType::String,
+            },
+        }
+    };
+
+    inline static constexpr std::array<EventItemSpec, 1> TIMEZONE_CHANGED_ITEMS = {{
+            {
+                .name = "Timezone",
+                .description = "Current timezone string.",
+                .type = EventItemType::String,
+            },
+        }
+    };
+
+    inline static constexpr std::array<EventSpec, static_cast<std::size_t>(EventId::Max)> EVENT_SPECS = {{
+            {
+                .name = "StateChanged",
+                .description = "Published when the SNTP synchronization state changes.",
+                .items = STATE_CHANGED_ITEMS,
+            },
+            {
+                .name = "TimezoneChanged",
+                .description = "Published when the SNTP timezone changes.",
+                .items = TIMEZONE_CHANGED_ITEMS,
+            },
+        }
+    };
+
+    static_assert(FUNCTION_SPECS.size() == static_cast<std::size_t>(FunctionId::Max));
+    static_assert(EVENT_SPECS.size() == static_cast<std::size_t>(EventId::Max));
 
 public:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -274,20 +236,13 @@ public:
      */
     static std::span<const FunctionSchema> get_function_schemas()
     {
-        static const std::array<FunctionSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(FunctionId::Max)> FUNCTION_SCHEMAS = {{
-                function_schema_set_servers(),
-                function_schema_set_timezone(),
-                function_schema_start(),
-                function_schema_stop(),
-                function_schema_get_servers(),
-                function_schema_get_timezone(),
-                function_schema_get_state(),
-                function_schema_is_time_synced(),
-                function_schema_load_data(),
-                function_schema_reset_data(),
-            }
-        };
-        return std::span<const FunctionSchema>(FUNCTION_SCHEMAS);
+        static std::array<FunctionSchema, FUNCTION_SPECS.size()> schemas;
+        static const bool initialized = [] {
+            detail::static_schema::materialize_function_schemas(FUNCTION_SPECS, schemas);
+            return true;
+        }();
+        static_cast<void>(initialized);
+        return schemas;
     }
 
     /**
@@ -297,12 +252,13 @@ public:
      */
     static std::span<const EventSchema> get_event_schemas()
     {
-        static const std::array<EventSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(EventId::Max)> EVENT_SCHEMAS = {{
-                event_schema_state_changed(),
-                event_schema_timezone_changed(),
-            }
-        };
-        return std::span<const EventSchema>(EVENT_SCHEMAS);
+        static std::array<EventSchema, EVENT_SPECS.size()> schemas;
+        static const bool initialized = [] {
+            detail::static_schema::materialize_event_schemas(EVENT_SPECS, schemas);
+            return true;
+        }();
+        static_cast<void>(initialized);
+        return schemas;
     }
 };
 
@@ -315,9 +271,5 @@ BROOKESIA_DESCRIBE_ENUM(
     LoadData, ResetData, Max
 );
 BROOKESIA_DESCRIBE_ENUM(SNTP::EventId, StateChanged, TimezoneChanged, Max);
-BROOKESIA_DESCRIBE_ENUM(SNTP::FunctionSetServersParam, Servers);
-BROOKESIA_DESCRIBE_ENUM(SNTP::FunctionSetTimezoneParam, Timezone);
-BROOKESIA_DESCRIBE_ENUM(SNTP::EventStateChangedParam, State);
-BROOKESIA_DESCRIBE_ENUM(SNTP::EventTimezoneChangedParam, Timezone);
 
 } // namespace esp_brookesia::service::helper

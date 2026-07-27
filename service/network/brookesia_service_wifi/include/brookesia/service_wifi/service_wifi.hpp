@@ -72,7 +72,7 @@ private:
             StorageHelper::get_name().data(),
         },
 #if BROOKESIA_SERVICE_WIFI_ENABLE_WORKER
-        .task_scheduler_config = lib_utils::TaskScheduler::StartConfig{
+        .task_scheduler_config = lib_utils::TaskSchedulerStartConfig{
             .worker_configs = {
                 lib_utils::ThreadConfig{
                     .name = BROOKESIA_SERVICE_WIFI_WORKER_NAME "0",
@@ -161,14 +161,6 @@ private:
                 Helper, Helper::FunctionId::SetScanParams, boost::json::object,
                 function_set_scan_params(PARAM)
             ),
-            BROOKESIA_SERVICE_HELPER_FUNC_HANDLER_1(
-                Helper, Helper::FunctionId::SetSoftApParams, boost::json::object,
-                function_set_softap_params(PARAM)
-            ),
-            BROOKESIA_SERVICE_HELPER_FUNC_HANDLER_0(
-                Helper, Helper::FunctionId::GetSoftApParams,
-                function_get_softap_params()
-            ),
             BROOKESIA_SERVICE_HELPER_FUNC_HANDLER_0(
                 Helper, Helper::FunctionId::TriggerScanStart,
                 function_trigger_scan_start()
@@ -176,6 +168,14 @@ private:
             BROOKESIA_SERVICE_HELPER_FUNC_HANDLER_0(
                 Helper, Helper::FunctionId::TriggerScanStop,
                 function_trigger_scan_stop()
+            ),
+            BROOKESIA_SERVICE_HELPER_FUNC_HANDLER_1(
+                Helper, Helper::FunctionId::SetSoftApParams, boost::json::object,
+                function_set_softap_params(PARAM)
+            ),
+            BROOKESIA_SERVICE_HELPER_FUNC_HANDLER_0(
+                Helper, Helper::FunctionId::GetSoftApParams,
+                function_get_softap_params()
             ),
             BROOKESIA_SERVICE_HELPER_FUNC_HANDLER_0(
                 Helper, Helper::FunctionId::TriggerSoftApStart,
@@ -204,7 +204,7 @@ private:
         };
     }
 
-    lib_utils::TaskScheduler::Group get_state_task_group() const
+    lib_utils::TaskSchedulerGroup get_state_task_group() const
     {
         return get_call_task_group();
     }
@@ -316,8 +316,8 @@ private:
     uint8_t connect_retries_ = 0;
     std::queue<GeneralAction> general_action_pending_queue_;
     std::queue<GeneralAction> general_action_ready_queue_;
-    lib_utils::TaskScheduler::TaskId general_action_queue_processing_task_ = 0;
-    lib_utils::TaskScheduler::TaskId auto_connect_task_ = 0;
+    lib_utils::TaskSchedulerTaskId general_action_queue_processing_task_ = 0;
+    lib_utils::TaskSchedulerTaskId auto_connect_task_ = 0;
 
     /* Direct synchronization for on_stop -> HAL Deinited handshake.
      * We can't go through publish_event() here because ServiceBase::stop() holds a unique

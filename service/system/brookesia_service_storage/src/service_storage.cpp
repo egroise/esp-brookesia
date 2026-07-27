@@ -537,6 +537,14 @@ std::expected<std::string, std::string> read_file_to_string(const std::filesyste
     }
 
     std::string result;
+    std::error_code size_error;
+    const auto expected_size = std::filesystem::file_size(path, size_error);
+    if (!size_error) {
+        if (expected_size > static_cast<uintmax_t>(result.max_size())) {
+            return std::unexpected("Storage FS text file is too large: " + path.generic_string());
+        }
+        result.reserve(static_cast<size_t>(expected_size));
+    }
     while (input) {
         input.read(reinterpret_cast<char *>(chunk.data()), static_cast<std::streamsize>(chunk.size()));
         const auto bytes_read = input.gcount();
@@ -1015,6 +1023,7 @@ std::expected<std::string, std::string> Storage::function_fs_read_text(const std
     }
 
     auto result = read_file_to_string(path.value());
+
     return result;
 }
 

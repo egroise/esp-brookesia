@@ -11,7 +11,6 @@
 #endif
 #include "private/utils.hpp"
 #include "brookesia/lib_utils/function_guard.hpp"
-#include "brookesia/service_helper/media/audio.hpp"
 #include "brookesia/service_helper/network/sntp.hpp"
 #include "brookesia/service_manager/service/manager.hpp"
 #include "brookesia/agent_manager/state_machine.hpp"

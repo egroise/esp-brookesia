@@ -16,7 +16,7 @@
 #include "brookesia/lib_utils/describe_helpers.hpp"
 #include "brookesia/lib_utils/plugin.hpp"
 #include "brookesia/service_helper/system/storage.hpp"
-#include "brookesia/service_manager.hpp"
+#include "brookesia/service_manager/service/manager.hpp"
 #include "brookesia/service_sntp/service_sntp.hpp"
 
 namespace esp_brookesia::service {

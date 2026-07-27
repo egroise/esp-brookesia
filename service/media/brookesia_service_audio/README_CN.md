@@ -8,6 +8,10 @@
 
 更多信息请参考 [ESP-Brookesia 编程指南](https://docs.espressif.com/projects/esp-brookesia/zh_CN/latest/service/audio.html)。
 
+## DataFlow 集成
+
+该服务会向 Service Manager 注册由 provider 提供的音频播放和采集操作。应用可以通过类型安全的 DataFlow 合约或 `DataFlow` helper 选择可用 provider，无需直接绑定编解码器或设备实现。
+
 ## 如何使用
 
 ### 开发环境要求

@@ -692,9 +692,9 @@ BROOKESIA_TEST_CASE(
             .name = "Play single URL",
             .method = BROOKESIA_DESCRIBE_ENUM_TO_STR(AudioPlaybackHelper::FunctionId::Play),
             .params = boost::json::object{
-                {BROOKESIA_DESCRIBE_TO_STR(AudioHelper::PlaybackFunctionPlayParam::Url), get_audio_file_path("0.mp3")},
+                {"Url", get_audio_file_path("0.mp3")},
                 {
-                    BROOKESIA_DESCRIBE_TO_STR(AudioHelper::PlaybackFunctionPlayParam::Config),
+                    "Config",
                     BROOKESIA_DESCRIBE_TO_JSON(play_config)
                 }
             },
@@ -707,11 +707,11 @@ BROOKESIA_TEST_CASE(
             .method = BROOKESIA_DESCRIBE_ENUM_TO_STR(AudioPlaybackHelper::FunctionId::PlayUrls),
             .params = boost::json::object{
                 {
-                    BROOKESIA_DESCRIBE_TO_STR(AudioHelper::PlaybackFunctionPlayUrlsParam::Urls),
+                    "Urls",
                     BROOKESIA_DESCRIBE_TO_JSON(urls)
                 },
                 {
-                    BROOKESIA_DESCRIBE_TO_STR(AudioHelper::PlaybackFunctionPlayUrlsParam::Config),
+                    "Config",
                     BROOKESIA_DESCRIBE_TO_JSON(play_config)
                 }
             },

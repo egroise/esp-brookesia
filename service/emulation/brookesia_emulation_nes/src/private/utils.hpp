@@ -6,4 +6,5 @@
 #pragma once
 
 #define BROOKESIA_LOG_TAG "SvcNES"
-#include "brookesia/lib_utils.hpp"
+#include "brookesia/lib_utils/check.hpp"
+#include "brookesia/lib_utils/log.hpp"

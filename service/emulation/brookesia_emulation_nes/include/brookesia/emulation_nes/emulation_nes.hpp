@@ -84,8 +84,8 @@ private:
     void publish_error(const std::string &message);
     bool start_frame_task_locked();
     bool start_audio_task_locked();
-    void take_task_ids_locked(std::vector<lib_utils::TaskScheduler::TaskId> &task_ids);
-    void cancel_and_wait_task_ids(const std::vector<lib_utils::TaskScheduler::TaskId> &task_ids);
+    void take_task_ids_locked(std::vector<lib_utils::TaskSchedulerTaskId> &task_ids);
+    void cancel_and_wait_task_ids(const std::vector<lib_utils::TaskSchedulerTaskId> &task_ids);
     bool frame_task();
     bool audio_task();
     bool frame_step(bool draw_video, FrameStepStats *stats);
@@ -96,8 +96,8 @@ private:
     std::shared_ptr<Runtime> runtime_;
     Config config_;
     State state_ = State::Idle;
-    lib_utils::TaskScheduler::TaskId frame_task_id_ = 0;
-    lib_utils::TaskScheduler::TaskId audio_task_id_ = 0;
+    lib_utils::TaskSchedulerTaskId frame_task_id_ = 0;
+    lib_utils::TaskSchedulerTaskId audio_task_id_ = 0;
     int64_t next_frame_deadline_ms_ = 0;
     bool skip_next_video_frame_ = false;
     uint32_t base_frame_skip_ = 0;

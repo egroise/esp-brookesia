@@ -184,9 +184,9 @@ private:
     void try_erase_data();
 
     std::shared_ptr<lib_utils::TaskScheduler> scheduler_;
-    lib_utils::TaskScheduler::TaskId wait_for_network_task_id_ = 0;
-    lib_utils::TaskScheduler::TaskId sync_time_task_id_ = 0;
-    lib_utils::TaskScheduler::TaskId retry_task_id_ = 0;
+    lib_utils::TaskSchedulerTaskId wait_for_network_task_id_ = 0;
+    lib_utils::TaskSchedulerTaskId sync_time_task_id_ = 0;
+    lib_utils::TaskSchedulerTaskId retry_task_id_ = 0;
 
     hal::InterfaceHandle<hal::network::SntpClientIface> sntp_iface_;
     hal::InterfaceHandle<hal::network::ConnectivityIface> connectivity_iface_;

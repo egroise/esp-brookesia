@@ -258,7 +258,7 @@ private:
     bool is_chat_listening_ = false;
     void *chat_handle_ = nullptr;
     std::string speaking_text_{};
-    lib_utils::TaskScheduler::TaskId speaking_text_task_id_ = 0;
+    lib_utils::TaskSchedulerTaskId speaking_text_task_id_ = 0;
 };
 
 BROOKESIA_DESCRIBE_ENUM(Coze::DataType, BotIndex, Max);

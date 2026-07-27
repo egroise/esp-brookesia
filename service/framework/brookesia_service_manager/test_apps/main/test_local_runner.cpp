@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: CC0-1.0
  */
 #include "brookesia/lib_utils/test_adapter.hpp"
+#include "boost/format.hpp"
 #include "boost/json.hpp"
 #include "brookesia/lib_utils.hpp"
 #include "brookesia/service_manager.hpp"

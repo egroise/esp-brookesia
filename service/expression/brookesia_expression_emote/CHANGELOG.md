@@ -1,5 +1,12 @@
 # ChangeLog
 
+## v0.8.2 - 2026-07-27
+
+### Enhancements:
+
+- chore(deps): use helper contracts without direct display or HAL implementation dependencies.
+- chore(build): align service metadata with lightweight utility headers.
+
 ## v0.8.1 - 2026-07-13
 
 ### Enhancements:

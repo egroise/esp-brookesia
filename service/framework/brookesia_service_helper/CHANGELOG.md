@@ -1,10 +1,21 @@
 # ChangeLog
 
-## v0.8.2 - 2026-07-20
+## v0.8.3 - 2026-07-27
+
+### Enhancements:
+
+- feat(dataflow): add the typed helper for provider discovery, operation control, and source routing.
+
+## v0.8.2 - 2026-07-21
 
 ### Enhancements:
 
 - feat(picodet): add typed helper contracts for the PicoDet service.
+- feat(bt-speaker): add the typed Bluetooth speaker helper, state models, and service schemas.
+
+### Bug Fixes:
+
+- fix(bt): declare typed return schemas for Bluetooth capability, state, profile, connection, and volume queries.
 
 ## v0.8.1 - 2026-07-13
 

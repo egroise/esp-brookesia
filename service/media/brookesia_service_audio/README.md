@@ -8,6 +8,10 @@
 
 For more information, see the [ESP-Brookesia Programming Guide](https://docs.espressif.com/projects/esp-brookesia/en/latest/service/audio.html).
 
+## DataFlow Integration
+
+The service registers provider-backed audio playback and capture operations with the Service Manager. Applications can select an available provider through the typed DataFlow contracts or the `DataFlow` helper without binding directly to codec or device implementations.
+
 ## How to Use
 
 ### Environment Requirements

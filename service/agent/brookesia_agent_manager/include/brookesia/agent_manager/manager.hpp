@@ -12,7 +12,6 @@
 #include "brookesia/lib_utils/plugin.hpp"
 #include "brookesia/lib_utils/state_machine.hpp"
 #include "brookesia/service_manager/service/base.hpp"
-#include "brookesia/service_helper/media/audio.hpp"
 #include "brookesia/service_helper/network/sntp.hpp"
 #include "brookesia/service_helper/agent/manager.hpp"
 #include "brookesia/service_manager/macro_configs.h"
@@ -70,12 +69,10 @@ private:
         .description = "Coordinate agent selection, lifecycle, and shared state.",
         .version = get_component_version(),
         .dependencies = {
-            service::helper::AudioEncoder<0>::get_name().data(),
-            service::helper::AudioDecoder<0>::get_name().data(),
             service::helper::SNTP::get_name().data()
         },
 #if BROOKESIA_AGENT_MANAGER_ENABLE_WORKER
-        .task_scheduler_config = lib_utils::TaskScheduler::StartConfig{
+        .task_scheduler_config = lib_utils::TaskSchedulerStartConfig{
             .worker_configs = {
                 lib_utils::ThreadConfig{
                     .name = BROOKESIA_AGENT_MANAGER_WORKER_NAME,
@@ -249,7 +246,7 @@ private:
         }
     }
 
-    lib_utils::TaskScheduler::Group get_state_task_group() const
+    lib_utils::TaskSchedulerGroup get_state_task_group() const
     {
         return get_call_task_group();
     }

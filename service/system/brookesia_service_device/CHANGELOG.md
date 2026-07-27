@@ -1,5 +1,11 @@
 # ChangeLog
 
+## v0.8.2 - 2026-07-27
+
+### Enhancements:
+
+- chore(build): align the device service with the lightweight utility and scheduler APIs.
+
 ## v0.8.1 - 2026-07-13
 
 ### Enhancements:

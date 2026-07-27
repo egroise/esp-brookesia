@@ -120,7 +120,7 @@ BROOKESIA_TEST_CASE(test_servicesntp_basic_set_and_get, "Test ServiceSntp - basi
             .method = BROOKESIA_DESCRIBE_TO_STR(SNTPHelper::FunctionId::SetServers),
             .params = boost::json::object{
                 {
-                    BROOKESIA_DESCRIBE_TO_STR(SNTPHelper::FunctionSetServersParam::Servers),
+                    "Servers",
                     BROOKESIA_DESCRIBE_TO_JSON(test_servers)
                 }
             }
@@ -141,7 +141,7 @@ BROOKESIA_TEST_CASE(test_servicesntp_basic_set_and_get, "Test ServiceSntp - basi
             .method = BROOKESIA_DESCRIBE_TO_STR(SNTPHelper::FunctionId::SetTimezone),
             .params = boost::json::object{
                 {
-                    BROOKESIA_DESCRIBE_TO_STR(SNTPHelper::FunctionSetTimezoneParam::Timezone),
+                    "Timezone",
                     test_timezone
                 }
             }
@@ -223,7 +223,7 @@ BROOKESIA_TEST_CASE(test_servicesntp_complete_workflow, "Test ServiceSntp - comp
             .method = BROOKESIA_DESCRIBE_TO_STR(SNTPHelper::FunctionId::SetServers),
             .params = boost::json::object{
                 {
-                    BROOKESIA_DESCRIBE_TO_STR(SNTPHelper::FunctionSetServersParam::Servers),
+                    "Servers",
                     BROOKESIA_DESCRIBE_TO_JSON(test_servers)
                 }
             }
@@ -234,7 +234,7 @@ BROOKESIA_TEST_CASE(test_servicesntp_complete_workflow, "Test ServiceSntp - comp
             .method = BROOKESIA_DESCRIBE_TO_STR(SNTPHelper::FunctionId::SetTimezone),
             .params = boost::json::object{
                 {
-                    BROOKESIA_DESCRIBE_TO_STR(SNTPHelper::FunctionSetTimezoneParam::Timezone),
+                    "Timezone",
                     test_timezone
                 }
             }
@@ -378,7 +378,7 @@ BROOKESIA_TEST_CASE(test_servicesntp_reset_data, "Test ServiceSntp - reset data"
             .method = BROOKESIA_DESCRIBE_TO_STR(SNTPHelper::FunctionId::SetServers),
             .params = boost::json::object{
                 {
-                    BROOKESIA_DESCRIBE_TO_STR(SNTPHelper::FunctionSetServersParam::Servers),
+                    "Servers",
                     BROOKESIA_DESCRIBE_TO_JSON(test_servers)
                 }
             }
@@ -389,7 +389,7 @@ BROOKESIA_TEST_CASE(test_servicesntp_reset_data, "Test ServiceSntp - reset data"
             .method = BROOKESIA_DESCRIBE_TO_STR(SNTPHelper::FunctionId::SetTimezone),
             .params = boost::json::object{
                 {
-                    BROOKESIA_DESCRIBE_TO_STR(SNTPHelper::FunctionSetTimezoneParam::Timezone),
+                    "Timezone",
                     test_timezone
                 }
             }

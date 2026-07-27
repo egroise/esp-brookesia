@@ -1,5 +1,12 @@
 # ChangeLog
 
+## v0.8.2 - 2026-07-27
+
+### Enhancements:
+
+- chore(build): use lightweight scheduler and service schema APIs.
+- fix(events): use stable named parameters for SNTP service payloads.
+
 ## v0.8.1 - 2026-07-13
 
 ### Enhancements:

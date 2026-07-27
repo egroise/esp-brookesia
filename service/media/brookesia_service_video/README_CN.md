@@ -8,6 +8,10 @@
 
 更多信息请参考 [ESP-Brookesia 编程指南](https://docs.espressif.com/projects/esp-brookesia/zh_CN/latest/service/video.html)。
 
+## DataFlow 集成
+
+配置显示 sink 后，编码器和解码器通过与 provider 无关的显示 DataFlow 操作发现输出、选择源并提交帧。视频服务不再需要直接依赖显示 provider 的具体实现。
+
 ## 如何使用
 
 ### 开发环境要求

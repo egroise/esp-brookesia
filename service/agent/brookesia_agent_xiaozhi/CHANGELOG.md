@@ -1,5 +1,11 @@
 # ChangeLog
 
+## v0.8.2 - 2026-07-27
+
+### Enhancements:
+
+- chore(build): use lightweight service schema and scheduler APIs after the utility refactor.
+
 ## v0.8.1 - 2026-07-13
 
 ### Breaking Changes:

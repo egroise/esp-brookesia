@@ -5,7 +5,11 @@
  */
 #pragma once
 
+#include <array>
+#include <span>
+
 #include "brookesia/lib_utils/describe_helpers.hpp"
+#include "brookesia/service_manager/detail/static_schema.hpp"
 #include "brookesia/service_manager/helper/base.hpp"
 #include "manager.hpp"
 
@@ -73,90 +77,77 @@ public:
         Max,
     };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the function parameter types ////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    enum class FunctionSetActiveRobotIndexParam : uint8_t {
-        Index,
-    };
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the event parameter types ///////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    enum class EventCozeEventHappenedParam : uint8_t {
-        CozeEvent,
-    };
-
 private:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////// The following are the function schemas /////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    static service::FunctionSchema function_schema_set_active_robot_index()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetActiveRobotIndex),
-            .description = "Set active robot index.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionSetActiveRobotIndexParam::Index),
-                    .description = "Robot index to activate.",
-                    .type = service::FunctionValueType::Number
-                }
-            },
-            .require_scheduler = false
-        };
-    }
+    using FunctionParameterSpec = service::detail::static_schema::FunctionParameterSpec;
+    using FunctionReturnSpec = service::detail::static_schema::FunctionReturnSpec;
+    using FunctionSpec = service::detail::static_schema::FunctionSpec;
 
-    static service::FunctionSchema function_schema_get_active_robot_index()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetActiveRobotIndex),
-            .description = "Get active robot index.",
-            .require_scheduler = false,
-            .return_value = service::FunctionReturnSchema{
+    inline static constexpr std::array<FunctionParameterSpec, 1> SET_ACTIVE_ROBOT_INDEX_PARAMETERS = {{
+            {
+                .name = "Index",
+                .description = "Robot index to activate.",
                 .type = service::FunctionValueType::Number,
-                .description = "Example: 0",
             },
-        };
-    }
+        }
+    };
 
-    static service::FunctionSchema function_schema_get_robot_infos()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetRobotInfos),
-            .description = "Get robot info list.",
-            .require_scheduler = false,
-            .return_value = service::FunctionReturnSchema{
-                .type = service::FunctionValueType::Array,
-                .description = (boost::format("Example: %1%")
-                % BROOKESIA_DESCRIBE_JSON_SERIALIZE(std::vector<RobotInfo>({
-                    RobotInfo{"robot1", "bot_id1", "voice_id1", "description1"},
-                    RobotInfo{"robot2", "bot_id2", "voice_id2", "description2"}
-                }))).str(),
+    inline static constexpr std::array<FunctionSpec, static_cast<size_t>(FunctionId::Max)> FUNCTION_SPECS = {{
+            {
+                .name = "SetActiveRobotIndex",
+                .description = "Set active robot index.",
+                .parameters = SET_ACTIVE_ROBOT_INDEX_PARAMETERS,
+                .require_scheduler = false,
             },
-        };
-    }
+            {
+                .name = "GetActiveRobotIndex",
+                .description = "Get active robot index.",
+                .parameters = std::span<const FunctionParameterSpec>{},
+                .require_scheduler = false,
+                .return_value = FunctionReturnSpec{
+                    .type = service::FunctionValueType::Number,
+                    .description = "Example: 0",
+                },
+            },
+            {
+                .name = "GetRobotInfos",
+                .description = "Get robot info list.",
+                .parameters = std::span<const FunctionParameterSpec>{},
+                .require_scheduler = false,
+                .return_value = FunctionReturnSpec{
+                    .type = service::FunctionValueType::Array,
+                    .description =
+                    "Example: [{\"name\":\"robot1\",\"bot_id\":\"bot_id1\",\"voice_id\":\"voice_id1\","
+                    "\"description\":\"description1\"},{\"name\":\"robot2\",\"bot_id\":\"bot_id2\","
+                    "\"voice_id\":\"voice_id2\",\"description\":\"description2\"}]",
+                },
+            },
+        }
+    };
+    static_assert(FUNCTION_SPECS.size() == static_cast<size_t>(FunctionId::Max));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////// The following are the event schemas /////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    static service::EventSchema event_schema_coze_event_happened()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EventId::CozeEventHappened),
-            .description = "Emitted when a Coze event occurs.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventCozeEventHappenedParam::CozeEvent),
-                    .description = (boost::format("Coze event. Allowed values: %1%")
-                    % BROOKESIA_DESCRIBE_TO_STR(std::vector<CozeEvent>({
-                        CozeEvent::InsufficientCreditsBalance
-                    }))).str(),
-                    .type = service::EventItemType::String
-                }
-            }
-        };
-    }
+    using EventItemSpec = service::detail::static_schema::EventItemSpec;
+    using EventSpec = service::detail::static_schema::EventSpec;
+
+    inline static constexpr std::array<EventItemSpec, 1> COZE_EVENT_HAPPENED_ITEMS = {{
+            {"CozeEvent", "Coze event. Allowed values: [InsufficientCreditsBalance]", service::EventItemType::String},
+        }
+    };
+
+    inline static constexpr std::array<EventSpec, static_cast<size_t>(EventId::Max)> EVENT_SPECS = {{
+            {
+                .name = "CozeEventHappened",
+                .description = "Emitted when a Coze event occurs.",
+                .items = COZE_EVENT_HAPPENED_ITEMS,
+            },
+        }
+    };
+    static_assert(EVENT_SPECS.size() == static_cast<size_t>(EventId::Max));
 
 public:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -179,13 +170,13 @@ public:
      */
     static std::span<const service::FunctionSchema> get_function_schemas()
     {
-        static const std::array < service::FunctionSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(FunctionId::Max) > FUNCTION_SCHEMAS = {{
-                function_schema_set_active_robot_index(),
-                function_schema_get_active_robot_index(),
-                function_schema_get_robot_infos(),
-            }
-        };
-        return std::span<const service::FunctionSchema>(FUNCTION_SCHEMAS);
+        static std::array<service::FunctionSchema, FUNCTION_SPECS.size()> schemas;
+        static const bool initialized = [] {
+            service::detail::static_schema::materialize_function_schemas(FUNCTION_SPECS, schemas);
+            return true;
+        }();
+        static_cast<void>(initialized);
+        return schemas;
     }
 
     /**
@@ -195,11 +186,13 @@ public:
      */
     static std::span<const service::EventSchema> get_event_schemas()
     {
-        static const std::array < service::EventSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(EventId::Max) > EVENT_SCHEMAS = {{
-                event_schema_coze_event_happened(),
-            }
-        };
-        return std::span<const service::EventSchema>(EVENT_SCHEMAS);
+        static std::array<service::EventSchema, EVENT_SPECS.size()> schemas;
+        static const bool initialized = [] {
+            service::detail::static_schema::materialize_event_schemas(EVENT_SPECS, schemas);
+            return true;
+        }();
+        static_cast<void>(initialized);
+        return schemas;
     }
 };
 
@@ -218,7 +211,5 @@ BROOKESIA_DESCRIBE_STRUCT(
 BROOKESIA_DESCRIBE_ENUM(Coze::CozeEvent, InsufficientCreditsBalance, Max);
 BROOKESIA_DESCRIBE_ENUM(Coze::FunctionId, SetActiveRobotIndex, GetActiveRobotIndex, GetRobotInfos, Max);
 BROOKESIA_DESCRIBE_ENUM(Coze::EventId, CozeEventHappened, Max);
-BROOKESIA_DESCRIBE_ENUM(Coze::FunctionSetActiveRobotIndexParam, Index);
-BROOKESIA_DESCRIBE_ENUM(Coze::EventCozeEventHappenedParam, CozeEvent);
 
 } // namespace esp_brookesia::service::helper

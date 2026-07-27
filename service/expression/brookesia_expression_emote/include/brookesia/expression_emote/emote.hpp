@@ -9,8 +9,7 @@
 #include <string_view>
 #include "esp_err.h"
 #include "brookesia/service_helper/expression/emote.hpp"
-#include "brookesia/service_display.hpp"
-#include "brookesia/service_manager.hpp"
+#include "brookesia/service_manager/dataflow/visual/operation.hpp"
 #include "brookesia/service_manager/service/base.hpp"
 #include "brookesia/expression_emote/macro_configs.h"
 
@@ -86,7 +85,7 @@ private:
         .version = get_component_version(),
         // Emote operations must run on a thread that uses an internal SRAM stack.
 #if BROOKESIA_EXPRESSION_EMOTE_ENABLE_WORKER
-        .task_scheduler_config = lib_utils::TaskScheduler::StartConfig{
+        .task_scheduler_config = lib_utils::TaskSchedulerStartConfig{
             .worker_configs = {
                 lib_utils::ThreadConfig{
                     .name = BROOKESIA_EXPRESSION_EMOTE_WORKER_NAME,
@@ -212,11 +211,10 @@ private:
     bool is_configured_ = false;
 
     void *native_handle_ = nullptr;
-    service::ServiceBinding display_service_binding_;
+    std::shared_ptr<service::dataflow::VisualOperation> display_operation_;
     esp_brookesia::lib_utils::connection display_source_state_connection_;
     std::string display_output_name_;
-    uint32_t display_source_id_ = 0;
-    service::Display::PixelFormat display_pixel_format_ = service::Display::PixelFormat::Max;
+    service::dataflow::VisualPixelFormat display_pixel_format_ = service::dataflow::VisualPixelFormat::Unknown;
 };
 
 BROOKESIA_DESCRIBE_ENUM(Emote::GFX_ObjectType, Emoji, Animation, Qrcode, Max);

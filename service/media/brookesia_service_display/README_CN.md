@@ -8,6 +8,10 @@
 
 更多信息请参考 [ESP-Brookesia 编程指南](https://docs.espressif.com/projects/esp-brookesia/zh_CN/latest/service/display.html)。
 
+## DataFlow 集成
+
+该服务会注册显示 DataFlow provider，提供输出与源发现、活动源路由和帧提交能力。视频消费者可以使用与 provider 无关的显示操作，而无需依赖本组件的具体实现细节。
+
 ## 如何使用
 
 ### 开发环境要求

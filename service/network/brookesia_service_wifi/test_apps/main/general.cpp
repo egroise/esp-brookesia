@@ -42,7 +42,7 @@ void EventCollector::on_general_action_triggered(const service::EventItemMap &pa
     std::lock_guard<std::mutex> lock(mutex);
     GeneralActionEvent evt;
 
-    auto action_it = params.find(BROOKESIA_DESCRIBE_TO_STR(WifiHelpler::EventGeneralActionTriggeredParam::Action));
+    auto action_it = params.find("Action");
     if (action_it != params.end()) {
         auto action_ptr = std::get_if<std::string>(&action_it->second);
         TEST_ASSERT_NOT_NULL_MESSAGE(action_ptr, "Failed to get action");
@@ -59,14 +59,14 @@ void EventCollector::on_general_event_happened(const service::EventItemMap &para
     std::lock_guard<std::mutex> lock(mutex);
     GeneralEventHappened evt;
 
-    auto event_it = params.find(BROOKESIA_DESCRIBE_TO_STR(WifiHelpler::EventGeneralEventHappenedParam::Event));
+    auto event_it = params.find("Event");
     if (event_it != params.end()) {
         auto event_ptr = std::get_if<std::string>(&event_it->second);
         TEST_ASSERT_NOT_NULL_MESSAGE(event_ptr, "Failed to get event");
 
         evt.event = *event_ptr;
         auto unexpected_it = params.find(
-                                 BROOKESIA_DESCRIBE_TO_STR(WifiHelpler::EventGeneralEventHappenedParam::IsUnexpected)
+                                 "IsUnexpected"
                              );
         if (unexpected_it != params.end()) {
             auto unexpected_ptr = std::get_if<bool>(&unexpected_it->second);
@@ -84,7 +84,7 @@ void EventCollector::on_scan_ap_infos_updated(const service::EventItemMap &param
     std::lock_guard<std::mutex> lock(mutex);
     ScanApInfosUpdatedEvent evt;
 
-    auto infos_it = params.find(BROOKESIA_DESCRIBE_TO_STR(WifiHelpler::EventScanApInfosUpdatedParam::ApInfos));
+    auto infos_it = params.find("ApInfos");
     if (infos_it != params.end()) {
         auto infos_ptr = std::get_if<boost::json::array>(&infos_it->second);
         TEST_ASSERT_NOT_NULL_MESSAGE(infos_ptr, "Failed to get infos");
@@ -116,7 +116,7 @@ void EventCollector::on_softap_event_happened(const service::EventItemMap &param
     std::lock_guard<std::mutex> lock(mutex);
     SoftApEventHappened evt;
 
-    auto event_it = params.find(BROOKESIA_DESCRIBE_TO_STR(WifiHelpler::EventSoftApEventHappenedParam::Event));
+    auto event_it = params.find("Event");
     if (event_it != params.end()) {
         auto event_ptr = std::get_if<std::string>(&event_it->second);
         TEST_ASSERT_NOT_NULL_MESSAGE(event_ptr, "Failed to get SoftAP event");

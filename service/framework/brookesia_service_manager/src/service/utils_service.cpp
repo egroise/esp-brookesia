@@ -22,6 +22,7 @@
 #   define BROOKESIA_LOG_DISABLE_DEBUG_TRACE 1
 #endif
 #include "private/utils.hpp"
+#include "brookesia/service_manager/event/registry.hpp"
 #include "brookesia/service_manager/service/utils_service.hpp"
 
 namespace esp_brookesia::service {
@@ -584,96 +585,66 @@ std::vector<EventSchema> UtilsService::get_event_schemas()
 ServiceBase::FunctionHandlerMap UtilsService::get_function_handlers()
 {
     return {
+        [this](FunctionParameterMap &&)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetDebugCapabilities),
-            [this](FunctionParameterMap &&)
-            {
-                return to_function_result(std::expected<boost::json::object, std::string>(
-                                              BROOKESIA_DESCRIBE_TO_JSON(impl_->get_debug_capabilities()).as_object()
+            return to_function_result(std::expected<boost::json::object, std::string>(
+                                          BROOKESIA_DESCRIBE_TO_JSON(impl_->get_debug_capabilities()).as_object()
+                                      ));
+        },
+        [this](FunctionParameterMap &&)
+        {
+            return to_function_result(std::expected<boost::json::object, std::string>(
+                                          BROOKESIA_DESCRIBE_TO_JSON(impl_->get_debug_config()).as_object()
+                                      ));
+        },
+        [this](FunctionParameterMap &&args)
+        {
+            const auto &value = std::get<boost::json::object>(
+                args.at(BROOKESIA_DESCRIBE_TO_STR(FunctionSetDebugConfigParam::Config))
+            );
+            DebugConfig config;
+            if (!BROOKESIA_DESCRIBE_FROM_JSON(value, config)) {
+                return to_function_result(std::expected<void, std::string>(
+                                              std::unexpected("Failed to parse Utils debug configuration")
                                           ));
-            },
+            }
+            return to_function_result(impl_->set_debug_config(std::move(config)));
         },
+        [this](FunctionParameterMap &&) { return to_function_result(impl_->start_memory_debug()); },
+        [this](FunctionParameterMap &&)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetDebugConfig),
-            [this](FunctionParameterMap &&)
-            {
+            impl_->stop_memory_debug();
+            return to_function_result(std::expected<void, std::string> {});
+        },
+        [this](FunctionParameterMap &&) { return to_function_result(impl_->start_thread_debug()); },
+        [this](FunctionParameterMap &&)
+        {
+            impl_->stop_thread_debug();
+            return to_function_result(std::expected<void, std::string> {});
+        },
+        [this](FunctionParameterMap &&)
+        {
+            return to_function_result(std::expected<boost::json::object, std::string>(
+                                          BROOKESIA_DESCRIBE_TO_JSON(impl_->get_debug_state()).as_object()
+                                      ));
+        },
+        [this](FunctionParameterMap &&)
+        {
+            return to_function_result(std::expected<boost::json::object, std::string>(
+                                          BROOKESIA_DESCRIBE_TO_JSON(impl_->get_debug_snapshot()).as_object()
+                                      ));
+        },
+        [this](FunctionParameterMap &&)
+        {
+            auto result = impl_->get_memory_snapshot();
+            if (!result) {
                 return to_function_result(std::expected<boost::json::object, std::string>(
-                                              BROOKESIA_DESCRIBE_TO_JSON(impl_->get_debug_config()).as_object()
+                                              std::unexpected(result.error())
                                           ));
-            },
-        },
-        {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetDebugConfig),
-            [this](FunctionParameterMap &&args)
-            {
-                const auto &value = std::get<boost::json::object>(
-                    args.at(BROOKESIA_DESCRIBE_TO_STR(FunctionSetDebugConfigParam::Config))
-                );
-                DebugConfig config;
-                if (!BROOKESIA_DESCRIBE_FROM_JSON(value, config)) {
-                    return to_function_result(std::expected<void, std::string>(
-                                                  std::unexpected("Failed to parse Utils debug configuration")
-                                              ));
-                }
-                return to_function_result(impl_->set_debug_config(std::move(config)));
-            },
-        },
-        {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::StartMemoryDebug),
-            [this](FunctionParameterMap &&) { return to_function_result(impl_->start_memory_debug()); },
-        },
-        {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::StopMemoryDebug),
-            [this](FunctionParameterMap &&)
-            {
-                impl_->stop_memory_debug();
-                return to_function_result(std::expected<void, std::string> {});
-            },
-        },
-        {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::StartThreadDebug),
-            [this](FunctionParameterMap &&) { return to_function_result(impl_->start_thread_debug()); },
-        },
-        {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::StopThreadDebug),
-            [this](FunctionParameterMap &&)
-            {
-                impl_->stop_thread_debug();
-                return to_function_result(std::expected<void, std::string> {});
-            },
-        },
-        {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetDebugState),
-            [this](FunctionParameterMap &&)
-            {
-                return to_function_result(std::expected<boost::json::object, std::string>(
-                                              BROOKESIA_DESCRIBE_TO_JSON(impl_->get_debug_state()).as_object()
-                                          ));
-            },
-        },
-        {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetDebugSnapshot),
-            [this](FunctionParameterMap &&)
-            {
-                return to_function_result(std::expected<boost::json::object, std::string>(
-                                              BROOKESIA_DESCRIBE_TO_JSON(impl_->get_debug_snapshot()).as_object()
-                                          ));
-            },
-        },
-        {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetMemorySnapshot),
-            [this](FunctionParameterMap &&)
-            {
-                auto result = impl_->get_memory_snapshot();
-                if (!result) {
-                    return to_function_result(std::expected<boost::json::object, std::string>(
-                                                  std::unexpected(result.error())
-                                              ));
-                }
-                return to_function_result(std::expected<boost::json::object, std::string>(
-                                              BROOKESIA_DESCRIBE_TO_JSON(*result).as_object()
-                                          ));
-            },
+            }
+            return to_function_result(std::expected<boost::json::object, std::string>(
+                                          BROOKESIA_DESCRIBE_TO_JSON(*result).as_object()
+                                      ));
         },
     };
 }

@@ -24,6 +24,12 @@
 
 namespace esp_brookesia::service {
 
+namespace dataflow {
+class DataFlowRegistry;
+}
+
+class DataFlowService;
+
 /**
  * @brief Registry of statically registered service plugins.
  */
@@ -140,9 +146,9 @@ public:
      * The configuration creates two worker threads for service dispatching and
      * uses the module-level scheduling defaults defined in `macro_configs.h`.
      */
-    static lib_utils::TaskScheduler::StartConfig make_default_task_scheduler_start_config()
+    static lib_utils::TaskSchedulerStartConfig make_default_task_scheduler_start_config()
     {
-        lib_utils::TaskScheduler::StartConfig config{
+        lib_utils::TaskSchedulerStartConfig config{
             .worker_configs = {},
         };
         lib_utils::ThreadConfig worker0;
@@ -183,7 +189,7 @@ public:
         return config;
     }
 
-    inline static const lib_utils::TaskScheduler::StartConfig DEFAULT_TASK_SCHEDULER_START_CONFIG =
+    inline static const lib_utils::TaskSchedulerStartConfig DEFAULT_TASK_SCHEDULER_START_CONFIG =
         make_default_task_scheduler_start_config();
 
     /**
@@ -192,9 +198,9 @@ public:
      * The secondary scheduler is intended for services that need manager-owned
      * workers with internal SRAM stacks.
      */
-    static lib_utils::TaskScheduler::StartConfig make_default_secondary_task_scheduler_start_config()
+    static lib_utils::TaskSchedulerStartConfig make_default_secondary_task_scheduler_start_config()
     {
-        lib_utils::TaskScheduler::StartConfig config{
+        lib_utils::TaskSchedulerStartConfig config{
             .worker_configs = {},
         };
         lib_utils::ThreadConfig worker0;
@@ -235,7 +241,7 @@ public:
         return config;
     }
 
-    inline static const lib_utils::TaskScheduler::StartConfig DEFAULT_SECONDARY_TASK_SCHEDULER_START_CONFIG =
+    inline static const lib_utils::TaskSchedulerStartConfig DEFAULT_SECONDARY_TASK_SCHEDULER_START_CONFIG =
         make_default_secondary_task_scheduler_start_config();
 
     /**
@@ -256,7 +262,7 @@ public:
      * @param[in] config Task scheduler start configuration
      * @return true if started successfully, false otherwise
      */
-    bool start(const lib_utils::TaskScheduler::StartConfig &config = DEFAULT_TASK_SCHEDULER_START_CONFIG);
+    bool start(const lib_utils::TaskSchedulerStartConfig &config = DEFAULT_TASK_SCHEDULER_START_CONFIG);
 
     /**
      * @brief Stop the service manager
@@ -322,6 +328,16 @@ public:
     ) const;
 
     /**
+     * @brief Get the manager-owned data-flow provider and operation registry.
+     *
+     * The registry exists after @ref init() and remains valid until @ref deinit()
+     * completes. Provider services use it to register adapters; consumers use it
+     * to open typed native operations without linking provider headers.
+     */
+    dataflow::DataFlowRegistry &get_dataflow_registry();
+    const dataflow::DataFlowRegistry &get_dataflow_registry() const;
+
+    /**
      * @brief Check if the service manager is initialized
      *
      * @return true if initialized, false otherwise
@@ -376,7 +392,9 @@ private:
         boost::condition_variable_any transition_cv; ///< Signals completion of start or stop transitions.
     };
 
-    ServiceManager() = default;
+    // Keep construction out-of-line: dataflow_registry_ deliberately remains a
+    // forward declaration in this public manager header.
+    ServiceManager();
     ~ServiceManager();
 
     void unbind(const std::string &name);
@@ -398,8 +416,11 @@ private:
     std::shared_ptr<lib_utils::TaskScheduler> secondary_task_scheduler_;
     std::shared_ptr<ManagerService> manager_service_;
     std::shared_ptr<UtilsService> utils_service_;
+    std::shared_ptr<DataFlowService> dataflow_service_;
+    std::unique_ptr<dataflow::DataFlowRegistry> dataflow_registry_;
     ServiceBinding manager_binding_;
     ServiceBinding utils_binding_;
+    ServiceBinding dataflow_binding_;
 
     // Service management
     mutable boost::shared_mutex service_mutex_;

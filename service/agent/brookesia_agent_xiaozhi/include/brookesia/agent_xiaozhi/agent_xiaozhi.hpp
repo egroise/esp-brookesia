@@ -230,8 +230,8 @@ private:
 
     uint32_t chat_handle_ = 0;
     esp_event_handler_instance_t agent_event_instance_ = nullptr;
-    lib_utils::TaskScheduler::TaskId get_chat_info_task_ = 0;
-    lib_utils::TaskScheduler::TaskId open_audio_channel_task_ = 0;
+    lib_utils::TaskSchedulerTaskId get_chat_info_task_ = 0;
+    lib_utils::TaskSchedulerTaskId open_audio_channel_task_ = 0;
     ChatInfo chat_info_{};
 
     mcp_utils::ToolRegistry mcp_tool_registry_;

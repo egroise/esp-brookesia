@@ -21,7 +21,7 @@ namespace esp_brookesia::agent {
 
 using ManagerHelper = service::helper::AgentManager;
 using StorageHelper = service::helper::Storage;
-using AudioHelper = service::helper::Audio;
+using AudioAfeEvent = service::dataflow::AudioAfeEvent;
 
 constexpr uint32_t STORAGE_ERASE_DATA_TIMEOUT_MS = 100;
 
@@ -98,16 +98,16 @@ bool Manager::on_init()
             BROOKESIA_LOGE("Failed to force transition to target state: %1%", state_str);
         });
     };
-    auto afe_event_happened_callback = [this](AudioHelper::AFE_Event event) {
+    auto afe_event_happened_callback = [this](AudioAfeEvent event) {
         BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
         BROOKESIA_LOGD("Params: event(%1%)", BROOKESIA_DESCRIBE_TO_STR(event));
 
         switch (event) {
-        case AudioHelper::AFE_Event::WakeStart:
+        case AudioAfeEvent::WakeStart:
             state_machine_->trigger_general_action(GeneralAction::WakeUp);
             break;
-        case AudioHelper::AFE_Event::WakeEnd:
+        case AudioAfeEvent::WakeEnd:
             state_machine_->trigger_general_action(GeneralAction::Sleep);
             break;
         default:

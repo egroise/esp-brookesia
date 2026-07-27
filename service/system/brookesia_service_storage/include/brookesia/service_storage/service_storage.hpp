@@ -54,9 +54,9 @@ private:
     static std::string get_component_version();
 
 #if BROOKESIA_SERVICE_STORAGE_ENABLE_PRIVATE_SCHEDULER
-    static lib_utils::TaskScheduler::StartConfig make_default_task_scheduler_start_config()
+    static lib_utils::TaskSchedulerStartConfig make_default_task_scheduler_start_config()
     {
-        lib_utils::TaskScheduler::StartConfig config{
+        lib_utils::TaskSchedulerStartConfig config{
             .worker_configs = {},
         };
         lib_utils::ThreadConfig worker0;

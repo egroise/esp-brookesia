@@ -54,27 +54,10 @@ bool function_schema_has_param(HttpHelper::FunctionId function_id, std::string_v
     return false;
 }
 
-bool event_schema_has_item(HttpHelper::EventId event_id, HttpHelper::EventRequestParam item)
+bool event_schema_has_item(HttpHelper::EventId event_id, std::string_view item)
 {
     const auto expected_event_name = BROOKESIA_DESCRIBE_TO_STR(event_id);
-    const auto expected_item_name = BROOKESIA_DESCRIBE_TO_STR(item);
-    for (const auto &schema : HttpHelper::get_event_schemas()) {
-        if (schema.name != expected_event_name) {
-            continue;
-        }
-        for (const auto &item_schema : schema.items) {
-            if (item_schema.name == expected_item_name) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-bool event_schema_has_item(HttpHelper::EventId event_id, HttpHelper::EventGeneralStateChangedParam item)
-{
-    const auto expected_event_name = BROOKESIA_DESCRIBE_TO_STR(event_id);
-    const auto expected_item_name = BROOKESIA_DESCRIBE_TO_STR(item);
+    const auto expected_item_name = item;
     for (const auto &schema : HttpHelper::get_event_schemas()) {
         if (schema.name != expected_event_name) {
             continue;
@@ -275,13 +258,13 @@ BROOKESIA_TEST_CASE(helper_schema_and_serialization, "Test ServiceHttp - helper 
     TEST_ASSERT_TRUE(has_function_schema(HttpHelper::FunctionId::ResetStatistics));
     TEST_ASSERT_TRUE(
         function_schema_has_param(
-            HttpHelper::FunctionId::Request, BROOKESIA_DESCRIBE_TO_STR(HttpHelper::FunctionRequestParam::Request)
+            HttpHelper::FunctionId::Request, "Request"
         )
     );
     TEST_ASSERT_TRUE(
         function_schema_has_param(
             HttpHelper::FunctionId::RequestAsync,
-            BROOKESIA_DESCRIBE_TO_STR(HttpHelper::FunctionRequestAsyncParam::Request)
+            "Request"
         )
     );
 
@@ -292,24 +275,24 @@ BROOKESIA_TEST_CASE(helper_schema_and_serialization, "Test ServiceHttp - helper 
     TEST_ASSERT_TRUE(has_event_schema(HttpHelper::EventId::RequestCanceled));
     TEST_ASSERT_TRUE(has_event_schema(HttpHelper::EventId::GeneralStateChanged));
     TEST_ASSERT_TRUE(
-        event_schema_has_item(HttpHelper::EventId::RequestStarted, HttpHelper::EventRequestParam::RequestId)
+        event_schema_has_item(HttpHelper::EventId::RequestStarted, "RequestId")
     );
-    TEST_ASSERT_TRUE(event_schema_has_item(HttpHelper::EventId::RequestStarted, HttpHelper::EventRequestParam::State));
+    TEST_ASSERT_TRUE(event_schema_has_item(HttpHelper::EventId::RequestStarted, "State"));
     TEST_ASSERT_TRUE(
-        event_schema_has_item(HttpHelper::EventId::RequestProgress, HttpHelper::EventRequestParam::Progress)
-    );
-    TEST_ASSERT_TRUE(
-        event_schema_has_item(HttpHelper::EventId::RequestCompleted, HttpHelper::EventRequestParam::Response)
+        event_schema_has_item(HttpHelper::EventId::RequestProgress, "Progress")
     );
     TEST_ASSERT_TRUE(
-        event_schema_has_item(HttpHelper::EventId::RequestFailed, HttpHelper::EventRequestParam::Response)
+        event_schema_has_item(HttpHelper::EventId::RequestCompleted, "Response")
     );
     TEST_ASSERT_TRUE(
-        event_schema_has_item(HttpHelper::EventId::RequestCanceled, HttpHelper::EventRequestParam::Response)
+        event_schema_has_item(HttpHelper::EventId::RequestFailed, "Response")
+    );
+    TEST_ASSERT_TRUE(
+        event_schema_has_item(HttpHelper::EventId::RequestCanceled, "Response")
     );
     TEST_ASSERT_TRUE(
         event_schema_has_item(
-            HttpHelper::EventId::GeneralStateChanged, HttpHelper::EventGeneralStateChangedParam::State
+            HttpHelper::EventId::GeneralStateChanged, "State"
         )
     );
 }

@@ -43,20 +43,6 @@ if(NOT TARGET brookesia::service_helper)
     )
 endif()
 
-if(NOT TARGET brookesia::service_display)
-    add_subdirectory(
-        ${COMPONENT_DIR}/../../media/brookesia_service_display
-        ${CMAKE_BINARY_DIR}/brookesia_service_display
-    )
-endif()
-
-if(NOT TARGET brookesia::service_audio)
-    add_subdirectory(
-        ${COMPONENT_DIR}/../../media/brookesia_service_audio
-        ${CMAKE_BINARY_DIR}/brookesia_service_audio
-    )
-endif()
-
 set(COMPONENT_SRCS_C ${_BROOKESIA_EMULATION_NES_SRCS_C})
 set(COMPONENT_SRCS_CPP ${_BROOKESIA_EMULATION_NES_SRCS_CPP})
 
@@ -107,8 +93,6 @@ target_link_libraries(${COMPONENT_LIB}
     PUBLIC
         brookesia::service_manager
         brookesia::service_helper
-        brookesia::service_display
-        brookesia::service_audio
         brookesia::lib_utils
         Boost::thread
         Boost::system

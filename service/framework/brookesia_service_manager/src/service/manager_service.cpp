@@ -143,98 +143,83 @@ std::vector<EventSchema> ManagerService::get_event_schemas()
 ServiceBase::FunctionHandlerMap ManagerService::get_function_handlers()
 {
     return {
+        [this](FunctionParameterMap &&)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetServiceNames),
-            [this](FunctionParameterMap &&)
-            {
-                return to_function_result(std::expected<boost::json::array, std::string>(
-                                              BROOKESIA_DESCRIBE_TO_JSON(manager_.get_service_names()).as_array()
-                                          ));
-            },
+            return to_function_result(std::expected<boost::json::array, std::string>(
+                                          BROOKESIA_DESCRIBE_TO_JSON(manager_.get_service_names()).as_array()
+                                      ));
         },
+        [this](FunctionParameterMap &&args)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetServiceInfo),
-            [this](FunctionParameterMap &&args)
-            {
-                const auto &name = std::get<std::string>(
-                    args.at(BROOKESIA_DESCRIBE_TO_STR(FunctionGetServiceInfoParam::Name))
-                );
-                auto result = manager_.get_service_info(name);
-                if (!result) {
-                    return to_function_result(std::expected<boost::json::object, std::string>(
-                                                  std::unexpected((boost::format("Service not found: %1%") % name).str())
-                                              ));
-                }
+            const auto &name = std::get<std::string>(
+                args.at(BROOKESIA_DESCRIBE_TO_STR(FunctionGetServiceInfoParam::Name))
+            );
+            auto result = manager_.get_service_info(name);
+            if (!result) {
                 return to_function_result(std::expected<boost::json::object, std::string>(
-                                              BROOKESIA_DESCRIBE_TO_JSON(*result).as_object()
+                                              std::unexpected((boost::format("Service not found: %1%") % name).str())
                                           ));
-            },
+            }
+            return to_function_result(std::expected<boost::json::object, std::string>(
+                                          BROOKESIA_DESCRIBE_TO_JSON(*result).as_object()
+                                      ));
         },
+        [this](FunctionParameterMap &&args)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetServiceSchema),
-            [this](FunctionParameterMap &&args)
-            {
-                const auto &name = std::get<std::string>(
-                    args.at(BROOKESIA_DESCRIBE_TO_STR(FunctionGetServiceSchemaParam::Name))
-                );
-                auto result = manager_.get_service_schema(name);
-                if (!result) {
-                    return to_function_result(std::expected<boost::json::object, std::string>(
-                                                  std::unexpected((boost::format("Service not found: %1%") % name).str())
-                                              ));
-                }
+            const auto &name = std::get<std::string>(
+                                   args.at(BROOKESIA_DESCRIBE_TO_STR(FunctionGetServiceSchemaParam::Name))
+                               );
+            auto result = manager_.get_service_schema(name);
+            if (!result) {
                 return to_function_result(std::expected<boost::json::object, std::string>(
-                                              BROOKESIA_DESCRIBE_TO_JSON(*result).as_object()
+                                              std::unexpected((boost::format("Service not found: %1%") % name).str())
                                           ));
-            },
+            }
+            return to_function_result(std::expected<boost::json::object, std::string>(
+                                          BROOKESIA_DESCRIBE_TO_JSON(*result).as_object()
+                                      ));
         },
+        [this](FunctionParameterMap &&args)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetServiceFunctionSchema),
-            [this](FunctionParameterMap &&args)
-            {
-                const auto &service_name = std::get<std::string>(args.at(
-                            BROOKESIA_DESCRIBE_TO_STR(FunctionGetServiceFunctionSchemaParam::ServiceName)
-                        ));
-                const auto &function_name = std::get<std::string>(args.at(
-                            BROOKESIA_DESCRIBE_TO_STR(FunctionGetServiceFunctionSchemaParam::FunctionName)
-                        ));
-                auto result = manager_.get_service_function_schema(service_name, function_name);
-                if (!result) {
-                    auto kind = manager_.get_service_info(service_name) ? "Function" : "Service";
-                    auto name = (kind == std::string_view("Function"))
-                    ? service_name + "." + function_name : service_name;
-                    return to_function_result(std::expected<boost::json::object, std::string>(
-                                                  std::unexpected((boost::format("%1% not found: %2%") % kind % name).str())
-                                              ));
-                }
+            const auto &service_name = std::get<std::string>(args.at(
+                                           BROOKESIA_DESCRIBE_TO_STR(FunctionGetServiceFunctionSchemaParam::ServiceName)
+                                       ));
+            const auto &function_name = std::get<std::string>(args.at(
+                                            BROOKESIA_DESCRIBE_TO_STR(FunctionGetServiceFunctionSchemaParam::FunctionName)
+                                        ));
+            auto result = manager_.get_service_function_schema(service_name, function_name);
+            if (!result) {
+                auto kind = manager_.get_service_info(service_name) ? "Function" : "Service";
+                auto name = (kind == std::string_view("Function"))
+                            ? service_name + "." + function_name : service_name;
                 return to_function_result(std::expected<boost::json::object, std::string>(
-                                              BROOKESIA_DESCRIBE_TO_JSON(*result).as_object()
+                                              std::unexpected((boost::format("%1% not found: %2%") % kind % name).str())
                                           ));
-            },
+            }
+            return to_function_result(std::expected<boost::json::object, std::string>(
+                                          BROOKESIA_DESCRIBE_TO_JSON(*result).as_object()
+                                      ));
         },
+        [this](FunctionParameterMap &&args)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetServiceEventSchema),
-            [this](FunctionParameterMap &&args)
-            {
-                const auto &service_name = std::get<std::string>(args.at(
-                            BROOKESIA_DESCRIBE_TO_STR(FunctionGetServiceEventSchemaParam::ServiceName)
-                        ));
-                const auto &event_name = std::get<std::string>(args.at(
-                            BROOKESIA_DESCRIBE_TO_STR(FunctionGetServiceEventSchemaParam::EventName)
-                        ));
-                auto result = manager_.get_service_event_schema(service_name, event_name);
-                if (!result) {
-                    auto kind = manager_.get_service_info(service_name) ? "Event" : "Service";
-                    auto name = (kind == std::string_view("Event"))
-                    ? service_name + "." + event_name : service_name;
-                    return to_function_result(std::expected<boost::json::object, std::string>(
-                                                  std::unexpected((boost::format("%1% not found: %2%") % kind % name).str())
-                                              ));
-                }
+            const auto &service_name = std::get<std::string>(args.at(
+                                           BROOKESIA_DESCRIBE_TO_STR(FunctionGetServiceEventSchemaParam::ServiceName)
+                                       ));
+            const auto &event_name = std::get<std::string>(args.at(
+                                         BROOKESIA_DESCRIBE_TO_STR(FunctionGetServiceEventSchemaParam::EventName)
+                                     ));
+            auto result = manager_.get_service_event_schema(service_name, event_name);
+            if (!result) {
+                auto kind = manager_.get_service_info(service_name) ? "Event" : "Service";
+                auto name = (kind == std::string_view("Event"))
+                            ? service_name + "." + event_name : service_name;
                 return to_function_result(std::expected<boost::json::object, std::string>(
-                                              BROOKESIA_DESCRIBE_TO_JSON(*result).as_object()
+                                              std::unexpected((boost::format("%1% not found: %2%") % kind % name).str())
                                           ));
-            },
+            }
+            return to_function_result(std::expected<boost::json::object, std::string>(
+                                          BROOKESIA_DESCRIBE_TO_JSON(*result).as_object()
+                                      ));
         },
     };
 }

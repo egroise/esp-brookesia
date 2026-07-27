@@ -8,6 +8,10 @@
 
 更多信息请参考 [ESP-Brookesia 编程指南](https://docs.espressif.com/projects/esp-brookesia/zh_CN/latest/service/framework/helper/index.html)。
 
+## DataFlow Helper
+
+`DataFlow` helper 提供类型安全的控制面接口，用于 provider 发现、操作归属、生命周期管理和源路由。原生视频帧与音频缓冲区访问仍通过类型安全的 C++ 操作接口提供。
+
 ## 如何使用
 
 ### 开发环境要求

@@ -8,7 +8,6 @@
 #include <string>
 #include <map>
 #include <vector>
-#include <functional>
 #include <memory>
 #include <optional>
 #include "boost/json.hpp"
@@ -17,11 +16,6 @@
 #include "brookesia/service_manager/function/definition.hpp"
 
 namespace esp_brookesia::service {
-
-/**
- * @brief Signature of a service function implementation.
- */
-using FunctionHandler = std::function < FunctionResult(FunctionParameterMap &&) >;
 
 /**
  * @brief Registry of callable service functions and their schemas.

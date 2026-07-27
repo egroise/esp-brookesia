@@ -458,7 +458,7 @@ bool XiaoZhi::on_activate()
         auto result = publish_event(BROOKESIA_DESCRIBE_TO_STR(XiaoZhiHelper::EventId::ActivationCodeReceived),
         service::EventItemMap{
             {
-                BROOKESIA_DESCRIBE_TO_STR(XiaoZhiHelper::EventActivationCodeReceivedParam::Code),
+                "Code",
                 info.activation_code
             }
         });
