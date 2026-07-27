@@ -8,19 +8,24 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include "brookesia/system_core/macro_configs.h"
 #if !BROOKESIA_SYSTEM_CORE_SYSTEM_ENABLE_DEBUG_LOG
 #   define BROOKESIA_LOG_DISABLE_DEBUG_TRACE 1
 #endif
+#include "brookesia/lib_utils/function_guard.hpp"
 #include "brookesia/system_core/app/package.hpp"
 #include "private/filesystem.hpp"
 #include "private/utils.hpp"
 #include "private/heap_trace.hpp"
+#include "private/runtime/call_context.hpp"
 #include "private/system/impl.hpp"
-#include "brookesia/service_manager/common.hpp"
+#include "brookesia/service_manager/dataflow/registry.hpp"
+#include "brookesia/service_manager/service/manager.hpp"
 
 #if BROOKESIA_SYSTEM_CORE_ENABLE_PROFILE_LOG
 #   define SYSTEM_CORE_PROFILE_LOGI(...) BROOKESIA_LOGI(__VA_ARGS__)
@@ -32,13 +37,21 @@ namespace esp_brookesia::system::core {
 
 namespace {
 
-constexpr const char *RUNTIME_APP_ID_CALL_CONTEXT_KEY = "brookesia.system.runtime_app_id";
 using SteadyClock = std::chrono::steady_clock;
 using SteadyTimePoint = SteadyClock::time_point;
 
-bool is_runtime_service_call_context()
+template<typename RuntimeAppId>
+void release_runtime_dataflow_operations(const std::optional<RuntimeAppId> &runtime_app_id)
 {
-    return service::get_current_call_context_value(RUNTIME_APP_ID_CALL_CONTEXT_KEY).has_value();
+    if (!runtime_app_id.has_value()) {
+        return;
+    }
+
+    auto &service_manager = service::ServiceManager::get_instance();
+    if (!service_manager.is_initialized()) {
+        return;
+    }
+    service_manager.get_dataflow_registry().release_operations_for_owner(std::to_string(*runtime_app_id));
 }
 
 int64_t elapsed_ms_since(SteadyTimePoint started_at, SteadyTimePoint ended_at = SteadyClock::now())
@@ -187,6 +200,33 @@ std::expected<const System::Impl::AppRecord *, std::string> System::Impl::get_re
     return &it->second;
 }
 
+void System::Impl::cleanup_app_transient_resources(AppRecord &record)
+{
+    const auto app_id = record.info.app_id;
+    owner_.on_hide_app_loading(app_id);
+
+    std::vector<KeyboardRequestId> keyboard_request_ids;
+    for (const auto &[request_id, keyboard] : keyboard_requests_) {
+        if (keyboard.app_id == app_id) {
+            keyboard_request_ids.push_back(request_id);
+        }
+    }
+    for (const auto request_id : keyboard_request_ids) {
+        auto result = owner_.hide_app_keyboard(app_id, request_id);
+        if (!result) {
+            BROOKESIA_LOGW(
+                "Failed to close app keyboard during cleanup: app_id(%1%), request_id(%2%), error(%3%)",
+                app_id,
+                request_id,
+                result.error()
+            );
+        }
+    }
+
+    owner_.close_message_dialogs_for_app(app_id);
+    cancel_app_timers(record);
+}
+
 
 std::expected<void, std::string> System::Impl::dispatch_action(
     AppId app_id,
@@ -206,6 +246,7 @@ std::expected<void, std::string> System::Impl::dispatch_action(
         }
         return record.native_app->on_action(*record.context, action);
     }
+
     return call_runtime_lifecycle(
                record,
                LIFECYCLE_ON_ACTION,
@@ -465,6 +506,7 @@ std::expected<void, std::string> System::uninstall_app(AppId app_id)
         }
     }
     const auto uninstalled_app = record.info;
+    release_runtime_dataflow_operations(record.runtime_app_id);
     if (record.native_app && record.context) {
         record.native_app->on_uninstall(*record.context);
     } else if (record.info.manifest.kind == AppKind::Runtime) {
@@ -473,18 +515,7 @@ std::expected<void, std::string> System::uninstall_app(AppId app_id)
             BROOKESIA_LOGW("Runtime app uninstall hook failed: %1%", lifecycle_result.error());
         }
     }
-    on_hide_app_loading(record.info.app_id);
-    std::vector<KeyboardRequestId> uninstall_keyboard_requests;
-    for (const auto &[request_id, keyboard] : impl_->keyboard_requests_) {
-        if (keyboard.app_id == record.info.app_id) {
-            uninstall_keyboard_requests.push_back(request_id);
-        }
-    }
-    for (const auto request_id : uninstall_keyboard_requests) {
-        (void)hide_app_keyboard(record.info.app_id, request_id);
-    }
-    close_message_dialogs_for_app(record.info.app_id);
-    impl_->cancel_app_timers(record);
+    impl_->cleanup_app_transient_resources(record);
     impl_->unload_runtime(record);
     auto cleanup_result = impl_->run_task_sync<std::expected<void, std::string>>(
                               SYSTEM_GUI_TASK_GROUP,
@@ -552,6 +583,7 @@ std::expected<void, std::string> System::start_app(AppId app_id, const AppStartO
     if (record.info.state == AppState::Running) {
         return {};
     }
+
     const auto start_profile_started_at = SteadyClock::now();
     auto log_start_profile = [&](const char *stage, SteadyTimePoint stage_started_at) {
         const auto now = SteadyClock::now();
@@ -760,6 +792,12 @@ std::expected<void, std::string> System::start_app(AppId app_id, const AppStartO
     }
 
     if (!start_result) {
+        impl_->cleanup_app_transient_resources(record);
+        release_runtime_dataflow_operations(record.runtime_app_id);
+        if (record.info.manifest.kind == AppKind::Runtime) {
+            impl_->unload_runtime(record);
+        }
+
         auto rollback_result = impl_->run_task_sync<std::expected<void, std::string>>(
                                    SYSTEM_GUI_TASK_GROUP,
         [this, &record]() -> std::expected<void, std::string> {
@@ -860,34 +898,14 @@ std::expected<void, std::string> System::stop_app(AppId app_id)
     }
     auto &record = *record_result.value();
     if (record.info.state == AppState::Stopped || record.info.state == AppState::Installed) {
-        on_hide_app_loading(app_id);
-        std::vector<KeyboardRequestId> keyboard_requests;
-        for (const auto &[request_id, keyboard] : impl_->keyboard_requests_) {
-            if (keyboard.app_id == app_id) {
-                keyboard_requests.push_back(request_id);
-            }
-        }
-        for (const auto request_id : keyboard_requests) {
-            (void)hide_app_keyboard(app_id, request_id);
-        }
-        close_message_dialogs_for_app(app_id);
+        impl_->cleanup_app_transient_resources(record);
         return {};
     }
     auto heap_before_stop = heap_trace::capture();
     heap_trace::log("system.stop", "before stop", record.info.manifest.id, heap_before_stop);
     record.info.state = AppState::Stopping;
-    on_hide_app_loading(app_id);
-    std::vector<KeyboardRequestId> keyboard_requests;
-    for (const auto &[request_id, keyboard] : impl_->keyboard_requests_) {
-        if (keyboard.app_id == app_id) {
-            keyboard_requests.push_back(request_id);
-        }
-    }
-    for (const auto request_id : keyboard_requests) {
-        (void)hide_app_keyboard(app_id, request_id);
-    }
-    close_message_dialogs_for_app(app_id);
-    impl_->cancel_app_timers(record);
+    impl_->cleanup_app_transient_resources(record);
+    release_runtime_dataflow_operations(record.runtime_app_id);
     std::expected<void, std::string> stop_result = {};
     if (record.info.manifest.kind == AppKind::Native) {
         if (record.native_app && record.context) {
@@ -1071,7 +1089,9 @@ std::expected<KeyboardRequestId, std::string> System::show_app_keyboard(
     KeyboardResultHandler handler
 )
 {
-    if (impl_->should_schedule_app_task()) {
+    // Runtime sync service calls run on the service-call strand while the SystemApp
+    // task that initiated the call is blocked waiting. Re-posting would deadlock.
+    if (impl_->should_schedule_app_task() && !is_blocking_runtime_service_call_context()) {
         return impl_->run_task_sync<std::expected<KeyboardRequestId, std::string>>(
                    SYSTEM_APP_TASK_GROUP,
         [this, app_id, options = std::move(options), handler = std::move(handler)]() mutable {
@@ -1107,7 +1127,7 @@ std::expected<KeyboardRequestId, std::string> System::show_app_keyboard(
 
 std::expected<void, std::string> System::hide_app_keyboard(AppId app_id, KeyboardRequestId request_id)
 {
-    if (impl_->should_schedule_app_task()) {
+    if (impl_->should_schedule_app_task() && !is_blocking_runtime_service_call_context()) {
         return impl_->run_task_sync<std::expected<void, std::string>>(
                    SYSTEM_APP_TASK_GROUP,
         [this, app_id, request_id]() {
@@ -1191,13 +1211,9 @@ std::expected<MessageDialogRequestId, std::string> System::show_app_message_dial
     MessageDialogResultHandler handler
 )
 {
-    if (impl_->should_schedule_app_task()) {
-        if (is_runtime_service_call_context()) {
-            // Runtime sync service calls are handled on the service call strand while the
-            // SystemApp task that initiated the call is blocked waiting. Re-posting to the
-            // serial SystemApp queue would deadlock.
-            return enqueue_message_dialog(app_id, true, std::move(options), std::move(handler));
-        }
+    // Runtime sync service calls run on the service-call strand while the SystemApp
+    // task that initiated the call is blocked waiting. Re-posting would deadlock.
+    if (impl_->should_schedule_app_task() && !is_blocking_runtime_service_call_context()) {
         return impl_->run_task_sync<std::expected<MessageDialogRequestId, std::string>>(
                    SYSTEM_APP_TASK_GROUP,
         [this, app_id, options = std::move(options), handler = std::move(handler)]() mutable {
@@ -1212,7 +1228,7 @@ std::expected<MessageDialogRequestId, std::string> System::show_app_message_dial
 
 std::expected<void, std::string> System::hide_app_message_dialog(AppId app_id, MessageDialogRequestId request_id)
 {
-    if (impl_->should_schedule_app_task()) {
+    if (impl_->should_schedule_app_task() && !is_blocking_runtime_service_call_context()) {
         return impl_->run_task_sync<std::expected<void, std::string>>(
                    SYSTEM_APP_TASK_GROUP,
         [this, app_id, request_id]() {
@@ -1231,7 +1247,7 @@ std::expected<void, std::string> System::update_app_message_dialog(
     MessageDialogOptions options
 )
 {
-    if (impl_->should_schedule_app_task()) {
+    if (impl_->should_schedule_app_task() && !is_blocking_runtime_service_call_context()) {
         return impl_->run_task_sync<std::expected<void, std::string>>(
                    SYSTEM_APP_TASK_GROUP,
         [this, app_id, request_id, options = std::move(options)]() mutable {
@@ -1251,7 +1267,7 @@ std::expected<void, std::string> System::complete_app_message_dialog(
     MessageDialogCloseReason reason
 )
 {
-    if (impl_->should_schedule_app_task()) {
+    if (impl_->should_schedule_app_task() && !is_blocking_runtime_service_call_context()) {
         return impl_->run_task_sync<std::expected<void, std::string>>(
                    SYSTEM_APP_TASK_GROUP,
         [this, app_id, request_id, button_index, reason]() {

@@ -15,7 +15,9 @@
 #endif
 #include "brookesia/service_helper/network/sntp.hpp"
 #include "brookesia/service_helper/framework/utils.hpp"
-#include "brookesia/service_manager.hpp"
+#include "brookesia/service_manager/event/definition.hpp"
+#include "brookesia/service_manager/service/manager.hpp"
+#include "brookesia/service_manager/service/utils_service.hpp"
 #include "brookesia/system_super/system.hpp"
 #include "brookesia/service_helper/system/storage.hpp"
 #include "private/font_language.hpp"

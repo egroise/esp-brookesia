@@ -25,7 +25,7 @@
 #if !BROOKESIA_SYSTEM_CORE_SYSTEM_ENABLE_DEBUG_LOG
 #   define BROOKESIA_LOG_DISABLE_DEBUG_TRACE 1
 #endif
-#include "brookesia/service_helper.hpp"
+#include "brookesia/service_helper/system/storage.hpp"
 #include "private/utils.hpp"
 
 namespace esp_brookesia::system::core {

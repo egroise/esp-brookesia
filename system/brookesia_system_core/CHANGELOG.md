@@ -1,5 +1,12 @@
 # ChangeLog
 
+## v0.8.2 - 2026-07-27
+
+### Enhancements:
+
+- feat(build): split runtime, service, and GUI orchestration implementation units.
+- chore(build): use lightweight static schema and utility APIs.
+
 ## v0.8.1 - 2026-07-13
 
 ### Breaking Changes:

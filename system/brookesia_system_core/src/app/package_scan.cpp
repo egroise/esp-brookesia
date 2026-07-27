@@ -11,7 +11,7 @@
 #include "private/system/impl.hpp"
 
 #include <algorithm>
-#include "brookesia/service_helper.hpp"
+#include "brookesia/service_helper/system/storage.hpp"
 #include "brookesia/system_core/app/package.hpp"
 
 namespace esp_brookesia::system::core {

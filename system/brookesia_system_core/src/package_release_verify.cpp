@@ -18,7 +18,7 @@
 
 #include "boost/json.hpp"
 
-#include "brookesia/service_helper.hpp"
+#include "brookesia/service_helper/system/storage.hpp"
 #include "zlib.h"
 
 #if defined(ESP_PLATFORM) && ESP_PLATFORM && defined(BROOKESIA_SYSTEM_CORE_HAVE_PACKAGE_RELEASE_VERIFY) && \

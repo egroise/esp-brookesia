@@ -9,6 +9,7 @@
 #endif
 #include "private/utils.hpp"
 #include "private/heap_trace.hpp"
+#include "private/runtime/call_context.hpp"
 #include "private/runtime/host_bridge.hpp"
 #include "private/runtime/service_json.hpp"
 
@@ -26,7 +27,8 @@
 #include <type_traits>
 #include <utility>
 
-#include "brookesia/service_manager.hpp"
+#include "brookesia/service_manager/service/manager.hpp"
+#include "brookesia/service_manager/event/registry.hpp"
 
 namespace esp_brookesia::system::core {
 namespace {
@@ -40,7 +42,6 @@ using NativeValue = runtime::NativeValue;
 
 constexpr const char *STORAGE_PATH_MARKER_KEY = "$brookesiaStoragePath";
 constexpr const char *STORAGE_URL_MARKER_KEY = "$brookesiaStorageUrl";
-constexpr const char *RUNTIME_APP_ID_CALL_CONTEXT_KEY = "brookesia.system.runtime_app_id";
 
 bool get_string_arg(const NativeArgs &args, std::size_t index, std::string &value)
 {
@@ -194,13 +195,6 @@ std::expected<StorageFileLocation, std::string> storage_location_from_marker(con
 std::string file_url_from_path(std::string path)
 {
     return "file://" + std::move(path);
-}
-
-service::CallContext make_runtime_call_context(RuntimeAppId app_id)
-{
-    auto context = service::get_current_call_context();
-    context[RUNTIME_APP_ID_CALL_CONTEXT_KEY] = std::to_string(app_id);
-    return context;
 }
 
 } // namespace
@@ -718,7 +712,9 @@ NativeResult SystemHostBridge::Impl::call_function(const NativeArgs &args)
     if (!params) {
         return std::unexpected(params.error());
     }
-    service::ScopedCallContext call_context(make_runtime_call_context(app_id.value()));
+    service::ScopedCallContext call_context(
+        make_runtime_service_call_context(app_id.value(), RuntimeServiceCallMode::Blocking)
+    );
     auto result = service->call_function_sync(function_name, std::move(*params), timeout_ms);
     if constexpr (heap_trace::enabled) {
         const auto runtime_app_id = std::to_string(app_id.value());
@@ -840,7 +836,9 @@ void SystemHostBridge::Impl::call_function_async(const NativeArgs &args, NativeA
         }
     }
 
-    service::ScopedCallContext call_context(make_runtime_call_context(app_id.value()));
+    service::ScopedCallContext call_context(
+        make_runtime_service_call_context(app_id.value(), RuntimeServiceCallMode::Asynchronous)
+    );
     const bool accepted = service->call_function_async(
                               function_name,
                               std::move(*params),
@@ -978,7 +976,9 @@ NativeResult SystemHostBridge::Impl::call_functions(const NativeArgs &args)
     if (!calls) {
         return std::unexpected(calls.error());
     }
-    service::ScopedCallContext call_context(make_runtime_call_context(app_id.value()));
+    service::ScopedCallContext call_context(
+        make_runtime_service_call_context(app_id.value(), RuntimeServiceCallMode::Blocking)
+    );
     return NativeValue{function_batch_result_to_json(service->call_functions_sync(std::move(*calls)))};
 }
 
@@ -1029,7 +1029,9 @@ NativeResult SystemHostBridge::Impl::call_service_function(const NativeArgs &arg
     if (!params) {
         return std::unexpected(params.error());
     }
-    service::ScopedCallContext call_context(make_runtime_call_context(app_id.value()));
+    service::ScopedCallContext call_context(
+        make_runtime_service_call_context(app_id.value(), RuntimeServiceCallMode::Blocking)
+    );
     auto result = service->call_function_sync(function_name, std::move(*params), timeout_ms);
     return NativeValue{function_result_to_json(std::move(result))};
 }
@@ -1123,7 +1125,9 @@ void SystemHostBridge::Impl::call_service_function_async(const NativeArgs &args,
         }
     }
 
-    service::ScopedCallContext call_context(make_runtime_call_context(app_id.value()));
+    service::ScopedCallContext call_context(
+        make_runtime_service_call_context(app_id.value(), RuntimeServiceCallMode::Asynchronous)
+    );
     const bool accepted = service->call_function_async(
                               function_name,
                               std::move(*params),
@@ -1179,7 +1183,9 @@ NativeResult SystemHostBridge::Impl::call_service_functions(const NativeArgs &ar
     if (!calls) {
         return std::unexpected(calls.error());
     }
-    service::ScopedCallContext call_context(make_runtime_call_context(app_id.value()));
+    service::ScopedCallContext call_context(
+        make_runtime_service_call_context(app_id.value(), RuntimeServiceCallMode::Blocking)
+    );
     return NativeValue{function_batch_result_to_json(service->call_functions_sync(std::move(*calls)))};
 }
 

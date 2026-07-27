@@ -19,7 +19,7 @@
 #include <set>
 #include <string_view>
 
-#include "brookesia/service_helper.hpp"
+#include "brookesia/service_helper/system/storage.hpp"
 
 namespace esp_brookesia::system::core {
 namespace {

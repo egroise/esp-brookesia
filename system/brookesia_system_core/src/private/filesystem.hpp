@@ -11,7 +11,7 @@
 #include <string>
 #include <string_view>
 
-#include "brookesia/service_helper.hpp"
+#include "brookesia/service_helper/system/storage.hpp"
 #include "private/utils.hpp"
 
 namespace esp_brookesia::system::core {

@@ -14,7 +14,7 @@
 #include "brookesia/system_core/app/iapp.hpp"
 #include "brookesia/system_core/app/package.hpp"
 #include "brookesia/system_core/system/system.hpp"
-#include "brookesia/service_helper.hpp"
+#include "brookesia/service_helper/system/storage.hpp"
 #include "private/filesystem.hpp"
 
 namespace esp_brookesia::system::core {
@@ -638,6 +638,44 @@ std::string AppGuiRuntime::get_language() const
         return {};
     }
     return system_->system_gui().get_language();
+}
+
+std::expected<void, std::string> AppGuiRuntime::save_theme_preference(std::string_view theme_id) const
+{
+    if (system_ == nullptr) {
+        return std::unexpected("System is not available");
+    }
+    if (!is_native_system_app()) {
+        return std::unexpected("Only native system apps can save GUI theme preferences");
+    }
+    return system_->system_gui().save_theme_preference(theme_id);
+}
+
+std::expected<void, std::string> AppGuiRuntime::save_language_preference(std::string_view language) const
+{
+    if (system_ == nullptr) {
+        return std::unexpected("System is not available");
+    }
+    if (!is_native_system_app()) {
+        return std::unexpected("Only native system apps can save GUI language preferences");
+    }
+    return system_->system_gui().save_language_preference(language);
+}
+
+std::optional<std::string> AppGuiRuntime::get_stored_theme_preference() const
+{
+    if (system_ == nullptr || !is_native_system_app()) {
+        return std::nullopt;
+    }
+    return system_->system_gui().get_stored_theme_preference();
+}
+
+std::optional<std::string> AppGuiRuntime::get_stored_language_preference() const
+{
+    if (system_ == nullptr || !is_native_system_app()) {
+        return std::nullopt;
+    }
+    return system_->system_gui().get_stored_language_preference();
 }
 
 std::expected<gui::DocumentId, std::string> AppGuiRuntime::load_file(

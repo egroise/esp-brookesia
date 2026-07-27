@@ -11,7 +11,8 @@
 #include <string>
 #include <string_view>
 
-#include "brookesia/service_manager.hpp"
+#include "brookesia/service_manager/event/registry.hpp"
+#include "brookesia/service_manager/service/manager.hpp"
 #include "brookesia/system_core.hpp"
 #include "brookesia/system_super/macro_configs.h"
 

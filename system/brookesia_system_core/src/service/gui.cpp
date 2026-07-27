@@ -9,6 +9,7 @@
 #endif
 #include "private/utils.hpp"
 #include "private/heap_trace.hpp"
+#include "private/service/static_schema.hpp"
 #include "private/service/utils.hpp"
 
 #include <array>
@@ -18,15 +19,6 @@
 namespace esp_brookesia::system::core {
 
 namespace {
-
-FunctionSchema with_return(FunctionSchema schema, FunctionValueType return_type, std::string return_description)
-{
-    schema.return_value = service::FunctionReturnSchema{
-        .type = return_type,
-        .description = std::move(return_description),
-    };
-    return schema;
-}
 
 std::expected<int32_t, std::string> get_int_param_or(
     const FunctionParameterMap &params,
@@ -77,243 +69,291 @@ std::expected<std::vector<std::string>, std::string> parse_string_array(
     return values;
 }
 
+using static_schema::DefaultValueKind;
+using static_schema::FunctionParameterSpec;
+using static_schema::FunctionReturnSpec;
+using static_schema::FunctionSpec;
+
+constexpr std::array<FunctionParameterSpec, 3> SET_BINDING_PARAMETERS = {{
+        {"Path", "View absolute path", FunctionValueType::String},
+        {"Key", "Binding key", FunctionValueType::String},
+        {"Value", "Binding value", FunctionValueType::String},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 1> SET_BINDINGS_PARAMETERS = {{
+        {"Updates", "Binding updates", FunctionValueType::Array},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 2> GET_BINDING_PARAMETERS = {{
+        {"Path", "View absolute path", FunctionValueType::String},
+        {"Key", "Binding key", FunctionValueType::String},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 1> GET_CONSTANT_PARAMETERS = {{
+        {"Path", "Constant dot path", FunctionValueType::String},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 2> SET_TEXT_PARAMETERS = {{
+        {"Path", "View absolute path", FunctionValueType::String},
+        {"Text", "Text", FunctionValueType::String},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 2> SET_VALUE_PARAMETERS = {{
+        {"Path", "View absolute path", FunctionValueType::String},
+        {"Value", "Value", FunctionValueType::Number},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 2> SET_CHECKED_PARAMETERS = {{
+        {"Path", "View absolute path", FunctionValueType::String},
+        {"Checked", "Checked", FunctionValueType::Boolean},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 3> CREATE_VIEW_PARAMETERS = {{
+        {"TemplateId", "Template id", FunctionValueType::String},
+        {"ParentPath", "Parent absolute path", FunctionValueType::String},
+        {"InstanceId", "Instance id", FunctionValueType::String},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 1> DESTROY_VIEW_PARAMETERS = {{
+        {"Path", "View absolute path", FunctionValueType::String},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 1> SUBSCRIBE_ACTION_PARAMETERS = {{
+        {"Action", "Action name", FunctionValueType::String},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 2> TRIGGER_SCREEN_FLOW_PARAMETERS = {{
+        {"ScreenFlow", "Screen flow id", FunctionValueType::String},
+        {"Action", "Screen flow action", FunctionValueType::String},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 1> GET_SCREEN_FLOW_STATE_PARAMETERS = {{
+        {"ScreenFlow", "Screen flow id", FunctionValueType::String},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 1> GET_VIEW_FRAME_PARAMETERS = {{
+        {"Path", "View absolute path", FunctionValueType::String},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 2> SET_VIEW_SRC_PARAMETERS = {{
+        {"Path", "Image view absolute path", FunctionValueType::String},
+        {"Src", "Image resource id or path", FunctionValueType::String},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 1> IMAGE_IDS_PARAMETERS = {{
+        {"Ids", "Image resource id array", FunctionValueType::Array},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 2> START_VIEW_ANIMATION_PARAMETERS = {{
+        {"Path", "View absolute path", FunctionValueType::String},
+        {"Animation", "Animation object", FunctionValueType::Object},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 1> STOP_ANIMATION_PARAMETERS = {{
+        {"AnimationId", "Animation subscription id", FunctionValueType::Number},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 4> SCROLL_TO_PARAMETERS = {{
+        {"Path", "View absolute path", FunctionValueType::String},
+        {
+            "X",
+            "Scroll X offset",
+            FunctionValueType::Number,
+            {.kind = DefaultValueKind::Number, .number_value = 0},
+        },
+        {
+            "Y",
+            "Scroll Y offset",
+            FunctionValueType::Number,
+            {.kind = DefaultValueKind::Number, .number_value = 0},
+        },
+        {
+            "Animated",
+            "Whether to animate scrolling",
+            FunctionValueType::Boolean,
+            {.kind = DefaultValueKind::Boolean, .boolean_value = true},
+        },
+    }
+};
+constexpr std::array<FunctionParameterSpec, 2> SCROLL_TO_VIEW_PARAMETERS = {{
+        {"Path", "View absolute path", FunctionValueType::String},
+        {"Animated", "Whether to animate scrolling", FunctionValueType::Boolean},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 1> EXECUTE_BATCH_PARAMETERS = {{
+        {"Commands", "GUI command array", FunctionValueType::Array},
+    }
+};
+
+constexpr FunctionReturnSpec GET_BINDING_RETURN = {
+    FunctionValueType::String,
+    "Binding value string",
+};
+constexpr FunctionReturnSpec GET_CONSTANT_RETURN = {
+    FunctionValueType::Object,
+    "Constant value object. Example: {\"Value\":\"example\"}",
+};
+constexpr FunctionReturnSpec GET_SCREEN_FLOW_STATE_RETURN = {
+    FunctionValueType::Object,
+    "Screen flow state object. Example: {\"State\":\"screen_id\"}",
+};
+constexpr FunctionReturnSpec GET_VIEW_FRAME_RETURN = {
+    FunctionValueType::Object,
+    "View frame object. Example: {\"x\":0,\"y\":0,\"width\":320,\"height\":240}",
+};
+constexpr FunctionReturnSpec START_VIEW_ANIMATION_RETURN = {
+    FunctionValueType::Number,
+    "Animation subscription id",
+};
+constexpr FunctionReturnSpec EXECUTE_BATCH_RETURN = {
+    FunctionValueType::Object,
+    "Batch result object. Example: {\"success\":true,\"results\":[]}",
+};
+
+constexpr std::array<FunctionSpec, static_cast<size_t>(SystemGuiHelper::FunctionId::Max)> GUI_FUNCTION_SPECS = {{
+        {
+            "SetBinding",
+            "Set a binding in the caller app GUI document",
+            SET_BINDING_PARAMETERS,
+            false,
+        },
+        {
+            "SetBindings",
+            "Set multiple bindings in the caller app GUI document",
+            SET_BINDINGS_PARAMETERS,
+            false,
+        },
+        {
+            "GetBinding",
+            "Get a binding from the caller app GUI document",
+            GET_BINDING_PARAMETERS,
+            false,
+            &GET_BINDING_RETURN,
+        },
+        {
+            "GetConstant",
+            "Get a constant from the caller app GUI document",
+            GET_CONSTANT_PARAMETERS,
+            false,
+            &GET_CONSTANT_RETURN,
+        },
+        {
+            "SetText",
+            "Set label text in the caller app GUI document",
+            SET_TEXT_PARAMETERS,
+            false,
+        },
+        {
+            "SetValue",
+            "Set numeric value in the caller app GUI document",
+            SET_VALUE_PARAMETERS,
+            false,
+        },
+        {
+            "SetChecked",
+            "Set checked state in the caller app GUI document",
+            SET_CHECKED_PARAMETERS,
+            false,
+        },
+        {
+            "CreateView",
+            "Create a view in the caller app GUI document",
+            CREATE_VIEW_PARAMETERS,
+            false,
+        },
+        {
+            "DestroyView",
+            "Destroy a view in the caller app GUI document",
+            DESTROY_VIEW_PARAMETERS,
+            false,
+        },
+        {
+            "SubscribeAction",
+            "Forward a GUI action to brookesia_app.on_action(action)",
+            SUBSCRIBE_ACTION_PARAMETERS,
+            false,
+        },
+        {
+            "TriggerScreenFlow",
+            "Trigger a screen flow transition in the caller app GUI document",
+            TRIGGER_SCREEN_FLOW_PARAMETERS,
+            false,
+        },
+        {
+            "GetScreenFlowState",
+            "Get a running screen flow state from the caller app GUI document",
+            GET_SCREEN_FLOW_STATE_PARAMETERS,
+            false,
+            &GET_SCREEN_FLOW_STATE_RETURN,
+        },
+        {
+            "GetViewFrame",
+            "Get a view frame from the caller app GUI document",
+            GET_VIEW_FRAME_PARAMETERS,
+            false,
+            &GET_VIEW_FRAME_RETURN,
+        },
+        {
+            "SetViewSrc",
+            "Set an image source in the caller app GUI document",
+            SET_VIEW_SRC_PARAMETERS,
+            false,
+        },
+        {
+            "PreloadImages",
+            "Decode and cache caller app GUI image resources by id",
+            IMAGE_IDS_PARAMETERS,
+            false,
+        },
+        {
+            "ReleaseImages",
+            "Release manually preloaded caller app GUI image resources by id",
+            IMAGE_IDS_PARAMETERS,
+            false,
+        },
+        {
+            "StartViewAnimation",
+            "Start a view animation in the caller app GUI document",
+            START_VIEW_ANIMATION_PARAMETERS,
+            false,
+            &START_VIEW_ANIMATION_RETURN,
+        },
+        {
+            "StopAnimation",
+            "Stop a caller app GUI animation",
+            STOP_ANIMATION_PARAMETERS,
+            false,
+        },
+        {
+            "ScrollTo",
+            "Scroll a view to an absolute scroll offset",
+            SCROLL_TO_PARAMETERS,
+            false,
+        },
+        {
+            "ScrollToView",
+            "Scroll a view into the visible area of its scrollable parent",
+            SCROLL_TO_VIEW_PARAMETERS,
+            false,
+        },
+        {
+            "ExecuteBatch",
+            "Execute GUI commands in one caller app GUI scheduler task",
+            EXECUTE_BATCH_PARAMETERS,
+            false,
+            &EXECUTE_BATCH_RETURN,
+        },
+    }
+};
+
+static_assert(GUI_FUNCTION_SPECS.size() == static_cast<size_t>(SystemGuiHelper::FunctionId::Max));
+
 } // namespace
 
 std::span<const service::FunctionSchema> SystemGuiHelper::get_function_schemas()
 {
-    static const std::array<service::FunctionSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(FunctionId::Max)> SCHEMAS = {{
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetBinding),
-                .description = "Set a binding in the caller app GUI document",
-                .parameters = {
-                    {BROOKESIA_DESCRIBE_TO_STR(BindingParam::Path), "View absolute path", FunctionValueType::String},
-                    {BROOKESIA_DESCRIBE_TO_STR(BindingParam::Key), "Binding key", FunctionValueType::String},
-                    {BROOKESIA_DESCRIBE_TO_STR(BindingParam::Value), "Binding value", FunctionValueType::String},
-                },
-                .require_scheduler = false,
-            },
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetBindings),
-                .description = "Set multiple bindings in the caller app GUI document",
-                .parameters = {
-                    {
-                        BROOKESIA_DESCRIBE_TO_STR(BindingsParam::Updates),
-                        "Binding updates",
-                        FunctionValueType::Array,
-                    },
-                },
-                .require_scheduler = false,
-            },
-            with_return({
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetBinding),
-                .description = "Get a binding from the caller app GUI document",
-                .parameters = {
-                    {BROOKESIA_DESCRIBE_TO_STR(BindingParam::Path), "View absolute path", FunctionValueType::String},
-                    {BROOKESIA_DESCRIBE_TO_STR(BindingParam::Key), "Binding key", FunctionValueType::String},
-                },
-                .require_scheduler = false,
-            }, FunctionValueType::String, "Binding value string"),
-            with_return({
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetConstant),
-                .description = "Get a constant from the caller app GUI document",
-                .parameters = {
-                    {BROOKESIA_DESCRIBE_TO_STR(PathParam::Path), "Constant dot path", FunctionValueType::String},
-                },
-                .require_scheduler = false,
-            }, FunctionValueType::Object, "Constant value object. Example: {\"Value\":\"example\"}"),
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetText),
-                .description = "Set label text in the caller app GUI document",
-                .parameters = {
-                    {BROOKESIA_DESCRIBE_TO_STR(TextParam::Path), "View absolute path", FunctionValueType::String},
-                    {BROOKESIA_DESCRIBE_TO_STR(TextParam::Text), "Text", FunctionValueType::String},
-                },
-                .require_scheduler = false,
-            },
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetValue),
-                .description = "Set numeric value in the caller app GUI document",
-                .parameters = {
-                    {BROOKESIA_DESCRIBE_TO_STR(ValueParam::Path), "View absolute path", FunctionValueType::String},
-                    {BROOKESIA_DESCRIBE_TO_STR(ValueParam::Value), "Value", FunctionValueType::Number},
-                },
-                .require_scheduler = false,
-            },
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetChecked),
-                .description = "Set checked state in the caller app GUI document",
-                .parameters = {
-                    {BROOKESIA_DESCRIBE_TO_STR(CheckedParam::Path), "View absolute path", FunctionValueType::String},
-                    {BROOKESIA_DESCRIBE_TO_STR(CheckedParam::Checked), "Checked", FunctionValueType::Boolean},
-                },
-                .require_scheduler = false,
-            },
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::CreateView),
-                .description = "Create a view in the caller app GUI document",
-                .parameters = {
-                    {BROOKESIA_DESCRIBE_TO_STR(CreateViewParam::TemplateId), "Template id", FunctionValueType::String},
-                    {BROOKESIA_DESCRIBE_TO_STR(CreateViewParam::ParentPath), "Parent absolute path", FunctionValueType::String},
-                    {BROOKESIA_DESCRIBE_TO_STR(CreateViewParam::InstanceId), "Instance id", FunctionValueType::String},
-                },
-                .require_scheduler = false,
-            },
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::DestroyView),
-                .description = "Destroy a view in the caller app GUI document",
-                .parameters = {
-                    {BROOKESIA_DESCRIBE_TO_STR(PathParam::Path), "View absolute path", FunctionValueType::String},
-                },
-                .require_scheduler = false,
-            },
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::SubscribeAction),
-                .description = "Forward a GUI action to brookesia_app.on_action(action)",
-                .parameters = {
-                    {BROOKESIA_DESCRIBE_TO_STR(ActionParam::Action), "Action name", FunctionValueType::String},
-                },
-                .require_scheduler = false,
-            },
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::TriggerScreenFlow),
-                .description = "Trigger a screen flow transition in the caller app GUI document",
-                .parameters = {
-                    {
-                        BROOKESIA_DESCRIBE_TO_STR(ScreenFlowParam::ScreenFlow),
-                        "Screen flow id",
-                        FunctionValueType::String,
-                    },
-                    {BROOKESIA_DESCRIBE_TO_STR(ScreenFlowParam::Action), "Screen flow action", FunctionValueType::String},
-                },
-                .require_scheduler = false,
-            },
-            with_return({
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetScreenFlowState),
-                .description = "Get a running screen flow state from the caller app GUI document",
-                .parameters = {
-                    {
-                        BROOKESIA_DESCRIBE_TO_STR(ScreenFlowParam::ScreenFlow),
-                        "Screen flow id",
-                        FunctionValueType::String,
-                    },
-                },
-                .require_scheduler = false,
-            }, FunctionValueType::Object, "Screen flow state object. Example: {\"State\":\"screen_id\"}"),
-            with_return({
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetViewFrame),
-                .description = "Get a view frame from the caller app GUI document",
-                .parameters = {
-                    {BROOKESIA_DESCRIBE_TO_STR(PathParam::Path), "View absolute path", FunctionValueType::String},
-                },
-                .require_scheduler = false,
-            }, FunctionValueType::Object, "View frame object. Example: {\"x\":0,\"y\":0,\"width\":320,\"height\":240}"),
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetViewSrc),
-                .description = "Set an image source in the caller app GUI document",
-                .parameters = {
-                    {BROOKESIA_DESCRIBE_TO_STR(SourceParam::Path), "Image view absolute path", FunctionValueType::String},
-                    {BROOKESIA_DESCRIBE_TO_STR(SourceParam::Src), "Image resource id or path", FunctionValueType::String},
-                },
-                .require_scheduler = false,
-            },
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::PreloadImages),
-                .description = "Decode and cache caller app GUI image resources by id",
-                .parameters = {
-                    {
-                        BROOKESIA_DESCRIBE_TO_STR(ImageIdsParam::Ids),
-                        "Image resource id array",
-                        FunctionValueType::Array,
-                    },
-                },
-                .require_scheduler = false,
-            },
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::ReleaseImages),
-                .description = "Release manually preloaded caller app GUI image resources by id",
-                .parameters = {
-                    {
-                        BROOKESIA_DESCRIBE_TO_STR(ImageIdsParam::Ids),
-                        "Image resource id array",
-                        FunctionValueType::Array,
-                    },
-                },
-                .require_scheduler = false,
-            },
-            with_return({
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::StartViewAnimation),
-                .description = "Start a view animation in the caller app GUI document",
-                .parameters = {
-                    {BROOKESIA_DESCRIBE_TO_STR(AnimationParam::Path), "View absolute path", FunctionValueType::String},
-                    {BROOKESIA_DESCRIBE_TO_STR(AnimationParam::Animation), "Animation object", FunctionValueType::Object},
-                },
-                .require_scheduler = false,
-            }, FunctionValueType::Number, "Animation subscription id"),
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::StopAnimation),
-                .description = "Stop a caller app GUI animation",
-                .parameters = {
-                    {
-                        BROOKESIA_DESCRIBE_TO_STR(AnimationIdParam::AnimationId),
-                        "Animation subscription id",
-                        FunctionValueType::Number,
-                    },
-                },
-                .require_scheduler = false,
-            },
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::ScrollTo),
-                .description = "Scroll a view to an absolute scroll offset",
-                .parameters = {
-                    {BROOKESIA_DESCRIBE_TO_STR(ScrollToParam::Path), "View absolute path", FunctionValueType::String},
-                    {
-                        BROOKESIA_DESCRIBE_TO_STR(ScrollToParam::X),
-                        "Scroll X offset",
-                        FunctionValueType::Number,
-                        service::FunctionValue(0),
-                    },
-                    {
-                        BROOKESIA_DESCRIBE_TO_STR(ScrollToParam::Y),
-                        "Scroll Y offset",
-                        FunctionValueType::Number,
-                        service::FunctionValue(0),
-                    },
-                    {
-                        BROOKESIA_DESCRIBE_TO_STR(ScrollToParam::Animated),
-                        "Whether to animate scrolling",
-                        FunctionValueType::Boolean,
-                        service::FunctionValue(true),
-                    },
-                },
-                .require_scheduler = false,
-            },
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::ScrollToView),
-                .description = "Scroll a view into the visible area of its scrollable parent",
-                .parameters = {
-                    {BROOKESIA_DESCRIBE_TO_STR(ScrollParam::Path), "View absolute path", FunctionValueType::String},
-                    {
-                        BROOKESIA_DESCRIBE_TO_STR(ScrollParam::Animated),
-                        "Whether to animate scrolling",
-                        FunctionValueType::Boolean,
-                    },
-                },
-                .require_scheduler = false,
-            },
-            with_return({
-                .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::ExecuteBatch),
-                .description = "Execute GUI commands in one caller app GUI scheduler task",
-                .parameters = {
-                    {
-                        BROOKESIA_DESCRIBE_TO_STR(BatchParam::Commands),
-                        "GUI command array",
-                        FunctionValueType::Array,
-                    },
-                },
-                .require_scheduler = false,
-            }, FunctionValueType::Object, "Batch result object. Example: {\"success\":true,\"results\":[]}"),
-        }
-    };
+    static const std::vector<service::FunctionSchema> SCHEMAS =
+        static_schema::materialize_function_schemas(GUI_FUNCTION_SPECS);
     return std::span<const service::FunctionSchema>(SCHEMAS);
 }
 
@@ -343,8 +383,7 @@ GuiService::GuiService(System &system)
 
 std::vector<service::FunctionSchema> GuiService::get_function_schemas()
 {
-    auto schemas = SystemGuiHelper::get_function_schemas();
-    return std::vector<service::FunctionSchema>(schemas.begin(), schemas.end());
+    return static_schema::materialize_function_schemas(GUI_FUNCTION_SPECS);
 }
 
 std::vector<service::EventSchema> GuiService::get_event_schemas()
@@ -355,133 +394,90 @@ std::vector<service::EventSchema> GuiService::get_event_schemas()
 
 service::ServiceBase::FunctionHandlerMap GuiService::get_function_handlers()
 {
-    using FunctionId = SystemGuiHelper::FunctionId;
     return {
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetBinding), [this](FunctionParameterMap &&params)
-            {
-                return set_binding(std::move(params));
-            }
+            return set_binding(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetBindings), [this](FunctionParameterMap &&params)
-            {
-                return set_bindings(std::move(params));
-            }
+            return set_bindings(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetBinding), [this](FunctionParameterMap &&params)
-            {
-                return get_binding(std::move(params));
-            }
+            return get_binding(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetConstant), [this](FunctionParameterMap &&params)
-            {
-                return get_constant(std::move(params));
-            }
+            return get_constant(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetText), [this](FunctionParameterMap &&params)
-            {
-                return set_text(std::move(params));
-            }
+            return set_text(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetValue), [this](FunctionParameterMap &&params)
-            {
-                return set_value(std::move(params));
-            }
+            return set_value(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetChecked), [this](FunctionParameterMap &&params)
-            {
-                return set_checked(std::move(params));
-            }
+            return set_checked(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::CreateView), [this](FunctionParameterMap &&params)
-            {
-                return create_view(std::move(params));
-            }
+            return create_view(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::DestroyView), [this](FunctionParameterMap &&params)
-            {
-                return destroy_view(std::move(params));
-            }
+            return destroy_view(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::SubscribeAction), [this](FunctionParameterMap &&params)
-            {
-                return subscribe_action(std::move(params));
-            }
+            return subscribe_action(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::TriggerScreenFlow), [this](FunctionParameterMap &&params)
-            {
-                return trigger_screen_flow(std::move(params));
-            }
+            return trigger_screen_flow(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetScreenFlowState), [this](FunctionParameterMap &&params)
-            {
-                return get_screen_flow_state(std::move(params));
-            }
+            return get_screen_flow_state(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetViewFrame), [this](FunctionParameterMap &&params)
-            {
-                return get_view_frame(std::move(params));
-            }
+            return get_view_frame(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetViewSrc), [this](FunctionParameterMap &&params)
-            {
-                return set_view_src(std::move(params));
-            }
+            return set_view_src(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::PreloadImages), [this](FunctionParameterMap &&params)
-            {
-                return preload_images(std::move(params));
-            }
+            return preload_images(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::ReleaseImages), [this](FunctionParameterMap &&params)
-            {
-                return release_images(std::move(params));
-            }
+            return release_images(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::StartViewAnimation), [this](FunctionParameterMap &&params)
-            {
-                return start_view_animation(std::move(params));
-            }
+            return start_view_animation(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::StopAnimation), [this](FunctionParameterMap &&params)
-            {
-                return stop_animation(std::move(params));
-            }
+            return stop_animation(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::ScrollTo), [this](FunctionParameterMap &&params)
-            {
-                return scroll_to(std::move(params));
-            }
+            return scroll_to(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::ScrollToView), [this](FunctionParameterMap &&params)
-            {
-                return scroll_to_view(std::move(params));
-            }
+            return scroll_to_view(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::ExecuteBatch), [this](FunctionParameterMap &&params)
-            {
-                return execute_batch(std::move(params));
-            }
+            return execute_batch(std::move(params));
         },
     };
 }

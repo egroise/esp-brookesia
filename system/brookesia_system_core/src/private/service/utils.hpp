@@ -86,8 +86,6 @@ AppId to_app_id(double value);
 bool is_native_system_app(const AppInfo &app);
 std::expected<std::optional<AppInfo>, std::string> get_runtime_caller(System &system);
 boost::json::object app_info_to_json(const AppInfo &info, std::string_view language);
-FunctionSchema make_no_param_schema(SystemCoreHelper::FunctionId id, std::string description);
-FunctionSchema make_app_id_schema(SystemCoreHelper::FunctionId id, std::string description);
 FunctionSchema make_timer_id_schema(SystemTimerHelper::FunctionId id, std::string description);
 
 } // namespace esp_brookesia::system::core

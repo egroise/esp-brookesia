@@ -23,6 +23,7 @@
 #if defined(__EMSCRIPTEN__)
 #include "brookesia/gui_interface/wasm/gui_task_queue.hpp"
 #endif
+#include "brookesia/service_manager/service/manager.hpp"
 #include "brookesia/system_core/service/gui.hpp"
 #include "brookesia/system_core/service/system.hpp"
 #include "brookesia/system_core/service/timer.hpp"
@@ -49,7 +50,7 @@ inline constexpr const char *SYSTEM_APP_INPUT_TASK_GROUP = "SystemAppInput";
 inline constexpr const char *SYSTEM_TIMER_TASK_GROUP = "SystemTimer";
 
 extern thread_local const void *current_system_task_owner;
-extern thread_local lib_utils::TaskScheduler::Group current_system_task_group;
+extern thread_local lib_utils::TaskSchedulerGroup current_system_task_group;
 
 class System::Impl {
 public:
@@ -110,8 +111,8 @@ public:
 
     bool is_current_task_group(std::string_view group) const;
     bool is_current_task_domain(std::string_view group) const;
-    lib_utils::TaskScheduler::GroupConfig make_task_group_config(
-        const lib_utils::TaskScheduler::Group &group,
+    lib_utils::TaskSchedulerGroupConfig make_task_group_config(
+        const lib_utils::TaskSchedulerGroup &group,
         bool use_gui_thread_guard = false,
         bool use_gui_runtime_gate = false,
         bool use_app_callback_gate = false
@@ -120,11 +121,11 @@ public:
     bool should_schedule_app_task() const;
     bool should_defer_gui_task(std::string_view group) const;
     void execute_task_with_group_context(
-        const lib_utils::TaskScheduler::Group &group,
+        const lib_utils::TaskSchedulerGroup &group,
         lib_utils::TaskScheduler::OnceTask task
     );
     std::expected<void, std::string> post_task(
-        const lib_utils::TaskScheduler::Group &group,
+        const lib_utils::TaskSchedulerGroup &group,
         lib_utils::TaskScheduler::OnceTask task
     );
     std::expected<GuiBatchResult, std::string> execute_gui_batch_now(
@@ -133,7 +134,7 @@ public:
     );
     template <typename Result, typename Fn>
     Result run_task_sync(
-        const lib_utils::TaskScheduler::Group &group,
+        const lib_utils::TaskSchedulerGroup &group,
         Fn &&fn,
         Result post_error_result
     )
@@ -191,6 +192,7 @@ public:
 
     std::expected<AppRecord *, std::string> get_record(AppId app_id);
     std::expected<const AppRecord *, std::string> get_record(AppId app_id) const;
+    void cleanup_app_transient_resources(AppRecord &record);
 
     std::expected<void, std::string> ensure_runtime_initialized();
     std::expected<void, std::string> ensure_gui_loaded(AppRecord &record);
@@ -241,6 +243,8 @@ public:
     void load_gui_preferences();
     void persist_gui_theme_preference(std::string_view theme_id);
     void persist_gui_language_preference(std::string_view language);
+    std::expected<void, std::string> save_gui_theme_preference(std::string_view theme_id);
+    std::expected<void, std::string> save_gui_language_preference(std::string_view language);
     GuiThemeLanguage get_gui_theme_language_snapshot() const;
     void set_gui_theme_snapshot(std::string_view theme_id);
     void set_gui_language_snapshot(std::string_view language);
@@ -305,7 +309,7 @@ public:
     std::map<runtime::AppId, AppId> runtime_to_app_;
     std::map<AppId, PendingBindingBuffer> pending_gui_bindings_;
     std::set<gui::DocumentId::Value> live_preview_document_ids_;
-    std::optional<lib_utils::TaskScheduler::TaskId> live_preview_poll_task_id_;
+    std::optional<lib_utils::TaskSchedulerTaskId> live_preview_poll_task_id_;
     StorageLayout storage_layout_;
     std::map<std::string, AppStoragePaths> app_storage_paths_cache_;
     GuiThemeLanguage gui_theme_language_snapshot_ {

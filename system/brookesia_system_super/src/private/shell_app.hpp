@@ -16,10 +16,11 @@
 #include <unordered_map>
 #include <vector>
 
-#include "boost/json/object.hpp"
-
 #include "brookesia/system_super/macro_configs.h"
-#include "brookesia/service_manager.hpp"
+#include "brookesia/service_manager/dataflow/visual/operation.hpp"
+#include "brookesia/service_manager/event/registry.hpp"
+#include "brookesia/service_manager/service/manager.hpp"
+#include "brookesia/service_display/service_display.hpp"
 #include "brookesia/service_manager/service/utils_service.hpp"
 #include "brookesia/system_core.hpp"
 #include "brookesia/system_super/system.hpp"
@@ -133,6 +134,8 @@ private:
     void disconnect_launcher_actions();
     void disconnect_overlay_actions();
     void handle_launcher_event(const gui::Event &event);
+    bool ensure_display_operation();
+    void release_display_operation();
     bool ensure_display_service_binding();
     void release_display_service_binding();
     bool configure_display_gesture();
@@ -154,7 +157,7 @@ private:
     void refresh_status_clock();
     void schedule_status_clock_timer();
     void stop_status_clock_timer();
-    void handle_display_touch_gesture(const boost::json::object &info_json);
+    void handle_display_touch_gesture(const service::Display::TouchGestureInfo &info);
     void reset_gesture_indicator();
     void cancel_gesture_exit_hold_timer();
     void cancel_status_peek_auto_hide_timer();
@@ -172,10 +175,11 @@ private:
 
     System &owner_;
     core::AppContext *context_ = nullptr;
+    std::shared_ptr<service::dataflow::VisualOperation> display_operation_;
     service::ServiceBinding display_service_binding_;
     service::ServiceBinding wifi_service_binding_;
     service::ServiceBinding sntp_service_binding_;
-    service::EventRegistry::SignalConnection display_gesture_connection_;
+    std::vector<lib_utils::connection> display_gesture_connections_;
     service::EventRegistry::SignalConnection wifi_event_connection_;
     service::EventRegistry::SignalConnection sntp_event_connection_;
     bool background_mounted_ = false;

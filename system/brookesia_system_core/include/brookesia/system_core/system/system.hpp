@@ -14,10 +14,9 @@
 #include <string_view>
 #include <vector>
 
-#include "boost/json.hpp"
+#include "boost/json/object.hpp"
+#include "boost/json/value.hpp"
 #include "brookesia/gui_interface.hpp"
-#include "brookesia/lib_utils.hpp"
-#include "brookesia/runtime_manager.hpp"
 #include "brookesia/system_core/app/iapp.hpp"
 #include "brookesia/system_core/system/batch.hpp"
 #include "brookesia/system_core/system/gui_access.hpp"

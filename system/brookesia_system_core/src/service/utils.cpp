@@ -477,31 +477,6 @@ boost::json::object app_info_to_json(const AppInfo &info, std::string_view langu
     return root;
 }
 
-FunctionSchema make_no_param_schema(SystemCoreHelper::FunctionId id, std::string description)
-{
-    return FunctionSchema{
-        .name = BROOKESIA_DESCRIBE_TO_STR(id),
-        .description = std::move(description),
-        .require_scheduler = false,
-    };
-}
-
-FunctionSchema make_app_id_schema(SystemCoreHelper::FunctionId id, std::string description)
-{
-    return FunctionSchema{
-        .name = BROOKESIA_DESCRIBE_TO_STR(id),
-        .description = std::move(description),
-        .parameters = {
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::AppIdParam::AppId),
-                .description = "System app id",
-                .type = FunctionValueType::Number,
-            },
-        },
-        .require_scheduler = false,
-    };
-}
-
 FunctionSchema make_timer_id_schema(SystemTimerHelper::FunctionId id, std::string description)
 {
     return FunctionSchema{
