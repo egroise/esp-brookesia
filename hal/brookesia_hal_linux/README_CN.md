@@ -14,9 +14,9 @@
 
 可使用 `--dry-run` 预览安装命令。`--minimal` 只安装构建、Boost 和
 OpenSSL 依赖。`--full` 还会安装 PC 测试 app 用于透明绝对路径挂载的
-`proot` launcher。`--media`、`--video`、`--display`、`--network` 分别安装
+`proot` launcher。`--media`、`--video`、`--display`、`--network`、`--ble` 分别安装
 FFmpeg/PortAudio/V4L2、仅视频所需 FFmpeg/V4L2、SDL2、NetworkManager/UPower
-依赖组。
+以及 GLib/GIO + BlueZ 依赖组。
 
 脚本支持 `apt`、`dnf` 和 `pacman`。其他发行版会打印依赖组，便于手动安装。
 
@@ -36,6 +36,7 @@ cmake -S host_test -B host_test/build-real \
   -DBROOKESIA_HAL_LINUX_DISPLAY_BACKEND=sdl2 \
   -DBROOKESIA_HAL_LINUX_POWER_BACKEND=upower \
   -DBROOKESIA_HAL_LINUX_WIFI_BACKEND=networkmanager \
+  -DBROOKESIA_HAL_LINUX_BLE_BACKEND=bluez \
   -DBROOKESIA_HAL_LINUX_VIDEO_BACKEND=ffmpeg_v4l2
 cmake --build host_test/build-real
 ctest --test-dir host_test/build-real --output-on-failure
@@ -47,12 +48,18 @@ ctest --test-dir host_test/build-real --output-on-failure
 - `BROOKESIA_HAL_LINUX_MEDIA_BACKEND=auto|stub|ffmpeg_portaudio`
 - `BROOKESIA_HAL_LINUX_VIDEO_BACKEND=auto|stub|ffmpeg_v4l2`
 - `BROOKESIA_HAL_LINUX_WIFI_BACKEND=auto|stub|networkmanager`
+- `BROOKESIA_HAL_LINUX_BLE_BACKEND=auto|stub|bluez`
 - `BROOKESIA_HAL_LINUX_DISPLAY_BACKEND=auto|stub|sdl2`
 - `BROOKESIA_HAL_LINUX_POWER_BACKEND=auto|stub|upower`
 
 在 host test 之外，`auto` 会优先选择依赖已安装的真实后端。运行时如果没有图形会话、
 摄像头、`nmcli`、电池，或 NetworkManager 权限不足，会打印 warning 并降级到
 deterministic stub 路径。
+
+BLE 的 `bluez` 模式为严格模式：GIO、system D-Bus、`GattManager1` 或
+`LEAdvertisingManager1` 缺失都会返回错误，不会静默使用 stub。`auto` 会尝试相同的
+BlueZ 本地 GATT/广播后端，仅在初始化不可用时回退。stub 不执行无线操作，测试必须通过
+`ble::linux_test` hook 显式注入连接、MTU、订阅和写入事件。
 
 ## 运行时数据
 
@@ -94,3 +101,6 @@ launcher 启动二进制。在这种受支持的运行方式下，
   充电控制时会返回不支持。
 - Wi-Fi 通过 NetworkManager `nmcli` 实现扫描、连接、断开和状态查询。SoftAP
   是 best-effort，设备或权限不支持 AP mode 时会失败并记录日志。
+- BLE 通过 BlueZ system D-Bus 的 GATT 和 LE Advertising Manager 导出单连接
+  Peripheral/GATT Server，支持 Write、Write Without Response、通知订阅状态、二进制
+  Notify、MTU 长度校验、主动断开及断连后恢复广播。

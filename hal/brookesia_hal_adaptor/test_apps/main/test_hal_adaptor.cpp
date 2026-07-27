@@ -56,6 +56,9 @@
 #ifndef BROOKESIA_HAL_ADAPTOR_ENABLE_VIDEO_DEVICE
 #   define BROOKESIA_HAL_ADAPTOR_ENABLE_VIDEO_DEVICE  (0)
 #endif
+#ifndef BROOKESIA_HAL_ADAPTOR_ENABLE_BLE_DEVICE
+#   define BROOKESIA_HAL_ADAPTOR_ENABLE_BLE_DEVICE  (0)
+#endif
 #ifndef BROOKESIA_HAL_ADAPTOR_VIDEO_ENABLE_CAMERA_IMPL
 #   define BROOKESIA_HAL_ADAPTOR_VIDEO_ENABLE_CAMERA_IMPL  (0)
 #endif
@@ -144,6 +147,58 @@ TEST_CASE("HAL adaptor: device info exposes enabled provider declarations", "[ha
                          infos, hal::WifiDevice::DEVICE_NAME, hal::network::ConnectivityIface::NAME,
                          hal::WifiDevice::CONNECTIVITY_IFACE_NAME
                      ));
+#endif
+#if BROOKESIA_HAL_ADAPTOR_ENABLE_BLE_DEVICE
+    TEST_ASSERT_TRUE(has_interface_info(
+                         infos, hal::BleDevice::DEVICE_NAME, hal::bluetooth::ble::PeripheralIface::NAME,
+                         hal::BleDevice::PERIPHERAL_IFACE_NAME
+                     ));
+#   if CONFIG_BT_CONTROLLER_DISABLED
+    // Hosted capability probing must be cached. A second discovery must not run a
+    // controller init/deinit pair that could interfere with Remote Wi-Fi or BLE acquire.
+    const auto repeated_infos = hal::get_device_infos();
+    TEST_ASSERT_TRUE(has_interface_info(
+                         repeated_infos, hal::BleDevice::DEVICE_NAME, hal::bluetooth::ble::PeripheralIface::NAME,
+                         hal::BleDevice::PERIPHERAL_IFACE_NAME
+                     ));
+#   endif
+#endif
+}
+
+TEST_CASE("HAL adaptor: BLE peripheral lifecycle is restart-safe", "[hal][adaptor][ble]")
+{
+#if BROOKESIA_HAL_ADAPTOR_ENABLE_BLE_DEVICE
+    constexpr const char *SERVICE_UUID = "7a5a0001-6c8d-4f5a-9c2e-3b9e0b2f4a10";
+    constexpr const char *RX_UUID = "7a5a0002-6c8d-4f5a-9c2e-3b9e0b2f4a10";
+    constexpr const char *TX_UUID = "7a5a0003-6c8d-4f5a-9c2e-3b9e0b2f4a10";
+
+    auto peripheral = hal::acquire_interface<hal::bluetooth::ble::PeripheralIface>(hal::BleDevice::PERIPHERAL_IFACE_NAME);
+    TEST_ASSERT_TRUE(static_cast<bool>(peripheral));
+
+    const hal::bluetooth::ble::PeripheralConfig config = {
+        .device_name = "Brookesia-BLE-Test",
+        .preferred_mtu = 247,
+        .advertised_service_uuids = {SERVICE_UUID},
+        .services = {{
+                .uuid = SERVICE_UUID,
+                .characteristics = {
+                    {.uuid = RX_UUID, .write = true},
+                    {.uuid = TX_UUID, .notify = true},
+                },
+            }
+        },
+    };
+    TEST_ASSERT_TRUE(peripheral->configure(config, {}));
+    TEST_ASSERT_TRUE(peripheral->init());
+    TEST_ASSERT_TRUE(peripheral->start());
+    TEST_ASSERT_TRUE(peripheral->start_advertising());
+    TEST_ASSERT_TRUE(peripheral->stop_advertising());
+    TEST_ASSERT_TRUE(peripheral->stop());
+    TEST_ASSERT_TRUE(peripheral->start());
+    TEST_ASSERT_TRUE(peripheral->stop());
+    TEST_ASSERT_TRUE(peripheral->deinit());
+#else
+    TEST_IGNORE_MESSAGE("BLE device disabled");
 #endif
 }
 

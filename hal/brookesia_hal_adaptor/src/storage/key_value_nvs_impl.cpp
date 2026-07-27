@@ -6,6 +6,7 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include "boost/format.hpp"
 #include "nvs.h"
 #include "nvs_handle.hpp"
 #include "brookesia/hal_adaptor/macro_configs.h"

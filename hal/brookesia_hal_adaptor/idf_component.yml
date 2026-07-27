@@ -1,4 +1,4 @@
-version: "0.8.2"
+version: "0.8.3"
 description: ESP-Brookesia HAL adaptor which provides board-side audio and LCD device implementations for brookesia_hal_interface.
 url: https://github.com/espressif/esp-brookesia/tree/master/hal/brookesia_hal_adaptor
 repository: https://github.com/espressif/esp-brookesia.git
@@ -9,12 +9,31 @@ dependencies:
     override_path: ../brookesia_hal_interface
     require: public
 
+  espressif/esp_bt_audio:
+    version: "^0.8"
+    require: private
+    matches:
+      - if: "target in [esp32, esp32s31] && $CONFIG{BROOKESIA_HAL_ADAPTOR_ENABLE_BT_DEVICE} == True && $CONFIG{BT_CONTROLLER_ENABLED} == True && $CONFIG{BT_CLASSIC_ENABLED} == True && $CONFIG{BT_BLUEDROID_ENABLED} == True && $CONFIG{BT_A2DP_ENABLE} == True"
+
+  espressif/gmf_audio:
+    version: "^0.8"
+    require: private
+    matches:
+      - if: "target in [esp32, esp32s31] && $CONFIG{BROOKESIA_HAL_ADAPTOR_ENABLE_BT_DEVICE} == True && $CONFIG{BT_CONTROLLER_ENABLED} == True && $CONFIG{BT_CLASSIC_ENABLED} == True && $CONFIG{BT_BLUEDROID_ENABLED} == True && $CONFIG{BT_A2DP_ENABLE} == True"
+
+  espressif/gmf_io:
+    version: "^0.8"
+    require: private
+    matches:
+      - if: "target in [esp32, esp32s31] && $CONFIG{BROOKESIA_HAL_ADAPTOR_ENABLE_BT_DEVICE} == True && $CONFIG{BT_CONTROLLER_ENABLED} == True && $CONFIG{BT_CLASSIC_ENABLED} == True && $CONFIG{BT_BLUEDROID_ENABLED} == True && $CONFIG{BT_A2DP_ENABLE} == True"
+
   espressif/esp_board_manager:
     version: "0.5.*"
     matches:
       - if: $CONFIG{BROOKESIA_HAL_ADAPTOR_ENABLE_SYSTEM_DEVICE} == True && $CONFIG{BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_BOARD_INFO_IMPL} == True
       - if: $CONFIG{BROOKESIA_HAL_ADAPTOR_ENABLE_SYSTEM_DEVICE} == True && $CONFIG{BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_OTA_UPDATER_IMPL} == True
       - if: $CONFIG{BROOKESIA_HAL_ADAPTOR_ENABLE_AUDIO_DEVICE} == True
+      - if: $CONFIG{BROOKESIA_HAL_ADAPTOR_ENABLE_BT_DEVICE} == True
       - if: $CONFIG{BROOKESIA_HAL_ADAPTOR_ENABLE_VIDEO_DEVICE} == True && $CONFIG{BROOKESIA_HAL_ADAPTOR_VIDEO_ENABLE_CAMERA_IMPL} == True
       - if: $CONFIG{BROOKESIA_HAL_ADAPTOR_ENABLE_DISPLAY_DEVICE} == True
       - if: $CONFIG{BROOKESIA_HAL_ADAPTOR_ENABLE_STORAGE_DEVICE} == True && $CONFIG{BROOKESIA_HAL_ADAPTOR_STORAGE_ENABLE_FILE_SYSTEM_IMPL} == True && $CONFIG{BROOKESIA_HAL_ADAPTOR_STORAGE_FILE_SYSTEM_ENABLE_SPIFFS} == True

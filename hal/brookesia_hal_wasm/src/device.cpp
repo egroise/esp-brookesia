@@ -43,6 +43,7 @@
 #include "brookesia/hal_interface/interfaces/storage/file_system.hpp"
 #include "brookesia/hal_interface/interfaces/storage/key_value.hpp"
 #include "brookesia/hal_interface/interfaces/system/board_info.hpp"
+#include "brookesia/hal_interface/interfaces/system/general.hpp"
 #include "brookesia/hal_interface/interfaces/video/camera.hpp"
 #include "brookesia/hal_interface/interfaces/video/processor.hpp"
 #include "brookesia/hal_interface/interfaces/wifi/basic.hpp"
@@ -59,6 +60,22 @@ constexpr const char *WASM_DISPLAY_GROUP_ID = "wasm_display";
 constexpr const char *WASM_STORAGE_ROOT = "/brookesia";
 constexpr const char *WASM_STORAGE_KV_ROOT = "/brookesia/kv";
 constexpr uint64_t WASM_STORAGE_TOTAL_BYTES = 64ULL * 1024ULL * 1024ULL;
+
+#if defined(__EMSCRIPTEN__)
+EM_JS(int, brookesia_wasm_restart_host_js, (), {
+    const root = typeof Module !== 'undefined' ? Module : globalThis;
+    if (typeof root.__brookesiaRestart !== 'function') {
+        return 0;
+    }
+    try {
+        root.__brookesiaRestart();
+        return 1;
+    } catch (error) {
+        console.warn('Brookesia WASM restart callback failed:', error);
+        return 0;
+    }
+});
+#endif
 
 #if defined(__EMSCRIPTEN__)
 EM_JS(int, brookesia_wasm_fetch_start_js, (
@@ -1241,6 +1258,42 @@ public:
     }
 };
 
+class RestartWasmImpl final: public system::GeneralIface {
+public:
+    explicit RestartWasmImpl(SystemWasmDevice::RestartHandler handler)
+        : handler_(std::move(handler))
+    {
+    }
+
+    std::expected<void, std::string> restart() override
+    {
+        SystemWasmDevice::RestartHandler handler;
+        {
+            std::lock_guard lock(mutex_);
+            handler = handler_;
+        }
+        if (!handler) {
+#if defined(__EMSCRIPTEN__)
+            if (brookesia_wasm_restart_host_js() != 0) {
+                return {};
+            }
+#endif
+            return std::unexpected("WASM simulator restart is unavailable: no host handler registered");
+        }
+        return handler();
+    }
+
+    void set_handler(SystemWasmDevice::RestartHandler handler)
+    {
+        std::lock_guard lock(mutex_);
+        handler_ = std::move(handler);
+    }
+
+private:
+    mutable std::mutex mutex_;
+    SystemWasmDevice::RestartHandler handler_;
+};
+
 bool SystemWasmDevice::probe()
 {
     return true;
@@ -1250,6 +1303,7 @@ std::vector<InterfaceSpec> SystemWasmDevice::get_interface_specs() const
 {
     return {
         {system::BoardInfoIface::NAME, BOARD_INFO_IFACE_NAME},
+        {system::GeneralIface::NAME, RESTART_IFACE_NAME},
     };
 }
 
@@ -1259,6 +1313,13 @@ bool SystemWasmDevice::on_init()
 
     board_info_iface_ = std::make_shared<BoardInfoWasmImpl>();
     interfaces_.emplace(BOARD_INFO_IFACE_NAME, board_info_iface_);
+    RestartHandler restart_handler;
+    {
+        std::lock_guard lock(restart_mutex_);
+        restart_handler = restart_handler_;
+    }
+    restart_iface_ = std::make_shared<RestartWasmImpl>(std::move(restart_handler));
+    interfaces_.emplace(RESTART_IFACE_NAME, restart_iface_);
     return true;
 }
 
@@ -1268,6 +1329,23 @@ void SystemWasmDevice::on_deinit()
 
     interfaces_.erase(BOARD_INFO_IFACE_NAME);
     board_info_iface_.reset();
+    interfaces_.erase(RESTART_IFACE_NAME);
+    restart_iface_.reset();
+}
+
+void SystemWasmDevice::set_restart_handler(RestartHandler handler)
+{
+    std::shared_ptr<RestartWasmImpl> restart_iface;
+    RestartHandler handler_copy;
+    {
+        std::lock_guard lock(restart_mutex_);
+        restart_handler_ = std::move(handler);
+        handler_copy = restart_handler_;
+        restart_iface = restart_iface_;
+    }
+    if (restart_iface) {
+        restart_iface->set_handler(std::move(handler_copy));
+    }
 }
 
 class NetworkConnectivityWasmImpl: public network::ConnectivityIface {

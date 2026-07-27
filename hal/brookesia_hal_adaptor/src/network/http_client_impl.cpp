@@ -113,6 +113,7 @@ network::HttpClientIface::ErrorCode EspHttpTransaction::open(
     esp_http_client_config_t config = {};
     config.url = request.url.c_str();
     config.timeout_ms = request.timeout_ms;
+    config.buffer_size_tx = BROOKESIA_HAL_ADAPTOR_NETWORK_HTTP_CLIENT_TX_BUFFER_SIZE;
     config.disable_auto_redirect = false;
     config.event_handler = event_handler;
     config.user_data = this;

@@ -64,6 +64,12 @@ menu "ESP-Brookesia: HAL Linux Configurations"
             help
                 Enable debug or lower level logs for the Linux Wi-Fi device.
 
+        config BROOKESIA_HAL_LINUX_BLE_DEVICE_ENABLE_DEBUG_LOG
+            bool "BLE device"
+            default n
+            help
+                Enable debug or lower level logs for the Linux BLE device.
+
         config BROOKESIA_HAL_LINUX_STORAGE_DEVICE_ENABLE_DEBUG_LOG
             bool "Storage device"
             default n
@@ -151,6 +157,23 @@ menu "ESP-Brookesia: HAL Linux Configurations"
             bool "NetworkManager"
     endchoice
 
+    choice BROOKESIA_HAL_LINUX_BLE_BACKEND
+        prompt "BLE backend"
+        default BROOKESIA_HAL_LINUX_BLE_BACKEND_AUTO
+        help
+            Auto uses BlueZ when the system adapter supports local GATT and advertising,
+            otherwise it falls back to the deterministic stub. BlueZ is strict and never falls back.
+
+        config BROOKESIA_HAL_LINUX_BLE_BACKEND_AUTO
+            bool "Auto"
+
+        config BROOKESIA_HAL_LINUX_BLE_BACKEND_STUB
+            bool "Stub"
+
+        config BROOKESIA_HAL_LINUX_BLE_BACKEND_BLUEZ
+            bool "BlueZ"
+    endchoice
+
     choice BROOKESIA_HAL_LINUX_DISPLAY_BACKEND
         prompt "Display backend"
         default BROOKESIA_HAL_LINUX_DISPLAY_BACKEND_AUTO
@@ -212,6 +235,12 @@ menu "ESP-Brookesia: HAL Linux Configurations"
         default y
         help
             Enable the Linux Wi-Fi device and its Basic, Station, and SoftAP HAL interfaces.
+
+    config BROOKESIA_HAL_LINUX_ENABLE_BLE_DEVICE
+        bool "BLE Device"
+        default y
+        help
+            Enable the Linux single-connection BLE Peripheral/GATT Server HAL interface.
 
     config BROOKESIA_HAL_LINUX_ENABLE_STORAGE_DEVICE
         bool "Storage Device"

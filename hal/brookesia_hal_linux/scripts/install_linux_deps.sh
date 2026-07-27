@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
     cat <<'EOF'
-Usage: install_linux_deps.sh [--minimal|--full|--media|--video|--display|--network|--dry-run]
+Usage: install_linux_deps.sh [--minimal|--full|--media|--video|--display|--network|--ble|--dry-run]
 
 Options:
   --minimal   Install build, Boost, and OpenSSL dependencies only.
@@ -12,6 +12,7 @@ Options:
   --video     Include FFmpeg and V4L2 development packages.
   --display   Include SDL2 development packages.
   --network   Include NetworkManager and UPower development packages.
+  --ble       Include GLib/GIO development packages for the BlueZ D-Bus backend.
   --dry-run   Print the install command without running it.
   -h, --help  Show this help text.
 EOF
@@ -38,6 +39,9 @@ for arg in "$@"; do
             ;;
         --network)
             profile="network"
+            ;;
+        --ble)
+            profile="ble"
             ;;
         --dry-run)
             dry_run=1
@@ -89,6 +93,7 @@ case "$pm" in
         video=(ffmpeg libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libavdevice-dev libv4l-dev)
         display=(libsdl2-dev)
         network=(libnm-dev libupower-glib-dev)
+        ble=(libglib2.0-dev bluez)
         update_cmd=(sudo apt-get update)
         install_cmd=(sudo apt-get install -y)
         ;;
@@ -99,6 +104,7 @@ case "$pm" in
         video=(ffmpeg ffmpeg-devel libv4l-devel)
         display=(SDL2-devel)
         network=(NetworkManager-libnm-devel upower-devel)
+        ble=(glib2-devel bluez)
         update_cmd=()
         install_cmd=(sudo dnf install -y)
         ;;
@@ -109,6 +115,7 @@ case "$pm" in
         video=(ffmpeg v4l-utils)
         display=(sdl2)
         network=(networkmanager upower)
+        ble=(glib2 bluez)
         update_cmd=()
         install_cmd=(sudo pacman -S --needed)
         ;;
@@ -121,6 +128,7 @@ Unsupported package manager. Install the following dependency groups manually:
   video: FFmpeg development libraries, V4L2 headers
   display: SDL2 development package
   network: NetworkManager libnm and UPower development packages
+  ble: GLib/GIO development package and BlueZ
 EOF
         exit 2
         ;;
@@ -142,8 +150,11 @@ case "$profile" in
     network)
         packages+=("${network[@]}")
         ;;
+    ble)
+        packages+=("${ble[@]}")
+        ;;
     full)
-        packages+=("${runtime[@]}" "${media[@]}" "${display[@]}" "${network[@]}")
+        packages+=("${runtime[@]}" "${media[@]}" "${display[@]}" "${network[@]}" "${ble[@]}")
         ;;
 esac
 

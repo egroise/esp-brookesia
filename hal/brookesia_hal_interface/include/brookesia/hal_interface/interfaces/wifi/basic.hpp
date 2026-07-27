@@ -27,7 +27,7 @@ public:
 
     struct RuntimeContext {
         std::shared_ptr<lib_utils::TaskScheduler> task_scheduler; ///< Scheduler used for async Wi-Fi work.
-        lib_utils::TaskScheduler::Group task_group;               ///< Scheduler group used by the Wi-Fi service.
+        lib_utils::TaskSchedulerGroup task_group;                 ///< Scheduler group used by the Wi-Fi service.
     };
 
     struct Callbacks {

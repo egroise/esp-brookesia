@@ -20,6 +20,7 @@ public:
     static constexpr const char *DEVICE_NAME = "System";
     static constexpr const char *BOARD_INFO_IFACE_NAME = "System:BoardInfo";
     static constexpr const char *OTA_UPDATER_IFACE_NAME = "System:OtaUpdater";
+    static constexpr const char *RESTART_IFACE_NAME = "System:Restart";
 
     SystemDevice(const SystemDevice &) = delete;
     SystemDevice &operator=(const SystemDevice &) = delete;
@@ -48,6 +49,8 @@ private:
     void deinit_board_info();
     bool init_ota_updater();
     void deinit_ota_updater();
+    bool init_restart();
+    void deinit_restart();
 };
 
 } // namespace esp_brookesia::hal

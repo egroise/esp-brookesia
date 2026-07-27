@@ -8,11 +8,14 @@
 #   define BROOKESIA_LOG_DISABLE_DEBUG_TRACE 1
 #endif
 #include <fstream>
+#include <functional>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <sys/utsname.h>
 #include "private/utils.hpp"
 #include "brookesia/hal_interface/interfaces/system/board_info.hpp"
+#include "brookesia/hal_interface/interfaces/system/general.hpp"
 #include "brookesia/hal_linux/system/device.hpp"
 #include "ota_updater_impl.hpp"
 
@@ -65,6 +68,37 @@ public:
     }
 };
 
+class RestartLinuxImpl final: public system::GeneralIface {
+public:
+    explicit RestartLinuxImpl(SystemLinuxDevice::RestartHandler handler)
+        : handler_(std::move(handler))
+    {
+    }
+
+    std::expected<void, std::string> restart() override
+    {
+        SystemLinuxDevice::RestartHandler handler;
+        {
+            std::lock_guard lock(mutex_);
+            handler = handler_;
+        }
+        if (!handler) {
+            return std::unexpected("Linux simulator restart is unavailable: no host handler registered");
+        }
+        return handler();
+    }
+
+    void set_handler(SystemLinuxDevice::RestartHandler handler)
+    {
+        std::lock_guard lock(mutex_);
+        handler_ = std::move(handler);
+    }
+
+private:
+    mutable std::mutex mutex_;
+    SystemLinuxDevice::RestartHandler handler_;
+};
+
 bool SystemLinuxDevice::probe()
 {
     return true;
@@ -74,6 +108,7 @@ std::vector<InterfaceSpec> SystemLinuxDevice::get_interface_specs() const
 {
     std::vector<InterfaceSpec> specs = {
         {system::BoardInfoIface::NAME, BOARD_INFO_IFACE_NAME},
+        {system::GeneralIface::NAME, RESTART_IFACE_NAME},
     };
 #if BROOKESIA_HAL_LINUX_SYSTEM_ENABLE_OTA_UPDATER_IMPL
     specs.push_back({system::OtaUpdaterIface::NAME, OTA_UPDATER_IFACE_NAME});
@@ -93,6 +128,17 @@ bool SystemLinuxDevice::on_init()
 
     interfaces_.emplace(BOARD_INFO_IFACE_NAME, board_info_iface_);
 
+    RestartHandler restart_handler;
+    {
+        std::lock_guard lock(restart_mutex_);
+        restart_handler = restart_handler_;
+    }
+    BROOKESIA_CHECK_EXCEPTION_RETURN(
+        restart_iface_ = std::make_shared<RestartLinuxImpl>(std::move(restart_handler)), false,
+        "Failed to create restart linux"
+    );
+    interfaces_.emplace(RESTART_IFACE_NAME, restart_iface_);
+
 #if BROOKESIA_HAL_LINUX_SYSTEM_ENABLE_OTA_UPDATER_IMPL
     BROOKESIA_CHECK_EXCEPTION_RETURN(
         ota_updater_iface_ = std::make_shared<OtaUpdaterLinuxIface>(), false,
@@ -110,10 +156,27 @@ void SystemLinuxDevice::on_deinit()
 
     interfaces_.erase(BOARD_INFO_IFACE_NAME);
     board_info_iface_.reset();
+    interfaces_.erase(RESTART_IFACE_NAME);
+    restart_iface_.reset();
 #if BROOKESIA_HAL_LINUX_SYSTEM_ENABLE_OTA_UPDATER_IMPL
     interfaces_.erase(OTA_UPDATER_IFACE_NAME);
     ota_updater_iface_.reset();
 #endif
+}
+
+void SystemLinuxDevice::set_restart_handler(RestartHandler handler)
+{
+    std::shared_ptr<RestartLinuxImpl> restart_iface;
+    RestartHandler handler_copy;
+    {
+        std::lock_guard lock(restart_mutex_);
+        restart_handler_ = std::move(handler);
+        handler_copy = restart_handler_;
+        restart_iface = restart_iface_;
+    }
+    if (restart_iface) {
+        restart_iface->set_handler(std::move(handler_copy));
+    }
 }
 
 #if BROOKESIA_HAL_LINUX_ENABLE_SYSTEM_DEVICE

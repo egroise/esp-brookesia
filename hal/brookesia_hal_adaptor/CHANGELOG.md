@@ -1,5 +1,12 @@
 # ChangeLog
 
+## v0.8.3 - 2026-07-27
+
+### Enhancements:
+
+- feat(bluetooth): add A2DP and BLE adaptor wiring for supported ESP targets.
+- feat(deps): add conditional Bluetooth media dependencies for Classic Bluetooth builds.
+
 ## v0.8.2 - 2026-07-13
 
 ### Enhancements:

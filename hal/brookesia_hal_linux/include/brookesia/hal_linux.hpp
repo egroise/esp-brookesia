@@ -7,6 +7,8 @@
 
 #include "brookesia/hal_linux/macro_configs.h"
 #include "brookesia/hal_linux/audio/device.hpp"
+#include "brookesia/hal_linux/bluetooth/ble/device.hpp"
+#include "brookesia/hal_linux/bluetooth/device.hpp"
 #include "brookesia/hal_linux/display/device.hpp"
 #include "brookesia/hal_linux/network/device.hpp"
 #include "brookesia/hal_linux/power/device.hpp"

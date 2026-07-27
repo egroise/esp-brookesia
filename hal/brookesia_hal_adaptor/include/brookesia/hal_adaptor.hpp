@@ -7,6 +7,8 @@
 
 #include "brookesia/hal_adaptor/macro_configs.h"
 #include "brookesia/hal_adaptor/audio/device.hpp"
+#include "brookesia/hal_adaptor/bluetooth/ble/device.hpp"
+#include "brookesia/hal_adaptor/bluetooth/device.hpp"
 #include "brookesia/hal_adaptor/display/device.hpp"
 #include "brookesia/hal_adaptor/network/device.hpp"
 #include "brookesia/hal_adaptor/power/device.hpp"
