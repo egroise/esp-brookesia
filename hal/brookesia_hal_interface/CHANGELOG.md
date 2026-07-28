@@ -1,5 +1,16 @@
 # ChangeLog
 
+## v0.8.2 - 2026-07-20
+
+### Breaking Changes:
+
+- break(hal): move BLE interfaces under `interfaces/bluetooth/ble` and use the
+  `hal::bluetooth::ble` namespace without compatibility aliases.
+
+### Enhancements:
+
+- feat(bluetooth): add shared Bluetooth capability types and the A2DP Sink HAL contract.
+
 ## v0.8.1 - 2026-07-13
 
 ### Enhancements:

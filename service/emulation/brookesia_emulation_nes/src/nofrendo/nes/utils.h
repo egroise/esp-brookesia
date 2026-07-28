@@ -7,10 +7,16 @@
 #else
 #include <stdio.h>
 #define LOG_PRINTF(level, x...) printf(x)
-#ifndef IRAM_ATTR
-#define IRAM_ATTR
-#endif
 #define CRC32(a, b, c) (0)
+#endif
+
+/* Keep the fallback private because ESP-IDF may define IRAM_ATTR after this header. */
+#ifndef NOFRENDO_IRAM_ATTR
+#ifdef RETRO_GO
+#define NOFRENDO_IRAM_ATTR IRAM_ATTR
+#else
+#define NOFRENDO_IRAM_ATTR
+#endif
 #endif
 
 #define MESSAGE_ERROR(x...) LOG_PRINTF(1, "!! " x)

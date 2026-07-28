@@ -130,7 +130,7 @@
 公开 API
 --------------------
 
-- ``Runtime::set_binding_value(document_id, absolute_path, key, value)`` 写入单个 binding store；已声明该 binding 的节点会通过其已注册的 listener 重应用对应字段。
+- ``Runtime::set_binding_value(document_id, absolute_path, key, value)`` 写入单个 binding 值；Runtime 会直接向已声明该 binding 的节点重应用对应字段，随后通知显式注册的公开订阅者。
 - ``Runtime::set_binding_values(document_id, updates)`` 批量写入多个 binding，并显式按节点合并 dirty mask 后统一 apply，减少高频更新时的 backend apply 次数。
 - ``Runtime::get_binding_value(document_id, absolute_path, key)`` 可读取当前 scoped binding 值。
 - ``Runtime::subscribe_binding_value(document_id, absolute_path, key, listener)`` 可监听某个 scoped binding 的写入结果；listener 签名为 ``(absolute_path, key, value)``。

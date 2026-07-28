@@ -39,3 +39,24 @@ add_test(
     NAME brookesia_service_manager_host_smoke
     COMMAND brookesia_service_manager_host_test
 )
+
+add_executable(brookesia_service_manager_dataflow_test
+    dataflow_test.cpp
+)
+
+target_link_libraries(brookesia_service_manager_dataflow_test
+    PRIVATE
+        brookesia::service_manager
+)
+
+set_target_properties(brookesia_service_manager_dataflow_test PROPERTIES
+    CXX_STANDARD 23
+    CXX_STANDARD_REQUIRED ON
+)
+
+add_test(
+    NAME brookesia_service_manager_dataflow
+    COMMAND brookesia_service_manager_dataflow_test
+)
+
+brookesia_compile_tuning_apply_current_project()

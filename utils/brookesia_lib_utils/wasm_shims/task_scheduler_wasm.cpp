@@ -18,7 +18,7 @@
 
 #include "brookesia/lib_utils/check.hpp"
 #include "brookesia/lib_utils/log.hpp"
-#include "brookesia/lib_utils/task_scheduler.hpp"
+#include "private/task_scheduler_impl.hpp"
 
 namespace esp_brookesia::lib_utils {
 
@@ -47,20 +47,12 @@ void set_promise_value(const std::shared_ptr<boost::promise<bool>> &promise, boo
 
 } // namespace
 
-struct WasmTimerContext {
-    TaskScheduler *scheduler = nullptr;
-    std::shared_ptr<TaskScheduler::TaskHandle> handle;
-    TaskScheduler::OnceTask once_task;
-    TaskScheduler::PeriodicTask periodic_task;
-    uint64_t generation = 0;
-};
-
-TaskScheduler::~TaskScheduler()
+TaskScheduler::Impl::~Impl()
 {
     stop();
 }
 
-bool TaskScheduler::start(const StartConfig &config)
+bool TaskScheduler::Impl::start(const StartConfig &config)
 {
     boost::lock_guard lock(mutex_);
     if (is_running_) {
@@ -73,27 +65,27 @@ bool TaskScheduler::start(const StartConfig &config)
     return true;
 }
 
-bool TaskScheduler::is_current_thread_worker() const
+bool TaskScheduler::Impl::is_current_thread_worker() const
 {
     return false;
 }
 
-bool TaskScheduler::is_current_thread_in_group(const Group &group) const
+bool TaskScheduler::Impl::is_current_thread_in_group(const Group &group) const
 {
     (void)group;
     return false;
 }
 
-bool TaskScheduler::try_acquire_worker_wait_slot()
+bool TaskScheduler::Impl::try_acquire_worker_wait_slot()
 {
     return true;
 }
 
-void TaskScheduler::release_worker_wait_slot()
+void TaskScheduler::Impl::release_worker_wait_slot()
 {
 }
 
-void TaskScheduler::stop()
+void TaskScheduler::Impl::stop()
 {
     cancel_all();
     boost::lock_guard lock(mutex_);
@@ -103,7 +95,7 @@ void TaskScheduler::stop()
     post_execute_callbacks_.clear();
 }
 
-bool TaskScheduler::configure_group(const Group &group, const GroupConfig &config)
+bool TaskScheduler::Impl::configure_group(const Group &group, const GroupConfig &config)
 {
     boost::lock_guard lock(mutex_);
     pre_execute_callbacks_[group] = config.pre_execute_callback;
@@ -111,7 +103,7 @@ bool TaskScheduler::configure_group(const Group &group, const GroupConfig &confi
     return true;
 }
 
-bool TaskScheduler::post_internal(OnceTask task, TaskId *id, const Group &group, bool enable_immediate)
+bool TaskScheduler::Impl::post_internal(OnceTask task, TaskId *id, const Group &group, bool enable_immediate)
 {
     (void)enable_immediate;
     BROOKESIA_CHECK_FALSE_RETURN(task != nullptr, false, "Invalid task");
@@ -139,17 +131,17 @@ bool TaskScheduler::post_internal(OnceTask task, TaskId *id, const Group &group,
     return success;
 }
 
-bool TaskScheduler::dispatch(OnceTask task, TaskId *id, const Group &group)
+bool TaskScheduler::Impl::dispatch(OnceTask task, TaskId *id, const Group &group)
 {
     return post_internal(std::move(task), id, group, true);
 }
 
-bool TaskScheduler::post(OnceTask task, TaskId *id, const Group &group)
+bool TaskScheduler::Impl::post(OnceTask task, TaskId *id, const Group &group)
 {
     return post_internal(std::move(task), id, group, false);
 }
 
-bool TaskScheduler::post_delayed(OnceTask task, int delay_ms, TaskId *id, const Group &group)
+bool TaskScheduler::Impl::post_delayed(OnceTask task, int delay_ms, TaskId *id, const Group &group)
 {
     BROOKESIA_CHECK_FALSE_RETURN(task != nullptr, false, "Invalid delayed task");
     if (!is_running_) {
@@ -164,7 +156,7 @@ bool TaskScheduler::post_delayed(OnceTask task, int delay_ms, TaskId *id, const 
     return true;
 }
 
-bool TaskScheduler::post_periodic(PeriodicTask task, int interval_ms, TaskId *id, const Group &group)
+bool TaskScheduler::Impl::post_periodic(PeriodicTask task, int interval_ms, TaskId *id, const Group &group)
 {
     BROOKESIA_CHECK_FALSE_RETURN(task != nullptr, false, "Invalid periodic task");
     auto handle = create_handle(TaskType::Periodic, true, std::max(interval_ms, 0), group);
@@ -176,7 +168,7 @@ bool TaskScheduler::post_periodic(PeriodicTask task, int interval_ms, TaskId *id
     return true;
 }
 
-bool TaskScheduler::post_batch(std::vector<OnceTask> tasks, std::vector<TaskId> *ids, const Group &group)
+bool TaskScheduler::Impl::post_batch(std::vector<OnceTask> tasks, std::vector<TaskId> *ids, const Group &group)
 {
     if (ids != nullptr) {
         ids->clear();
@@ -192,13 +184,13 @@ bool TaskScheduler::post_batch(std::vector<OnceTask> tasks, std::vector<TaskId> 
     return true;
 }
 
-void TaskScheduler::cancel(TaskId id)
+void TaskScheduler::Impl::cancel(TaskId id)
 {
     boost::lock_guard lock(mutex_);
     cancel_internal(id);
 }
 
-void TaskScheduler::cancel_group(const Group &group)
+void TaskScheduler::Impl::cancel_group(const Group &group)
 {
     std::vector<TaskId> task_ids;
     {
@@ -214,7 +206,7 @@ void TaskScheduler::cancel_group(const Group &group)
     }
 }
 
-void TaskScheduler::cancel_all()
+void TaskScheduler::Impl::cancel_all()
 {
     std::vector<TaskId> task_ids;
     {
@@ -229,13 +221,13 @@ void TaskScheduler::cancel_all()
     }
 }
 
-bool TaskScheduler::suspend(TaskId id)
+bool TaskScheduler::Impl::suspend(TaskId id)
 {
     boost::lock_guard lock(mutex_);
     return suspend_internal(id);
 }
 
-size_t TaskScheduler::suspend_group(const Group &group)
+size_t TaskScheduler::Impl::suspend_group(const Group &group)
 {
     std::vector<TaskId> task_ids;
     {
@@ -255,7 +247,7 @@ size_t TaskScheduler::suspend_group(const Group &group)
     return count;
 }
 
-size_t TaskScheduler::suspend_all()
+size_t TaskScheduler::Impl::suspend_all()
 {
     std::vector<TaskId> task_ids;
     {
@@ -273,13 +265,13 @@ size_t TaskScheduler::suspend_all()
     return count;
 }
 
-bool TaskScheduler::resume(TaskId id)
+bool TaskScheduler::Impl::resume(TaskId id)
 {
     boost::lock_guard lock(mutex_);
     return resume_internal(id);
 }
 
-size_t TaskScheduler::resume_group(const Group &group)
+size_t TaskScheduler::Impl::resume_group(const Group &group)
 {
     std::vector<TaskId> task_ids;
     {
@@ -299,7 +291,7 @@ size_t TaskScheduler::resume_group(const Group &group)
     return count;
 }
 
-size_t TaskScheduler::resume_all()
+size_t TaskScheduler::Impl::resume_all()
 {
     std::vector<TaskId> task_ids;
     {
@@ -317,7 +309,7 @@ size_t TaskScheduler::resume_all()
     return count;
 }
 
-bool TaskScheduler::wait(TaskId id, int timeout_ms)
+bool TaskScheduler::Impl::wait(TaskId id, int timeout_ms)
 {
     (void)timeout_ms;
     boost::lock_guard lock(mutex_);
@@ -325,7 +317,7 @@ bool TaskScheduler::wait(TaskId id, int timeout_ms)
     return (task_it == tasks_.end()) || (task_it->second->state == TaskState::Finished);
 }
 
-bool TaskScheduler::wait_group(const Group &group, int timeout_ms)
+bool TaskScheduler::Impl::wait_group(const Group &group, int timeout_ms)
 {
     (void)timeout_ms;
     boost::lock_guard lock(mutex_);
@@ -333,14 +325,14 @@ bool TaskScheduler::wait_group(const Group &group, int timeout_ms)
     return (group_it == groups_.end()) || group_it->second.empty();
 }
 
-bool TaskScheduler::wait_all(int timeout_ms)
+bool TaskScheduler::Impl::wait_all(int timeout_ms)
 {
     (void)timeout_ms;
     boost::lock_guard lock(mutex_);
     return tasks_.empty();
 }
 
-bool TaskScheduler::restart_timer(TaskId id)
+bool TaskScheduler::Impl::restart_timer(TaskId id)
 {
     boost::lock_guard lock(mutex_);
     auto task_it = tasks_.find(id);
@@ -360,35 +352,35 @@ bool TaskScheduler::restart_timer(TaskId id)
     return false;
 }
 
-TaskScheduler::TaskType TaskScheduler::get_type(TaskId id) const
+TaskScheduler::TaskType TaskScheduler::Impl::get_type(TaskId id) const
 {
     boost::lock_guard lock(mutex_);
     auto task_it = tasks_.find(id);
     return (task_it != tasks_.end()) ? task_it->second->type : TaskType::Immediate;
 }
 
-TaskScheduler::TaskState TaskScheduler::get_state(TaskId id) const
+TaskScheduler::TaskState TaskScheduler::Impl::get_state(TaskId id) const
 {
     boost::lock_guard lock(mutex_);
     auto task_it = tasks_.find(id);
     return (task_it != tasks_.end()) ? task_it->second->state.load() : TaskState::Finished;
 }
 
-TaskScheduler::Group TaskScheduler::get_group(TaskId id) const
+TaskScheduler::Group TaskScheduler::Impl::get_group(TaskId id) const
 {
     boost::lock_guard lock(mutex_);
     auto task_it = tasks_.find(id);
     return (task_it != tasks_.end()) ? task_it->second->group : Group{};
 }
 
-size_t TaskScheduler::get_group_task_count(const Group &group) const
+size_t TaskScheduler::Impl::get_group_task_count(const Group &group) const
 {
     boost::lock_guard lock(mutex_);
     auto group_it = groups_.find(group);
     return (group_it != groups_.end()) ? group_it->second.size() : 0;
 }
 
-std::vector<TaskScheduler::Group> TaskScheduler::get_active_groups() const
+std::vector<TaskScheduler::Group> TaskScheduler::Impl::get_active_groups() const
 {
     boost::lock_guard lock(mutex_);
     std::vector<Group> groups;
@@ -401,7 +393,7 @@ std::vector<TaskScheduler::Group> TaskScheduler::get_active_groups() const
     return groups;
 }
 
-TaskScheduler::Statistics TaskScheduler::get_statistics() const
+TaskScheduler::Statistics TaskScheduler::Impl::get_statistics() const
 {
     return {
         .total_tasks = static_cast<size_t>(total_tasks_.load()),
@@ -412,7 +404,7 @@ TaskScheduler::Statistics TaskScheduler::get_statistics() const
     };
 }
 
-void TaskScheduler::reset_statistics()
+void TaskScheduler::Impl::reset_statistics()
 {
     total_tasks_ = 0;
     completed_tasks_ = 0;
@@ -421,7 +413,7 @@ void TaskScheduler::reset_statistics()
     suspended_tasks_ = 0;
 }
 
-std::shared_ptr<TaskScheduler::TaskHandle> TaskScheduler::create_handle(
+std::shared_ptr<TaskScheduler::Impl::TaskHandle> TaskScheduler::Impl::create_handle(
     TaskType type, bool repeat, int interval_ms, const Group &group)
 {
     auto handle = std::make_shared<TaskHandle>();
@@ -443,7 +435,7 @@ std::shared_ptr<TaskScheduler::TaskHandle> TaskScheduler::create_handle(
     return handle;
 }
 
-void TaskScheduler::schedule_once(std::shared_ptr<TaskHandle> handle, OnceTask task)
+void TaskScheduler::Impl::schedule_once(std::shared_ptr<TaskHandle> handle, OnceTask task)
 {
     auto context = std::make_unique<WasmTimerContext>();
     context->scheduler = this;
@@ -476,7 +468,7 @@ void TaskScheduler::schedule_once(std::shared_ptr<TaskHandle> handle, OnceTask t
     }, context.release(), delay_ms);
 }
 
-void TaskScheduler::schedule_periodic(std::shared_ptr<TaskHandle> handle, PeriodicTask task)
+void TaskScheduler::Impl::schedule_periodic(std::shared_ptr<TaskHandle> handle, PeriodicTask task)
 {
     auto context = std::make_unique<WasmTimerContext>();
     context->scheduler = this;
@@ -519,7 +511,7 @@ void TaskScheduler::schedule_periodic(std::shared_ptr<TaskHandle> handle, Period
     }, context.release(), delay_ms);
 }
 
-void TaskScheduler::cancel_internal(TaskId task_id)
+void TaskScheduler::Impl::cancel_internal(TaskId task_id)
 {
     auto task_it = tasks_.find(task_id);
     if (task_it == tasks_.end()) {
@@ -536,7 +528,7 @@ void TaskScheduler::cancel_internal(TaskId task_id)
     remove_task_internal(task_id, handle->group);
 }
 
-bool TaskScheduler::suspend_internal(TaskId task_id)
+bool TaskScheduler::Impl::suspend_internal(TaskId task_id)
 {
     auto task_it = tasks_.find(task_id);
     if (task_it == tasks_.end()) {
@@ -552,7 +544,7 @@ bool TaskScheduler::suspend_internal(TaskId task_id)
     return true;
 }
 
-bool TaskScheduler::resume_internal(TaskId task_id)
+bool TaskScheduler::Impl::resume_internal(TaskId task_id)
 {
     auto task_it = tasks_.find(task_id);
     if (task_it == tasks_.end()) {
@@ -577,7 +569,7 @@ bool TaskScheduler::resume_internal(TaskId task_id)
     return false;
 }
 
-bool TaskScheduler::wait_tasks_internal(const std::vector<TaskId> &task_ids, int timeout_ms)
+bool TaskScheduler::Impl::wait_tasks_internal(const std::vector<TaskId> &task_ids, int timeout_ms)
 {
     (void)timeout_ms;
     boost::lock_guard lock(mutex_);
@@ -589,7 +581,7 @@ bool TaskScheduler::wait_tasks_internal(const std::vector<TaskId> &task_ids, int
     return true;
 }
 
-void TaskScheduler::remove_task_internal(TaskId task_id, const Group &group)
+void TaskScheduler::Impl::remove_task_internal(TaskId task_id, const Group &group)
 {
     tasks_.erase(task_id);
     if (!group.empty()) {
@@ -603,7 +595,7 @@ void TaskScheduler::remove_task_internal(TaskId task_id, const Group &group)
     }
 }
 
-void TaskScheduler::mark_finished(std::shared_ptr<TaskHandle> handle, bool success)
+void TaskScheduler::Impl::mark_finished(std::shared_ptr<TaskHandle> handle, bool success)
 {
     if (handle == nullptr) {
         return;
@@ -625,14 +617,7 @@ void TaskScheduler::mark_finished(std::shared_ptr<TaskHandle> handle, bool succe
     remove_task_internal(handle->id, handle->group);
 }
 
-boost::shared_future<bool> TaskScheduler::get_future(TaskId id)
-{
-    boost::lock_guard lock(mutex_);
-    auto task_it = tasks_.find(id);
-    return (task_it != tasks_.end()) ? task_it->second->future : boost::shared_future<bool>();
-}
-
-void TaskScheduler::invoke_pre_execute_callback(TaskId task_id, TaskType task_type, const Group &group)
+void TaskScheduler::Impl::invoke_pre_execute_callback(TaskId task_id, TaskType task_type, const Group &group)
 {
     PreExecuteCallback global_callback;
     PreExecuteCallback group_callback;
@@ -655,7 +640,7 @@ void TaskScheduler::invoke_pre_execute_callback(TaskId task_id, TaskType task_ty
     }
 }
 
-void TaskScheduler::invoke_post_execute_callback(TaskId task_id, TaskType task_type, bool success, const Group &group)
+void TaskScheduler::Impl::invoke_post_execute_callback(TaskId task_id, TaskType task_type, bool success, const Group &group)
 {
     PostExecuteCallback global_callback;
     PostExecuteCallback group_callback;

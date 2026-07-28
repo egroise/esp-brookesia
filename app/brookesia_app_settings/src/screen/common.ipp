@@ -31,8 +31,20 @@ std::expected<void, std::string> SettingsApp::refresh_theme_state(system::core::
     }
 
     std::vector<gui::BindingValueUpdate> updates;
-    add_theme_mode_updates(updates, "/display/page/theme_modes/light_mode", !dark, *tokens, "#f3f3f3");
-    add_theme_mode_updates(updates, "/display/page/theme_modes/dark_mode", dark, *tokens, "#38393a");
+    auto light_label = localized_text(current_locale_, "light");
+    if (pending_theme_id_ == THEME_LIGHT) {
+        light_label += " (" + localized_text(current_locale_, "restart_required") + ")";
+    }
+    auto dark_label = localized_text(current_locale_, "dark");
+    if (pending_theme_id_ == THEME_DARK) {
+        dark_label += " (" + localized_text(current_locale_, "restart_required") + ")";
+    }
+    add_theme_mode_updates(
+        updates, "/display/page/theme_modes/light_mode", !dark, *tokens, "#f3f3f3", std::move(light_label)
+    );
+    add_theme_mode_updates(
+        updates, "/display/page/theme_modes/dark_mode", dark, *tokens, "#38393a", std::move(dark_label)
+    );
     add_binding_update(
         updates,
         "/settings_home/page/main_list/display/value_box/value",
@@ -67,6 +79,8 @@ std::expected<void, std::string> SettingsApp::refresh_language_state(system::cor
             updates,
             path + "/value_box/value",
             "labelProps.text",
+            it->second == pending_language_locale_ ?
+            localized_text(current_locale_, "restart_required") :
             it->second == current_locale_ ? localized_text(current_locale_, "current") : ""
         );
     }

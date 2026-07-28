@@ -5,12 +5,14 @@
  */
 #pragma once
 
+#include <map>
 #include <string>
 #include <vector>
 #include <variant>
 #include <type_traits>
 #include "boost/json.hpp"
 #include "brookesia/lib_utils/describe_helpers.hpp"
+#include "brookesia/lib_utils/signal.hpp"
 #include "brookesia/service_manager/common.hpp"
 
 namespace esp_brookesia::service {
@@ -61,6 +63,21 @@ struct EventItem : std::variant<bool, double, std::string, boost::json::object, 
  * @brief Event payload map keyed by item name.
  */
 using EventItemMap = std::map<std::string /* name */, EventItem /* item */>;
+
+/**
+ * @brief Signal type used for local in-process event listeners.
+ */
+using EventSignal = lib_utils::signal<void(const std::string &event_name, const EventItemMap &event_items)>;
+
+/**
+ * @brief RAII connection handle returned by an event subscription.
+ */
+using EventSignalConnection = lib_utils::scoped_connection;
+
+/**
+ * @brief Slot type accepted by an event subscription.
+ */
+using EventSignalSlot = EventSignal::slot_type;
 
 /**
  * @brief Schema description for one event payload item.

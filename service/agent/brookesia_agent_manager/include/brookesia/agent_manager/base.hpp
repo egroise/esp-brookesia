@@ -7,10 +7,14 @@
 
 #include <bitset>
 #include <functional>
+#include <memory>
 #include <string>
+#include <vector>
 #include "brookesia/lib_utils/signal.hpp"
 #include "boost/thread/shared_mutex.hpp"
 #include "brookesia/lib_utils/describe_helpers.hpp"
+#include "brookesia/service_manager/dataflow/audio/capture_operation.hpp"
+#include "brookesia/service_manager/dataflow/audio/playback_operation.hpp"
 #include "brookesia/service_manager/service/base.hpp"
 #include "brookesia/service_helper/media/audio.hpp"
 #include "brookesia/service_helper/agent/manager.hpp"
@@ -119,7 +123,7 @@ protected:
      * @param[in] attributes Public agent metadata.
      * @param[in] version Agent component version.
      * @param[in] audio_config Audio configuration used by the agent.
-     * @param[in] service_config Additional service dependencies beyond the audio service.
+     * @param[in] service_config Additional service dependencies required by the agent.
      */
     Base(
         const AgentAttributes &attributes, const std::string &version, const AudioConfig &audio_config,
@@ -129,17 +133,7 @@ protected:
         .name = attributes.name.data(),
         .description = "Provide conversational agent capabilities for " + attributes.name + ".",
         .version = version,
-        .dependencies = [ & ]()
-        {
-            std::vector<std::string> deps = {
-                service::helper::AudioEncoder<0>::get_name().data(),
-                service::helper::AudioDecoder<0>::get_name().data(),
-            };
-            if (!service_config.dependencies.empty()) {
-                deps.insert(deps.end(), service_config.dependencies.begin(), service_config.dependencies.end());
-            }
-            return deps;
-        }(),
+        .dependencies = service_config.dependencies,
         .bindable = false,
     })
     , attributes_(attributes)
@@ -307,7 +301,7 @@ private:
     using service::ServiceBase::stop;
 
     using UnexpectedGeneralEventHappenedCallback = std::function<void(GeneralEvent event)>;
-    using AFE_EventHappenedCallback = std::function<void(service::helper::Audio::AFE_Event event)>;
+    using AFE_EventHappenedCallback = std::function<void(service::dataflow::AudioAfeEvent event)>;
 
     struct Callbacks {
         UnexpectedGeneralEventHappenedCallback unexpected_general_event_happened;
@@ -412,7 +406,10 @@ private:
 
     std::vector<std::string> wake_words_;
 
-    service::EventRegistry::SignalConnection afe_event_happened_connection_;
+    std::shared_ptr<service::dataflow::AudioPlaybackOperation> audio_playback_operation_;
+    std::shared_ptr<service::dataflow::AudioCaptureOperation> audio_capture_operation_;
+
+    esp_brookesia::lib_utils::connection afe_event_happened_connection_;
     esp_brookesia::lib_utils::connection encoder_data_ready_connection_;
 
     inline static Callbacks callbacks_{};

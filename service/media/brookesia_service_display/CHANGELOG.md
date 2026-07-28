@@ -1,5 +1,12 @@
 # ChangeLog
 
+## v0.8.2 - 2026-07-27
+
+### Enhancements:
+
+- feat(dataflow): register a provider for display output routing and visual frame operations.
+- chore(build): split display lifecycle, rendering, touch, and DataFlow implementation units.
+
 ## v0.8.1 - 2026-07-13
 
 ### Enhancements:

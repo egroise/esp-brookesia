@@ -12,6 +12,9 @@ dependencies:
   espressif/brookesia_service_audio:
     version: "0.8.*"
     override_path: ../../../../service/media/brookesia_service_audio
+  espressif/brookesia_service_display:
+    version: "0.8.*"
+    override_path: ../../../../service/media/brookesia_service_display
   espressif/brookesia_service_device:
     version: "0.8.*"
     override_path: ../../../../service/system/brookesia_service_device

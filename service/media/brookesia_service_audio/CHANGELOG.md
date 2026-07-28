@@ -1,5 +1,12 @@
 # ChangeLog
 
+## v0.8.2 - 2026-07-27
+
+### Enhancements:
+
+- feat(dataflow): register audio encoder and decoder providers for playback and capture operations.
+- chore(build): split codec, playback, and DataFlow provider implementation units.
+
 ## v0.8.1 - 2026-07-13
 
 ### Enhancements:

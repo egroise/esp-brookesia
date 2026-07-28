@@ -51,7 +51,7 @@ private:
         RequestState state = RequestState::Queued;
         std::atomic<uint32_t> downloaded{0};
         std::atomic<uint32_t> total{0};
-        lib_utils::TaskScheduler::TaskId task_id = 0;
+        lib_utils::TaskSchedulerTaskId task_id = 0;
         std::mutex transaction_mutex;
         std::shared_ptr<HttpTransaction> transaction;
         std::atomic<bool> cancel_requested{false};
@@ -68,9 +68,9 @@ private:
      * a worker) cannot starve cooperative tasks such as the periodic
      * progress emitter.
      */
-    static lib_utils::TaskScheduler::StartConfig make_default_task_scheduler_start_config()
+    static lib_utils::TaskSchedulerStartConfig make_default_task_scheduler_start_config()
     {
-        lib_utils::TaskScheduler::StartConfig config{
+        lib_utils::TaskSchedulerStartConfig config{
             .worker_configs = {},
         };
         lib_utils::ThreadConfig worker0;
@@ -176,7 +176,7 @@ private:
     std::expected<std::shared_ptr<RequestContext>, std::string> submit_request(
         HttpRequest request, std::shared_ptr<std::promise<HttpResponse>> response_promise = nullptr
     );
-    lib_utils::TaskScheduler::Group get_state_task_group() const
+    lib_utils::TaskSchedulerGroup get_state_task_group() const
     {
         return get_call_task_group();
     }
@@ -229,7 +229,7 @@ private:
 
     mutable std::mutex pending_progress_mutex_;
     std::optional<RequestProgress> pending_progress_;
-    lib_utils::TaskScheduler::TaskId progress_emitter_task_id_ = 0;
+    lib_utils::TaskSchedulerTaskId progress_emitter_task_id_ = 0;
 };
 
 } // namespace esp_brookesia::service::http

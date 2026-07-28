@@ -18,6 +18,7 @@
 #include "brookesia/lib_utils/signal.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "boost/thread/lock_guard.hpp"
 #include "boost/thread/mutex.hpp"
 #include "brookesia/lib_utils/macro_configs.h"
 #include "brookesia/lib_utils/describe_helpers.hpp"

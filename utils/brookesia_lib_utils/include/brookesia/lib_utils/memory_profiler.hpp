@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <limits>
 #include "brookesia/lib_utils/signal.hpp"
+#include "boost/thread/lock_guard.hpp"
 #include "boost/thread/mutex.hpp"
 #include "brookesia/lib_utils/macro_configs.h"
 #include "brookesia/lib_utils/describe_helpers.hpp"

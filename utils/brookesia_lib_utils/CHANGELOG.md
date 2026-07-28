@@ -1,5 +1,26 @@
 # ChangeLog
 
+## v0.8.2 - 2026-07-22
+
+### Breaking Changes:
+
+- break(abi): require rebuilding binary consumers after the `TaskScheduler` PImpl and public value-type migration.
+- break(task_scheduler): remove the backend-specific executor and future accessors from the public scheduler API.
+- break(headers): require the opt-in `task_scheduler_describe.hpp` and `thread_config_describe.hpp` headers for reflection metadata.
+- break(log): require `log_describe.hpp`, `describe_helpers.hpp`, or a formatter specialization for non-primitive log arguments.
+
+### Enhancements:
+
+- feat(cmake): add shared C++ compile job-pool and IPA-clone tuning for first-party examples, test apps, host tests, and the PC simulator.
+- feat(task_scheduler): hide Asio, Boost.Thread, timers, futures, and worker state behind a private implementation.
+- feat(task_scheduler): move scheduler value types and describe metadata into lightweight and opt-in headers.
+- feat(log): keep Boost.Format, JSON, and describe helpers out of the base logging header and add an extensible argument formatter.
+
+### Bug Fixes:
+
+- fix(log): keep plain-enum formatting numeric and independent of optional describe includes across translation units.
+- fix(log): preserve the full contents of non-null-terminated string-view arguments.
+
 ## v0.8.1 - 2026-07-13
 
 ### Enhancements:

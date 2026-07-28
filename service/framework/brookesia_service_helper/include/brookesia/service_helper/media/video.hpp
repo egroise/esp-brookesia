@@ -5,14 +5,17 @@
  */
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "brookesia/lib_utils/describe_helpers.hpp"
 #include "brookesia/hal_interface/interfaces/video/processor.hpp"
+#include "brookesia/service_manager/detail/static_schema.hpp"
 #include "brookesia/service_manager/helper/base.hpp"
 
 namespace esp_brookesia::service::helper {
@@ -123,308 +126,224 @@ public:
         Max,
     };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the function parameter types ////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /**
      * @brief Parameter keys for `EncoderFunctionId::Open`.
      */
-    enum class EncoderFunctionOpenParam : uint8_t {
-        Config,
-    };
     /**
      * @brief Parameter keys for `EncoderFunctionId::FetchFrame`.
      */
-    enum class EncoderFunctionFetchFrameParam : uint8_t {
-        SinkIndex,
-    };
 
     /**
      * @brief Parameter keys for `DecoderFunctionId::Open`.
      */
-    enum class DecoderFunctionOpenParam : uint8_t {
-        Config,
-    };
     /**
      * @brief Parameter keys for `DecoderFunctionId::FeedFrame`.
      */
-    enum class DecoderFunctionFeedFrameParam : uint8_t {
-        Frame,
-    };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the event parameter types ///////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /**
      * @brief Item keys for `EncoderEventId::StreamSinkFrameReady`.
      */
-    enum class EncoderEventStreamSinkFrameReadyParam : uint8_t {
-        SinkIndex,
-        SinkInfo,
-        Frame,
-    };
     /**
      * @brief Item keys for `EncoderEventId::FetchSinkFrameReady`.
      */
-    enum class EncoderEventFetchSinkFrameReadyParam : uint8_t {
-        SinkIndex,
-        SinkInfo,
-        Frame,
-    };
     /**
      * @brief Item keys for `DecoderEventId::SinkFrameReady`.
      */
-    enum class DecoderEventSinkFrameReadyParam : uint8_t {
-        Width,
-        Height,
-        Frame,
-    };
 
 private:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////// The following are the function schemas /////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    static FunctionSchema encoder_function_schema_open()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EncoderFunctionId::Open),
-            .description = "Open the encoder with config. If `display` is set, sink format is derived from the "
-            "selected Display output when `Max`; width/height are filled from the output area when zero. "
-            "When stream mode is enabled, frames are emitted automatically through `StreamSinkFrameReady`; "
-            "`FetchFrame` is only for non-stream mode.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EncoderFunctionOpenParam::Config),
-                    .description = (boost::format("Encoder config. Example: %1%")
-                    % BROOKESIA_DESCRIBE_JSON_SERIALIZE((EncoderConfig{
-                        .sinks = std::vector<EncoderSinkInfo>({
-                            EncoderSinkInfo{EncoderSinkFormat::H264, 320, 240, 30},
-                            EncoderSinkInfo{EncoderSinkFormat::MJPEG, 320, 240, 15}
-                        }),
-                        .enable_stream_mode = true,
-                        .source = EncoderSourceConfig{
-                            .device_path = std::string("/dev/video0"),
-                            .fixed_format = EncoderSinkFormat::RGB565,
-                            .fixed_width = 320,
-                            .fixed_height = 240,
-                            .v4l2_buffer_count = 2,
-                        },
-                        .display = EncoderDisplayConfig{
-                            .output_name = std::string("Output0"),
-                            .source_name = std::string(DISPLAY_SOURCE_NAME),
-                            .source_role = std::string(DISPLAY_SOURCE_ROLE),
-                            .x = 0,
-                            .y = 0,
-                            .draw_timeout_ms = 1000,
-                            .publish_sink_event = false,
-                            .activate_source = true,
-                            .sink_index = 0,
-                        },
-                    }))).str(),
-                    .type = FunctionValueType::Object
-                }
+    using DefaultValueKind = detail::static_schema::DefaultValueKind;
+    using DefaultValueSpec = detail::static_schema::DefaultValueSpec;
+    using EventItemSpec = detail::static_schema::EventItemSpec;
+    using EventSpec = detail::static_schema::EventSpec;
+    using FunctionParameterSpec = detail::static_schema::FunctionParameterSpec;
+    using FunctionSpec = detail::static_schema::FunctionSpec;
+
+    inline static constexpr DefaultValueSpec ZERO_NUMBER_DEFAULT = {
+        .kind = DefaultValueKind::Number,
+        .number = 0,
+    };
+
+    inline static constexpr std::array<FunctionParameterSpec, 1> ENCODER_OPEN_PARAMETERS = {{
+            {
+                .name = "Config",
+                .description =
+                R"(Encoder config. Example: {"sinks":[{"format":"H264","width":320,"height":240,"fps":30},)"
+                R"({"format":"MJPEG","width":320,"height":240,"fps":15}],"enable_stream_mode":true,)"
+                R"("source":{"device_path":"/dev/video0","fixed_format":"RGB565","fixed_width":320,)"
+                R"("fixed_height":240,"v4l2_buffer_count":2},"display":{"output_name":"Output0",)"
+                R"("source_name":"Video","source_role":"video","x":0,"y":0,"draw_timeout_ms":1000,)"
+                R"("publish_sink_event":false,"activate_source":true,"sink_index":0}})",
+                .type = FunctionValueType::Object,
             },
-            .default_timeout_ms = 2000,
-        };
-    }
+        }
+    };
 
-    static FunctionSchema encoder_function_schema_close()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EncoderFunctionId::Close),
-            .description = "Close encoder.",
-            .require_scheduler = false,
-        };
-    }
+    inline static constexpr std::array<FunctionParameterSpec, 1> ENCODER_FETCH_FRAME_PARAMETERS = {{
+            {
+                .name = "SinkIndex",
+                .description = "Sink index.",
+                .type = FunctionValueType::Number,
+                .default_value = ZERO_NUMBER_DEFAULT,
+            },
+        }
+    };
 
-    static FunctionSchema encoder_function_schema_start()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EncoderFunctionId::Start),
-            .description = "Start encoder.",
-        };
-    }
+    inline static constexpr std::array<FunctionParameterSpec, 1> DECODER_OPEN_PARAMETERS = {{
+            {
+                .name = "Config",
+                .description =
+                R"(Decoder config. Example: {"width":0,"height":0,"source_format":"MJPEG","sink_format":"Max",)"
+                R"("enable_stream_mode":true,"enable_hw_acceleration":true,"display":{"output_name":"Output0",)"
+                R"("source_name":"Video","source_role":"video","x":0,"y":0,"draw_timeout_ms":1000,)"
+                R"("publish_sink_event":false}})",
+                .type = FunctionValueType::Object,
+            },
+        }
+    };
 
-    static FunctionSchema encoder_function_schema_stop()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EncoderFunctionId::Stop),
-            .description = "Stop encoder.",
-            .require_scheduler = false,
-        };
-    }
+    inline static constexpr std::array<FunctionParameterSpec, 1> DECODER_FEED_FRAME_PARAMETERS = {{
+            {
+                .name = "Frame",
+                .description = "Frame data.",
+                .type = FunctionValueType::RawBuffer,
+            },
+        }
+    };
 
-    static FunctionSchema encoder_function_schema_fetch_frame()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EncoderFunctionId::FetchFrame),
-            .description = "Fetch an encoder output frame and emit `FetchSinkFrameReady`. "
-            "Only available in non-stream mode; stream mode emits `StreamSinkFrameReady` automatically.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EncoderFunctionFetchFrameParam::SinkIndex),
-                    .description = "Sink index.",
-                    .type = FunctionValueType::Number,
-                    .default_value = 0
-                }
-            }
-        };
-    }
+    inline static constexpr std::array<FunctionSpec, static_cast<size_t>(EncoderFunctionId::Max)>
+    ENCODER_FUNCTION_SPECS = {{
+            {
+                .name = "Open",
+                .description =
+                "Open the encoder with config. If `display` is set, sink format is derived from the "
+                "selected Display output when `Max`; width/height are filled from the output area when zero. "
+                "When stream mode is enabled, frames are emitted automatically through `StreamSinkFrameReady`; "
+                "`FetchFrame` is only for non-stream mode.",
+                .parameters = ENCODER_OPEN_PARAMETERS,
+                .default_timeout_ms = 2000,
+            },
+            {
+                .name = "Close",
+                .description = "Close encoder.",
+                .parameters = std::span<const FunctionParameterSpec>{},
+                .require_scheduler = false,
+            },
+            {
+                .name = "Start",
+                .description = "Start encoder.",
+                .parameters = std::span<const FunctionParameterSpec>{},
+            },
+            {
+                .name = "Stop",
+                .description = "Stop encoder.",
+                .parameters = std::span<const FunctionParameterSpec>{},
+                .require_scheduler = false,
+            },
+            {
+                .name = "FetchFrame",
+                .description = "Fetch an encoder output frame and emit `FetchSinkFrameReady`. "
+                "Only available in non-stream mode; stream mode emits `StreamSinkFrameReady` "
+                "automatically.",
+                .parameters = ENCODER_FETCH_FRAME_PARAMETERS,
+            },
+        }
+    };
+    static_assert(ENCODER_FUNCTION_SPECS.size() == static_cast<size_t>(EncoderFunctionId::Max));
 
-    static FunctionSchema decoder_function_schema_open()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(DecoderFunctionId::Open),
-            .description = "Open the decoder with config. If `display` is set, sink format is derived from the "
-            "selected Display output; width/height are used when non-zero, otherwise filled from the output area.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(DecoderFunctionOpenParam::Config),
-                    .description = (boost::format("Decoder config. Example: %1%")
-                    % BROOKESIA_DESCRIBE_JSON_SERIALIZE((DecoderConfig{
-                        .source_format = DecoderSourceFormat::MJPEG,
-                        .enable_stream_mode = true,
-                        .enable_hw_acceleration = true,
-                        .display = DecoderDisplayConfig{
-                            .output_name = std::string("Output0"),
-                            .source_name = std::string(DISPLAY_SOURCE_NAME),
-                            .source_role = std::string(DISPLAY_SOURCE_ROLE),
-                            .x = 0,
-                            .y = 0,
-                            .draw_timeout_ms = 1000,
-                            .publish_sink_event = false,
-                        },
-                    }))).str(),
-                    .type = FunctionValueType::Object
-                }
-            }
-        };
-    }
-
-    static FunctionSchema decoder_function_schema_close()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(DecoderFunctionId::Close),
-            .description = "Close decoder.",
-        };
-    }
-
-    static FunctionSchema decoder_function_schema_start()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(DecoderFunctionId::Start),
-            .description = "Start decoder.",
-        };
-    }
-
-    static FunctionSchema decoder_function_schema_stop()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(DecoderFunctionId::Stop),
-            .description = "Stop decoder.",
-        };
-    }
-
-    static FunctionSchema decoder_function_schema_feed_frame()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(DecoderFunctionId::FeedFrame),
-            .description = "Feed a decoder input frame.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(DecoderFunctionFeedFrameParam::Frame),
-                    .description = "Frame data.",
-                    .type = FunctionValueType::RawBuffer
-                }
-            }
-        };
-    }
+    inline static constexpr std::array<FunctionSpec, static_cast<size_t>(DecoderFunctionId::Max)>
+    DECODER_FUNCTION_SPECS = {{
+            {
+                .name = "Open",
+                .description =
+                "Open the decoder with config. If `display` is set, sink format is derived from the "
+                "selected Display output; width/height are used when non-zero, otherwise filled from the output "
+                "area.",
+                .parameters = DECODER_OPEN_PARAMETERS,
+            },
+            {
+                .name = "Close",
+                .description = "Close decoder.",
+                .parameters = std::span<const FunctionParameterSpec>{},
+            },
+            {
+                .name = "Start",
+                .description = "Start decoder.",
+                .parameters = std::span<const FunctionParameterSpec>{},
+            },
+            {
+                .name = "Stop",
+                .description = "Stop decoder.",
+                .parameters = std::span<const FunctionParameterSpec>{},
+            },
+            {
+                .name = "FeedFrame",
+                .description = "Feed a decoder input frame.",
+                .parameters = DECODER_FEED_FRAME_PARAMETERS,
+            },
+        }
+    };
+    static_assert(DECODER_FUNCTION_SPECS.size() == static_cast<size_t>(DecoderFunctionId::Max));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////// The following are the event schemas /////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    static EventSchema encoder_event_schema_stream_sink_frame_ready()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EncoderEventId::StreamSinkFrameReady),
-            .description = "Emitted when an encoder stream frame is ready. Stream mode only.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EncoderEventStreamSinkFrameReadyParam::SinkIndex),
-                    .description = "Sink index.",
-                    .type = EventItemType::Number
-                },
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EncoderEventStreamSinkFrameReadyParam::SinkInfo),
-                    .description = (boost::format("Sink info. Example: %1%")
-                    % BROOKESIA_DESCRIBE_JSON_SERIALIZE((EncoderSinkInfo{
-                        EncoderSinkFormat::H264, 320, 240, 30
-                    }))).str(),
-                    .type = EventItemType::Object
-                },
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EncoderEventStreamSinkFrameReadyParam::Frame),
-                    .description = "Encoded frame data.",
-                    .type = EventItemType::RawBuffer
-                }
+    inline static constexpr std::array<EventItemSpec, 3> ENCODER_STREAM_SINK_FRAME_READY_ITEMS = {{
+            {"SinkIndex", "Sink index.", EventItemType::Number},
+            {
+                "SinkInfo", R"(Sink info. Example: {"format":"H264","width":320,"height":240,"fps":30})",
+                EventItemType::Object
             },
-            .require_scheduler = false,
-        };
-    }
-    static EventSchema encoder_event_schema_fetch_sink_frame_ready()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EncoderEventId::FetchSinkFrameReady),
-            .description = "Emitted when an encoder fetched frame is ready. Non-stream mode only.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EncoderEventFetchSinkFrameReadyParam::SinkIndex),
-                    .description = "Sink index.",
-                    .type = EventItemType::Number
-                },
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EncoderEventFetchSinkFrameReadyParam::SinkInfo),
-                    .description = (boost::format("Sink info. Example: %1%")
-                    % BROOKESIA_DESCRIBE_JSON_SERIALIZE((EncoderSinkInfo{
-                        EncoderSinkFormat::MJPEG, 320, 240, 15
-                    }))).str(),
-                    .type = EventItemType::Object
-                },
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EncoderEventFetchSinkFrameReadyParam::Frame),
-                    .description = "Encoded frame data.",
-                    .type = EventItemType::RawBuffer
-                }
-            },
-            .require_scheduler = false,
-        };
-    }
+            {"Frame", "Encoded frame data.", EventItemType::RawBuffer},
+        }
+    };
 
-    static EventSchema decoder_event_schema_sink_frame_ready()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(DecoderEventId::SinkFrameReady),
-            .description = "Emitted when a decoder output frame is ready.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(DecoderEventSinkFrameReadyParam::Width),
-                    .description = "Decoded frame width.",
-                    .type = EventItemType::Number
-                },
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(DecoderEventSinkFrameReadyParam::Height),
-                    .description = "Decoded frame height.",
-                    .type = EventItemType::Number
-                },
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(DecoderEventSinkFrameReadyParam::Frame),
-                    .description = "Decoded frame data.",
-                    .type = EventItemType::RawBuffer,
-                }
+    inline static constexpr std::array<EventItemSpec, 3> ENCODER_FETCH_SINK_FRAME_READY_ITEMS = {{
+            {"SinkIndex", "Sink index.", EventItemType::Number},
+            {
+                "SinkInfo", R"(Sink info. Example: {"format":"MJPEG","width":320,"height":240,"fps":15})",
+                EventItemType::Object
             },
-            .require_scheduler = false,
-        };
-    }
+            {"Frame", "Encoded frame data.", EventItemType::RawBuffer},
+        }
+    };
+
+    inline static constexpr std::array<EventItemSpec, 3> DECODER_SINK_FRAME_READY_ITEMS = {{
+            {"Width", "Decoded frame width.", EventItemType::Number},
+            {"Height", "Decoded frame height.", EventItemType::Number},
+            {"Frame", "Decoded frame data.", EventItemType::RawBuffer},
+        }
+    };
+
+    inline static constexpr std::array<EventSpec, static_cast<size_t>(EncoderEventId::Max)> ENCODER_EVENT_SPECS = {{
+            {
+                .name = "StreamSinkFrameReady",
+                .description = "Emitted when an encoder stream frame is ready. Stream mode only.",
+                .items = ENCODER_STREAM_SINK_FRAME_READY_ITEMS,
+                .require_scheduler = false,
+            },
+            {
+                .name = "FetchSinkFrameReady",
+                .description = "Emitted when an encoder fetched frame is ready. Non-stream mode only.",
+                .items = ENCODER_FETCH_SINK_FRAME_READY_ITEMS,
+                .require_scheduler = false,
+            },
+        }
+    };
+    static_assert(ENCODER_EVENT_SPECS.size() == static_cast<size_t>(EncoderEventId::Max));
+
+    inline static constexpr std::array<EventSpec, static_cast<size_t>(DecoderEventId::Max)> DECODER_EVENT_SPECS = {{
+            {
+                .name = "SinkFrameReady",
+                .description = "Emitted when a decoder output frame is ready.",
+                .items = DECODER_SINK_FRAME_READY_ITEMS,
+                .require_scheduler = false,
+            },
+        }
+    };
+    static_assert(DECODER_EVENT_SPECS.size() == static_cast<size_t>(DecoderEventId::Max));
 
 public:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -437,15 +356,13 @@ public:
      */
     static std::span<const FunctionSchema> get_encoder_function_schemas()
     {
-        static const std::array<FunctionSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(EncoderFunctionId::Max)> FUNCTION_SCHEMAS = {{
-                encoder_function_schema_open(),
-                encoder_function_schema_close(),
-                encoder_function_schema_start(),
-                encoder_function_schema_stop(),
-                encoder_function_schema_fetch_frame(),
-            }
-        };
-        return std::span<const FunctionSchema>(FUNCTION_SCHEMAS);
+        static std::array<FunctionSchema, ENCODER_FUNCTION_SPECS.size()> schemas;
+        static const bool initialized = [] {
+            detail::static_schema::materialize_function_schemas(ENCODER_FUNCTION_SPECS, schemas);
+            return true;
+        }();
+        static_cast<void>(initialized);
+        return schemas;
     }
     /**
      * @brief Get all encoder event schemas.
@@ -454,12 +371,13 @@ public:
      */
     static std::span<const EventSchema> get_encoder_event_schemas()
     {
-        static const std::array<EventSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(EncoderEventId::Max)> EVENT_SCHEMAS = {{
-                encoder_event_schema_stream_sink_frame_ready(),
-                encoder_event_schema_fetch_sink_frame_ready(),
-            }
-        };
-        return std::span<const EventSchema>(EVENT_SCHEMAS);
+        static std::array<EventSchema, ENCODER_EVENT_SPECS.size()> schemas;
+        static const bool initialized = [] {
+            detail::static_schema::materialize_event_schemas(ENCODER_EVENT_SPECS, schemas);
+            return true;
+        }();
+        static_cast<void>(initialized);
+        return schemas;
     }
 
     /**
@@ -469,15 +387,13 @@ public:
      */
     static std::span<const FunctionSchema> get_decoder_function_schemas()
     {
-        static const std::array<FunctionSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(DecoderFunctionId::Max)> FUNCTION_SCHEMAS = {{
-                decoder_function_schema_open(),
-                decoder_function_schema_close(),
-                decoder_function_schema_start(),
-                decoder_function_schema_stop(),
-                decoder_function_schema_feed_frame(),
-            }
-        };
-        return std::span<const FunctionSchema>(FUNCTION_SCHEMAS);
+        static std::array<FunctionSchema, DECODER_FUNCTION_SPECS.size()> schemas;
+        static const bool initialized = [] {
+            detail::static_schema::materialize_function_schemas(DECODER_FUNCTION_SPECS, schemas);
+            return true;
+        }();
+        static_cast<void>(initialized);
+        return schemas;
     }
     /**
      * @brief Get all decoder event schemas.
@@ -486,11 +402,13 @@ public:
      */
     static std::span<const EventSchema> get_decoder_event_schemas()
     {
-        static const std::array<EventSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(DecoderEventId::Max)> EVENT_SCHEMAS = {{
-                decoder_event_schema_sink_frame_ready(),
-            }
-        };
-        return std::span<const EventSchema>(EVENT_SCHEMAS);
+        static std::array<EventSchema, DECODER_EVENT_SPECS.size()> schemas;
+        static const bool initialized = [] {
+            detail::static_schema::materialize_event_schemas(DECODER_EVENT_SPECS, schemas);
+            return true;
+        }();
+        static_cast<void>(initialized);
+        return schemas;
     }
 };
 
@@ -596,19 +514,12 @@ public:
  */
 BROOKESIA_DESCRIBE_ENUM(Video::EncoderFunctionId, Open, Close, Start, Stop, FetchFrame, Max);
 BROOKESIA_DESCRIBE_ENUM(Video::DecoderFunctionId, Open, Close, Start, Stop, FeedFrame, Max);
-BROOKESIA_DESCRIBE_ENUM(Video::EncoderFunctionOpenParam, Config);
-BROOKESIA_DESCRIBE_ENUM(Video::EncoderFunctionFetchFrameParam, SinkIndex);
-BROOKESIA_DESCRIBE_ENUM(Video::DecoderFunctionOpenParam, Config);
-BROOKESIA_DESCRIBE_ENUM(Video::DecoderFunctionFeedFrameParam, Frame);
 
 /**
  * @brief  Event related
  */
 BROOKESIA_DESCRIBE_ENUM(Video::EncoderEventId, StreamSinkFrameReady, FetchSinkFrameReady, Max);
 BROOKESIA_DESCRIBE_ENUM(Video::DecoderEventId, SinkFrameReady, Max);
-BROOKESIA_DESCRIBE_ENUM(Video::EncoderEventStreamSinkFrameReadyParam, SinkIndex, SinkInfo, Frame);
-BROOKESIA_DESCRIBE_ENUM(Video::EncoderEventFetchSinkFrameReadyParam, SinkIndex, SinkInfo, Frame);
-BROOKESIA_DESCRIBE_ENUM(Video::DecoderEventSinkFrameReadyParam, Width, Height, Frame);
 BROOKESIA_DESCRIBE_STRUCT(
     Video::EncoderDisplayConfig, (),
     (output_name, source_name, source_role, x, y, draw_timeout_ms, publish_sink_event, activate_source, sink_index)

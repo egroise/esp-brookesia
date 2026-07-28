@@ -722,7 +722,7 @@ void Http::publish_general_state(GeneralState state)
     // so noisy but expected lifecycle phases don't surface as ERROR-level logs.
     BROOKESIA_CHECK_FALSE_EXECUTE(
     publish_event(BROOKESIA_DESCRIBE_TO_STR(Helper::EventId::GeneralStateChanged), EventItemMap{
-        {BROOKESIA_DESCRIBE_TO_STR(Helper::EventGeneralStateChangedParam::State), BROOKESIA_DESCRIBE_TO_STR(state)}
+        {"State", BROOKESIA_DESCRIBE_TO_STR(state)}
     }), {}, {
         BROOKESIA_LOGD("Skipped general state change publication (state=%1%)", BROOKESIA_DESCRIBE_TO_STR(state));
     }
@@ -788,8 +788,8 @@ void Http::set_context_state(std::shared_ptr<RequestContext> context, RequestSta
 void Http::publish_request_started(const RequestContext &context)
 {
     const bool published = publish_event(BROOKESIA_DESCRIBE_TO_STR(Helper::EventId::RequestStarted), EventItemMap{
-        {BROOKESIA_DESCRIBE_TO_STR(Helper::EventRequestParam::RequestId), context.request_id},
-        {BROOKESIA_DESCRIBE_TO_STR(Helper::EventRequestParam::State), BROOKESIA_DESCRIBE_TO_STR(context.state)}
+        {"RequestId", context.request_id},
+        {"State", BROOKESIA_DESCRIBE_TO_STR(context.state)}
     });
     BROOKESIA_CHECK_FALSE_EXECUTE(published, {}, {
         BROOKESIA_LOGE("Failed to publish request started event");
@@ -824,9 +824,9 @@ void Http::emit_pending_progress()
     }
     BROOKESIA_CHECK_FALSE_EXECUTE(
     publish_event(BROOKESIA_DESCRIBE_TO_STR(Helper::EventId::RequestProgress), EventItemMap{
-        {BROOKESIA_DESCRIBE_TO_STR(Helper::EventRequestParam::RequestId), snapshot->request_id},
+        {"RequestId", snapshot->request_id},
         {
-            BROOKESIA_DESCRIBE_TO_STR(Helper::EventRequestParam::Progress),
+            "Progress",
             request_progress_to_json(*snapshot)
         }
     }), {}, {
@@ -846,9 +846,9 @@ void Http::publish_request_finished(const RequestContext &context)
 
     BROOKESIA_CHECK_FALSE_EXECUTE(
     publish_event(BROOKESIA_DESCRIBE_TO_STR(event_id), EventItemMap{
-        {BROOKESIA_DESCRIBE_TO_STR(Helper::EventRequestParam::RequestId), context.request_id},
+        {"RequestId", context.request_id},
         {
-            BROOKESIA_DESCRIBE_TO_STR(Helper::EventRequestParam::Response),
+            "Response",
             http_response_to_json(context.response)
         }
     }), {}, {

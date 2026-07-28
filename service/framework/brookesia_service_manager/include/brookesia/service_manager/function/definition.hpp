@@ -5,9 +5,10 @@
  */
 #pragma once
 
-#include <string>
-#include <optional>
+#include <functional>
 #include <map>
+#include <optional>
+#include <string>
 #include <vector>
 #include <variant>
 #include <type_traits>
@@ -187,6 +188,11 @@ struct FunctionResult {
     }
 };
 BROOKESIA_DESCRIBE_STRUCT(FunctionResult, (), (success, error_message, data));
+
+/**
+ * @brief Signature of a service function implementation.
+ */
+using FunctionHandler = std::function < FunctionResult(FunctionParameterMap &&) >;
 
 /**
  * @brief One function call entry used by batched calls on the same service.

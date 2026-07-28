@@ -12,9 +12,16 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 # Work around esp-idf-configdep mapping CONFIG_ESP_LVGL_ADAPTER_PARTIAL_AUX_IMG_CACHE
 # to a Windows-invalid path containing the reserved device name "aux".
-set(CONFIGDEP_ENABLE 0 CACHE BOOL "Disable esp-idf-configdep for Windows AUX path compatibility" FORCE)
+# Only force this off on Windows: elsewhere it makes idf.py's default
+# `-DCONFIGDEP_ENABLE=True` permanently disagree with the forced cache value, which
+# makes idf.py re-run CMake configure on every build/flash (~24s each time).
+if(CMAKE_HOST_WIN32)
+    set(CONFIGDEP_ENABLE 0 CACHE BOOL "Disable esp-idf-configdep for Windows AUX path compatibility" FORCE)
+endif()
 
 project(example_agent_chatbot)
 
 # Temporary workaround for `espressif__mcp-c-sdk` stringop-truncation warning
 idf_build_set_property(COMPILE_OPTIONS -Wno-error=stringop-truncation APPEND)
+
+brookesia_compile_tuning_apply_current_project()

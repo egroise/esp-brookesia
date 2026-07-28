@@ -14,12 +14,15 @@
 #include <utility>
 #include <vector>
 
+#include "boost/format.hpp"
 #include "sdkconfig.h"
+#include "esp_log.h"
 #include "brookesia/lib_utils/function_guard.hpp"
 #include "brookesia/service_manager.hpp"
 #include "brookesia/service_helper.hpp"
 #include "brookesia/mcp_utils/mcp_utils.hpp"
 #include "brookesia/hal_interface.hpp"
+#include "brookesia/service_helper/media/bt_speaker.hpp"
 #include "private/utils.hpp"
 #include "modules/display/display.hpp"
 #include "ai_agents.hpp"
@@ -33,6 +36,7 @@ using XiaoZhiHelper = esp_brookesia::service::helper::XiaoZhi;
 using EmoteHelper = esp_brookesia::service::helper::ExpressionEmote;
 using AudioHelper = esp_brookesia::service::helper::Audio;
 using AudioPlaybackHelper = esp_brookesia::service::helper::AudioPlayback;
+using BtSpeakerHelper = esp_brookesia::service::helper::BtSpeaker;
 using WifiHelper = esp_brookesia::service::helper::Wifi;
 using DeviceHelper = esp_brookesia::service::helper::Device;
 using VideoHelper = esp_brookesia::service::helper::Video;
@@ -312,6 +316,22 @@ void AI_Agents::init_xiaozhi()
             );
         }
 
+        if (BtSpeakerHelper::is_available()) {
+            auto state_result = BtSpeakerHelper::call_function_sync<boost::json::object>(
+                                    BtSpeakerHelper::FunctionId::GetState
+                                );
+            if (!state_result) {
+                BROOKESIA_LOGW("BtSpeaker GetState failed: %1%", state_result.error());
+            } else {
+                BtSpeakerHelper::State state;
+                if (!BROOKESIA_DESCRIBE_FROM_JSON(*state_result, state)) {
+                    BROOKESIA_LOGW("Failed to parse BtSpeaker state");
+                } else if (state.is_connected) {
+                    return;
+                }
+            }
+        }
+
         // Build URL list: activation.mp3 followed by digit files (0.mp3 - 9.mp3)
         std::vector<std::string> urls;
         urls.reserve(code.size() + 1);
@@ -462,6 +482,107 @@ void AI_Agents::process_agent_general_events()
     //   1. Stopped: Restart the agent after a delay
     process_agent_general_unexpected_events();
     process_agent_general_suspend_status_changed();
+    process_bt_speaker_events();
+}
+
+void AI_Agents::process_bt_speaker_events()
+{
+    if (!BtSpeakerHelper::is_available()) {
+        BROOKESIA_LOGW("BtSpeaker service is not available, skip Agent playback coordination");
+        return;
+    }
+
+    auto slot = [this](const std::string &, const std::string & general_event, bool) {
+        AgentHelper::GeneralEvent event;
+        if (!BROOKESIA_DESCRIBE_STR_TO_ENUM(general_event, event)) {
+            BROOKESIA_LOGW("Failed to parse Agent general event: %1%", general_event);
+            return;
+        }
+
+        if (event == AgentHelper::GeneralEvent::Awake) {
+            auto state_result = BtSpeakerHelper::call_function_sync<boost::json::object>(
+                                    BtSpeakerHelper::FunctionId::GetState
+                                );
+            if (!state_result) {
+                BROOKESIA_LOGW("BtSpeaker GetState failed while handling Agent Awake: %1%", state_result.error());
+                return;
+            }
+
+            BtSpeakerHelper::State state;
+            if (!BROOKESIA_DESCRIBE_FROM_JSON(*state_result, state)) {
+                BROOKESIA_LOGW("Failed to parse BtSpeaker state while handling Agent Awake");
+                return;
+            }
+            if (should_resume_bt_speaker_) {
+                if (state.is_connected && state.connection &&
+                        state.connection->connection_id == paused_bt_connection_id_.load()) {
+                    return;
+                }
+                should_resume_bt_speaker_ = false;
+                paused_bt_connection_id_ = -1;
+            }
+            if (!state.is_music_active || !state.is_connected || !state.connection) {
+                return;
+            }
+
+            auto pause_result = BtSpeakerHelper::call_function_sync(BtSpeakerHelper::FunctionId::Pause);
+            if (!pause_result) {
+                BROOKESIA_LOGW("BtSpeaker Pause failed while handling Agent Awake: %1%", pause_result.error());
+                return;
+            }
+            paused_bt_connection_id_ = state.connection->connection_id;
+            should_resume_bt_speaker_ = true;
+            return;
+        }
+
+        if ((event == AgentHelper::GeneralEvent::Slept || event == AgentHelper::GeneralEvent::Stopped) &&
+                should_resume_bt_speaker_) {
+            auto state_result = BtSpeakerHelper::call_function_sync<boost::json::object>(
+                                    BtSpeakerHelper::FunctionId::GetState
+                                );
+            BtSpeakerHelper::State state;
+            if (!state_result || !BROOKESIA_DESCRIBE_FROM_JSON(*state_result, state) || !state.is_started ||
+                    !state.is_connected || !state.connection ||
+                    state.connection->connection_id != paused_bt_connection_id_.load()) {
+                should_resume_bt_speaker_ = false;
+                paused_bt_connection_id_ = -1;
+                return;
+            }
+            auto resume_result = BtSpeakerHelper::call_function_sync(BtSpeakerHelper::FunctionId::Resume);
+            if (!resume_result) {
+                BROOKESIA_LOGW("BtSpeaker Resume failed while handling Agent idle event: %1%", resume_result.error());
+                return;
+            }
+            should_resume_bt_speaker_ = false;
+            paused_bt_connection_id_ = -1;
+        }
+    };
+    auto connection = AgentHelper::subscribe_event(AgentHelper::EventId::GeneralEventHappened, slot);
+    if (connection.connected()) {
+        service_connections_.push_back(std::move(connection));
+    } else {
+        BROOKESIA_LOGW("Failed to subscribe to Agent events for BtSpeaker playback coordination");
+    }
+
+    auto connection_state_slot = [this](
+                                     const std::string &, const std::string & state,
+                                     const boost::json::object &
+    ) {
+        BtSpeakerHelper::ConnectionState connection_state;
+        if (BROOKESIA_DESCRIBE_STR_TO_ENUM(state, connection_state) &&
+                connection_state == BtSpeakerHelper::ConnectionState::Disconnected) {
+            should_resume_bt_speaker_ = false;
+            paused_bt_connection_id_ = -1;
+        }
+    };
+    auto bt_connection = BtSpeakerHelper::subscribe_event(
+                             BtSpeakerHelper::EventId::ConnectionStateChanged, connection_state_slot
+                         );
+    if (bt_connection.connected()) {
+        service_connections_.push_back(std::move(bt_connection));
+    } else {
+        BROOKESIA_LOGW("Failed to subscribe to BtSpeaker connection events");
+    }
 }
 
 void AI_Agents::process_emote_when_general_action_triggered()

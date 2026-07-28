@@ -1,5 +1,11 @@
 # ChangeLog
 
+## v0.8.2 - 2026-07-27
+
+### Enhancements:
+
+- feat(build): split LVGL style and property implementations to reduce flash-sensitive code.
+
 ## v0.8.1 - 2026-07-13
 
 ### Enhancements:

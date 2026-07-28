@@ -36,6 +36,7 @@ Module Overview
    Base <base>
    Audio <audio>
    Display <display>
+   DataFlow <dataflow>
    PicoDet <picodet>
    Device Control <device>
    Emote <emote>

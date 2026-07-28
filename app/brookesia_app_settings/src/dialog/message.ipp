@@ -7,14 +7,15 @@
 system::core::MessageDialogOptions SettingsApp::make_message_dialog_options(
     std::string text,
     system::core::MessageDialogIcon icon,
-    int32_t auto_close_ms
+    int32_t auto_close_ms,
+    std::vector<system::core::MessageDialogButton> buttons
 ) const
 {
     return system::core::MessageDialogOptions{
         .text = std::move(text),
         .informative_text = {},
         .icon = icon,
-        .buttons = {},
+        .buttons = std::move(buttons),
         .auto_close_ms = auto_close_ms,
     };
 }
@@ -23,10 +24,11 @@ void SettingsApp::ensure_message_dialog(
     system::core::AppContext &context,
     std::string text,
     system::core::MessageDialogIcon icon,
-    int32_t auto_close_ms
+    int32_t auto_close_ms,
+    std::vector<system::core::MessageDialogButton> buttons
 )
 {
-    auto options = make_message_dialog_options(std::move(text), icon, auto_close_ms);
+    auto options = make_message_dialog_options(std::move(text), icon, auto_close_ms, std::move(buttons));
     if (message_dialog_request_id_ != system::core::INVALID_MESSAGE_DIALOG_REQUEST_ID) {
         auto update_result = context.system_service().update_message_dialog(message_dialog_request_id_, options);
         if (update_result) {
@@ -39,8 +41,12 @@ void SettingsApp::ensure_message_dialog(
     auto request_id = context.system_service().show_message_dialog(
                           std::move(options),
     [this](const system::core::MessageDialogResult & result) {
+        const auto prompt_kind = restart_prompt_kind_;
         if (message_dialog_request_id_ == result.request_id) {
             message_dialog_request_id_ = system::core::INVALID_MESSAGE_DIALOG_REQUEST_ID;
+        }
+        if (context_ != nullptr && prompt_kind != RestartPromptKind::None) {
+            handle_restart_dialog_result(*context_, prompt_kind, result);
         }
     }
                       );
@@ -55,14 +61,15 @@ void SettingsApp::update_message_dialog_if_visible(
     system::core::AppContext &context,
     std::string text,
     system::core::MessageDialogIcon icon,
-    int32_t auto_close_ms
+    int32_t auto_close_ms,
+    std::vector<system::core::MessageDialogButton> buttons
 )
 {
     if (message_dialog_request_id_ == system::core::INVALID_MESSAGE_DIALOG_REQUEST_ID) {
         return;
     }
 
-    auto options = make_message_dialog_options(std::move(text), icon, auto_close_ms);
+    auto options = make_message_dialog_options(std::move(text), icon, auto_close_ms, std::move(buttons));
     auto update_result = context.system_service().update_message_dialog(message_dialog_request_id_, std::move(options));
     if (!update_result) {
         BROOKESIA_LOGW("Failed to update Settings message dialog: %1%", update_result.error());

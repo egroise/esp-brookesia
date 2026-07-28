@@ -15,3 +15,5 @@ else()
     project(test_brookesia_runtime_manager LANGUAGES CXX)
     include(${CMAKE_CURRENT_LIST_DIR}/cmake/pc_platform.cmake)
 endif()
+
+brookesia_compile_tuning_apply_current_project()

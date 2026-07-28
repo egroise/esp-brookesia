@@ -6,15 +6,14 @@
 #include "sdkconfig.h"
 #include "brookesia/hal_interface.hpp"
 #include "brookesia/hal_adaptor.hpp"
-#include "brookesia/service_manager.hpp"
-#include "brookesia/service_helper.hpp"
+#include "brookesia/service_helper/media/audio.hpp"
+#include "brookesia/service_manager/service/manager.hpp"
 #include "private/utils.hpp"
 #include "general_services.hpp"
 
 using namespace esp_brookesia;
 
 using AudioPlaybackHelper = esp_brookesia::service::helper::AudioPlayback;
-using DeviceHelper = esp_brookesia::service::helper::Device;
 
 constexpr const char *AUDIO_WAKEUP_WORD_MODEL_PARTITION_LABEL = "model";
 constexpr const char *AUDIO_WAKEUP_WORD_MN_LANGUAGE = "cn";

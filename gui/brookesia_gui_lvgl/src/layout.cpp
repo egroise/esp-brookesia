@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <memory>
 #include <optional>
 #include <utility>
 
@@ -221,17 +222,6 @@ static lv_align_t to_lvgl_align(PlacementAlign align)
     }
 }
 
-static Record *find_record_by_absolute_path(BackendImpl &impl, std::string_view absolute_path)
-{
-    for (auto &[unused_handle, record] : impl.records) {
-        (void)unused_handle;
-        if (record.absolute_path == absolute_path) {
-            return &record;
-        }
-    }
-    return nullptr;
-}
-
 static std::string view_reference_path_to_absolute(
     std::string_view scope_root_absolute_path,
     std::string_view relative_to)
@@ -251,24 +241,89 @@ static bool object_is_valid(const Record &record)
     return record.object != nullptr && lv_obj_is_valid(record.object);
 }
 
+static void release_placement_cache_entry(BackendImpl &impl, PlacementCacheEntry *entry)
+{
+    if (entry == nullptr) {
+        return;
+    }
+
+    auto cache_it = std::find_if(
+                        impl.placement_cache.begin(), impl.placement_cache.end(),
+    [entry](const auto & candidate) {
+        return candidate.get() == entry;
+    }
+                    );
+    if (cache_it == impl.placement_cache.end() || (*cache_it)->ref_count == 0) {
+        BROOKESIA_LOGE("Attempted to release an invalid placement cache entry: %1%", static_cast<void *>(entry));
+        return;
+    }
+
+    --(*cache_it)->ref_count;
+    if ((*cache_it)->ref_count == 0) {
+        impl.placement_cache.erase(cache_it);
+    }
+}
+
+static PlacementCacheEntry *replace_record_placement(
+    BackendImpl &impl, Record &record, const Placement &placement)
+{
+    auto *old_entry = record.placement_cache_entry;
+    if (old_entry != nullptr && old_entry->value == placement) {
+        return old_entry;
+    }
+
+    for (auto &entry : impl.placement_cache) {
+        if (entry.get() == old_entry || !(entry->value == placement)) {
+            continue;
+        }
+        auto *new_entry = entry.get();
+        ++entry->ref_count;
+        record.placement_cache_entry = new_entry;
+        release_placement_cache_entry(impl, old_entry);
+#if BROOKESIA_GUI_INTERFACE_ENABLE_MEMORY_TRACE
+        ++impl.placement_cache_hits;
+#endif
+        return new_entry;
+    }
+
+#if BROOKESIA_GUI_INTERFACE_ENABLE_MEMORY_TRACE
+    ++impl.placement_cache_misses;
+#endif
+    // A binding may update x/y every frame. If this Record is the sole owner, preserve the stable
+    // cache allocation and replace the value in place instead of creating allocator churn.
+    if (old_entry != nullptr && old_entry->ref_count == 1) {
+        old_entry->value = placement;
+        return old_entry;
+    }
+
+    auto new_entry = std::make_unique<PlacementCacheEntry>();
+    new_entry->value = placement;
+    new_entry->ref_count = 1;
+    auto *result = new_entry.get();
+    impl.placement_cache.push_back(std::move(new_entry));
+    record.placement_cache_entry = result;
+    release_placement_cache_entry(impl, old_entry);
+    return result;
+}
+
 static bool align_relative_record(BackendImpl &impl, Record &record, bool warn_if_missing)
 {
-    if (!object_is_valid(record) || record.placement.mode != PlacementMode::Relative ||
-            record.placement.relative_to.empty()) {
+    const auto &placement = get_record_placement(record);
+    if (!object_is_valid(record) || placement.mode != PlacementMode::Relative || placement.relative_to.empty()) {
         return false;
     }
 
     const auto target_path = view_reference_path_to_absolute(
-                                 record.scope_root_absolute_path,
-                                 record.placement.relative_to
+                                 impl.build_scope_root_absolute_path(record),
+                                 placement.relative_to
                              );
-    auto *target = find_record_by_absolute_path(impl, target_path);
+    auto *target = impl.find_record_by_absolute_path(target_path);
     if (target == nullptr || !object_is_valid(*target)) {
         if (warn_if_missing) {
             BROOKESIA_LOGW(
                 "Relative placement target not found: node='%1%', relative_to='%2%', target_path='%3%'",
-                record.absolute_path,
-                record.placement.relative_to,
+                impl.build_absolute_path(record),
+                placement.relative_to,
                 target_path
             );
         }
@@ -277,11 +332,11 @@ static bool align_relative_record(BackendImpl &impl, Record &record, bool warn_i
 
     lv_obj_update_layout(target->object);
     lv_obj_update_layout(record.object);
-    const auto [offset_x, offset_y] = resolve_placement_offsets_px(record, record.placement);
+    const auto [offset_x, offset_y] = resolve_placement_offsets_px(record, placement);
     lv_obj_align_to(
         record.object,
         target->object,
-        to_lvgl_align(record.placement.align),
+        to_lvgl_align(placement.align),
         offset_x,
         offset_y
     );
@@ -308,17 +363,21 @@ static void apply_flex_layout(Record &record, const Layout &layout, LayoutApplyM
 
 static void apply_grid_tracks(Record &record, const Layout &layout)
 {
-    record.grid_columns.clear();
-    record.grid_rows.clear();
+    if (record.grid_payload == nullptr) {
+        record.grid_payload = std::make_unique<Record::GridPayload>();
+    }
+    auto &grid = *record.grid_payload;
+    grid.columns.clear();
+    grid.rows.clear();
     for (const auto &column : layout.grid_template_columns) {
-        record.grid_columns.push_back(to_lvgl_grid_track(column));
+        grid.columns.push_back(to_lvgl_grid_track(column));
     }
     for (const auto &row : layout.grid_template_rows) {
-        record.grid_rows.push_back(to_lvgl_grid_track(row));
+        grid.rows.push_back(to_lvgl_grid_track(row));
     }
-    record.grid_columns.push_back(LV_GRID_TEMPLATE_LAST);
-    record.grid_rows.push_back(LV_GRID_TEMPLATE_LAST);
-    lv_obj_set_grid_dsc_array(record.object, record.grid_columns.data(), record.grid_rows.data());
+    grid.columns.push_back(LV_GRID_TEMPLATE_LAST);
+    grid.rows.push_back(LV_GRID_TEMPLATE_LAST);
+    lv_obj_set_grid_dsc_array(record.object, grid.columns.data(), grid.rows.data());
 }
 
 static void apply_grid_layout(Record &record, const Layout &layout, LayoutApplyMask mask)
@@ -442,6 +501,18 @@ static void update_known_layer_layouts(const BackendImpl &impl)
 
 } // namespace
 
+const Placement &get_record_placement(const Record &record)
+{
+    static const Placement DEFAULT_PLACEMENT;
+    return record.placement_cache_entry != nullptr ? record.placement_cache_entry->value : DEFAULT_PLACEMENT;
+}
+
+void release_record_placement(BackendImpl &impl, Record &record)
+{
+    auto *entry = std::exchange(record.placement_cache_entry, nullptr);
+    release_placement_cache_entry(impl, entry);
+}
+
 lv_flex_flow_t to_lvgl_flex_flow(FlexFlow flow)
 {
     switch (flow) {
@@ -489,7 +560,7 @@ void apply_layout(Record &record, const Layout &layout, LayoutApplyMask mask)
 
     const bool requires_full_apply = mask == LayoutApplyMask::All ||
                                      has_mask(mask, LayoutApplyMask::Type) ||
-                                     record.layout.type != layout.type;
+                                     record.layout_type != static_cast<uint8_t>(layout.type);
     if (layout.type == LayoutType::Flex) {
         if (requires_full_apply) {
             lv_obj_set_layout(record.object, LV_LAYOUT_FLEX);
@@ -504,10 +575,16 @@ void apply_layout(Record &record, const Layout &layout, LayoutApplyMask mask)
         lv_obj_set_layout(record.object, 0);
     }
 
-    record.layout = layout;
+    record.layout_type = static_cast<uint8_t>(layout.type);
 }
 
-void apply_placement(BackendImpl &impl, Record &record, const Placement &placement, PlacementApplyMask mask)
+void apply_placement(
+    BackendImpl &impl,
+    Record &record,
+    const Placement &placement,
+    PlacementApplyMask mask,
+    bool refresh_frame
+)
 {
     BROOKESIA_LOG_TRACE_GUARD();
 
@@ -517,25 +594,30 @@ void apply_placement(BackendImpl &impl, Record &record, const Placement &placeme
 
     const bool requires_full_apply = mask == PlacementApplyMask::All ||
                                      has_mask(mask, PlacementApplyMask::Mode) ||
-                                     record.placement.mode != placement.mode;
+                                     get_record_placement(record).mode != placement.mode;
     const auto effective_mask = requires_full_apply ? PlacementApplyMask::All : mask;
-    record.placement = placement;
+
+    auto *stored_entry = replace_record_placement(impl, record, placement);
+    const auto &stored_placement = stored_entry->value;
 
     if (has_mask(effective_mask, PlacementApplyMask::Size)) {
-        apply_placement_size(record, placement);
-        refresh_frame_view(impl, record, record.frame_view_props);
+        apply_placement_size(record, stored_placement);
+        const auto *frame_view = record.get_type_payload<Record::FrameViewPayload>();
+        if (refresh_frame && frame_view != nullptr) {
+            refresh_frame_view(impl, record, frame_view->props);
+        }
     }
     if (has_mask(effective_mask, PlacementApplyMask::Position) ||
             has_mask(effective_mask, PlacementApplyMask::Align) ||
             has_mask(effective_mask, PlacementApplyMask::RelativeTo)) {
-        apply_placement_position(impl, record, placement);
+        apply_placement_position(impl, record, stored_placement);
     }
     if (has_mask(effective_mask, PlacementApplyMask::GridCell) ||
             has_mask(effective_mask, PlacementApplyMask::AlignSelf)) {
-        apply_placement_grid_cell(record, placement);
+        apply_placement_grid_cell(record, stored_placement);
     }
     if (has_mask(effective_mask, PlacementApplyMask::FlexGrow)) {
-        apply_placement_flex_grow(record, placement);
+        apply_placement_flex_grow(record, stored_placement);
     }
     refresh_text_input_inner_layout(record);
 }
@@ -547,7 +629,8 @@ void refresh_relative_placements(BackendImpl &impl)
     bool has_relative_target = false;
     for (const auto &[unused_handle, record] : impl.records) {
         (void)unused_handle;
-        if (record.placement.mode == PlacementMode::Relative && !record.placement.relative_to.empty()) {
+        const auto &placement = get_record_placement(record);
+        if (placement.mode == PlacementMode::Relative && !placement.relative_to.empty()) {
             has_relative_target = true;
             break;
         }

@@ -5,7 +5,11 @@
  */
 #pragma once
 
+#include <array>
+#include <span>
+
 #include "brookesia/lib_utils/describe_helpers.hpp"
+#include "brookesia/service_manager/detail/static_schema.hpp"
 #include "brookesia/service_manager/helper/base.hpp"
 #include "brookesia/service_helper/media/audio.hpp"
 
@@ -187,466 +191,333 @@ public:
         Max,
     };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the function parameter types ////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    enum class FunctionSetAgentInfoParam : uint8_t {
-        Name,
-        Info,
-    };
 
-    enum class FunctionSetChatModeParam : uint8_t {
-        Mode,
-    };
 
-    enum class FunctionSetTargetAgentParam : uint8_t {
-        Name,
-    };
 
-    enum class FunctionGetAgentAttributesParam : uint8_t {
-        Name,
-    };
 
-    enum class FunctionTriggerGeneralActionParam : uint8_t {
-        Action,
-    };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the event parameter types ///////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    enum class EventGeneralActionTriggeredParam : uint8_t {
-        Action,
-    };
 
-    enum class EventGeneralEventHappenedParam : uint8_t {
-        Event,
-        IsUnexpected,
-    };
 
-    enum class EventSuspendStatusChangedParam : uint8_t {
-        IsSuspended,
-    };
 
-    enum class EventAgentSpeakingTextGotParam : uint8_t {
-        Text,
-    };
 
-    enum class EventUserSpeakingTextGotParam : uint8_t {
-        Text,
-    };
 
-    enum class EventEmoteGotParam : uint8_t {
-        Emote,
-    };
 
-    enum class EventSpeakingStatusChangedParam : uint8_t {
-        IsSpeaking,
-    };
 
-    enum class EventListeningStatusChangedParam : uint8_t {
-        IsListening,
-    };
 
 private:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////// The following are the function schemas /////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    static service::FunctionSchema function_schema_set_agent_info()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetAgentInfo),
-            .description = "Set agent info.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionSetAgentInfoParam::Name),
-                    .description = "Agent name.",
-                    .type = service::FunctionValueType::String
+    using DefaultValueKind = service::detail::static_schema::DefaultValueKind;
+    using DefaultValueSpec = service::detail::static_schema::DefaultValueSpec;
+    using FunctionParameterSpec = service::detail::static_schema::FunctionParameterSpec;
+    using FunctionReturnSpec = service::detail::static_schema::FunctionReturnSpec;
+    using FunctionSpec = service::detail::static_schema::FunctionSpec;
+
+    inline static constexpr DefaultValueSpec EMPTY_STRING_DEFAULT = {
+        .kind = DefaultValueKind::String,
+        .string = "",
+    };
+
+    inline static constexpr std::array<FunctionParameterSpec, 2> SET_AGENT_INFO_PARAMETERS = {{
+            {
+                .name = "Name",
+                .description = "Agent name.",
+                .type = service::FunctionValueType::String,
+            },
+            {
+                .name = "Info",
+                .description =
+                R"(Agent info as a JSON object. Example: {"api_key":"api_key_value",)"
+                R"("model":"model_name"})",
+                .type = service::FunctionValueType::Object,
+            },
+        }
+    };
+
+    inline static constexpr std::array<FunctionParameterSpec, 1> SET_CHAT_MODE_PARAMETERS = {{
+            {
+                .name = "Mode",
+                .description = "Chat mode. Allowed values: [Manual, RealTime]",
+                .type = service::FunctionValueType::String,
+            },
+        }
+    };
+
+    inline static constexpr std::array<FunctionParameterSpec, 1> SET_TARGET_AGENT_PARAMETERS = {{
+            {
+                .name = "Name",
+                .description = "Agent name to set as target.",
+                .type = service::FunctionValueType::String,
+            },
+        }
+    };
+
+    inline static constexpr std::array<FunctionParameterSpec, 1> GET_AGENT_ATTRIBUTES_PARAMETERS = {{
+            {
+                .name = "Name",
+                .description = "Agent name (optional). Returns all agents when omitted.",
+                .type = service::FunctionValueType::String,
+                .default_value = EMPTY_STRING_DEFAULT,
+            },
+        }
+    };
+
+    inline static constexpr std::array<FunctionParameterSpec, 1> TRIGGER_GENERAL_ACTION_PARAMETERS = {{
+            {
+                .name = "Action",
+                .description = "General action. Allowed values: [TimeSync, Activate, Start, Stop, Sleep, WakeUp]",
+                .type = service::FunctionValueType::String,
+            },
+        }
+    };
+
+    // Preserve the public schema order, which intentionally differs from FunctionId's numeric order.
+    inline static constexpr std::array<FunctionSpec, static_cast<size_t>(FunctionId::Max)> FUNCTION_SPECS = {{
+            {
+                .name = "SetAgentInfo",
+                .description = "Set agent info.",
+                .parameters = SET_AGENT_INFO_PARAMETERS,
+                .require_scheduler = false,
+            },
+            {
+                .name = "SetChatMode",
+                .description = "Set chat mode.",
+                .parameters = SET_CHAT_MODE_PARAMETERS,
+            },
+            {
+                .name = "SetTargetAgent",
+                .description = "Set target agent. The agent will be activated by triggering `Activate` action.",
+                .parameters = SET_TARGET_AGENT_PARAMETERS,
+            },
+            {
+                .name = "GetTargetAgent",
+                .description = "Get target agent name.",
+                .parameters = std::span<const FunctionParameterSpec>{},
+                .return_value = FunctionReturnSpec{
+                    .type = service::FunctionValueType::String,
+                    .description = "Example: \"Coze\"",
                 },
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionSetAgentInfoParam::Info),
-                    .description = (boost::format("Agent info as a JSON object. Example: %1%")
-                    % BROOKESIA_DESCRIBE_JSON_SERIALIZE((std::map<std::string, std::string>({
-                        {"model", "model_name"},
-                        {"api_key", "api_key_value"}
-                    })))).str(),
-                    .type = service::FunctionValueType::Object
-                }
             },
-            .require_scheduler = false
-        };
-    }
-
-    static service::FunctionSchema function_schema_set_chat_mode()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetChatMode),
-            .description = "Set chat mode.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionSetChatModeParam::Mode),
-                    .description = (boost::format("Chat mode. Allowed values: %1%")
-                    % BROOKESIA_DESCRIBE_TO_STR(std::vector<ChatMode>({
-                        ChatMode::Manual, ChatMode::RealTime
-                    }))).str(),
-                    .type = service::FunctionValueType::String
-                }
+            {
+                .name = "GetAgentNames",
+                .description = "Get agent names.",
+                .parameters = std::span<const FunctionParameterSpec>{},
+                .return_value = FunctionReturnSpec{
+                    .type = service::FunctionValueType::Array,
+                    .description = "Example: [\"Agent1\", \"Agent2\"]",
+                },
             },
-        };
-    }
-
-    static service::FunctionSchema function_schema_set_target_agent()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetTargetAgent),
-            .description = "Set target agent. The agent will be activated by triggering `Activate` action.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionSetTargetAgentParam::Name),
-                    .description = "Agent name to set as target.",
+            {
+                .name = "GetAgentAttributes",
+                .description = "Get agent attributes.",
+                .parameters = GET_AGENT_ATTRIBUTES_PARAMETERS,
+                .require_scheduler = false,
+                .return_value = FunctionReturnSpec{
+                    .type = service::FunctionValueType::Array,
+                    .description =
+                    R"(Example: [{"name":"Agent","operation_timeout":{"activate":1000,"start":1000,"sleep":1000,)"
+                    R"("wake_up":1000,"stop":1000},"support_general_functions":[],"support_general_events":[],)"
+                    R"("require_time_sync":false}])",
+                },
+            },
+            {
+                .name = "GetChatMode",
+                .description = "Get chat mode.",
+                .parameters = std::span<const FunctionParameterSpec>{},
+                .return_value = FunctionReturnSpec{
                     .type = service::FunctionValueType::String,
-                }
-            }
-        };
-    }
-
-    static service::FunctionSchema function_schema_get_target_agent()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetTargetAgent),
-            .description = "Get target agent name.",
-            .return_value = service::FunctionReturnSchema{
-                .type = service::FunctionValueType::String,
-                .description = "Example: \"Coze\"",
+                    .description = "Allowed values: [Manual, RealTime]. Example: \"Manual\"",
+                },
             },
-        };
-    }
-
-    static service::FunctionSchema function_schema_get_agent_names()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetAgentNames),
-            .description = "Get agent names.",
-            .return_value = service::FunctionReturnSchema{
-                .type = service::FunctionValueType::Array,
-                .description = "Example: [\"Agent1\", \"Agent2\"]",
-            },
-        };
-    }
-
-    static service::FunctionSchema function_schema_get_agent_attributes()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetAgentAttributes),
-            .description = "Get agent attributes.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionGetAgentAttributesParam::Name),
-                    .description = "Agent name (optional). Returns all agents when omitted.",
+            {
+                .name = "GetActiveAgent",
+                .description = "Get active agent name.",
+                .parameters = std::span<const FunctionParameterSpec>{},
+                .return_value = FunctionReturnSpec{
                     .type = service::FunctionValueType::String,
-                    .default_value = std::optional<service::FunctionValue>(std::string(""))
-                }
+                    .description = "Example: \"Coze\"",
+                },
             },
-            .require_scheduler = false,
-            .return_value = service::FunctionReturnSchema{
-                .type = service::FunctionValueType::Array,
-                .description = (boost::format("Example: %1%")
-                % BROOKESIA_DESCRIBE_JSON_SERIALIZE(std::vector<AgentAttributes>({
-                    AgentAttributes{"Agent", {}},
-                }))).str(),
+            {
+                .name = "TriggerGeneralAction",
+                .description = "Trigger a general action.",
+                .parameters = TRIGGER_GENERAL_ACTION_PARAMETERS,
             },
-        };
-    }
-
-    static service::FunctionSchema function_schema_get_chat_mode()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetChatMode),
-            .description = "Get chat mode.",
-            .return_value = service::FunctionReturnSchema{
-                .type = service::FunctionValueType::String,
-                .description = (boost::format("Allowed values: %1%. Example: \"Manual\"")
-                % BROOKESIA_DESCRIBE_TO_STR(std::vector<ChatMode>({
-                    ChatMode::Manual, ChatMode::RealTime
-                }))).str(),
+            {
+                .name = "Suspend",
+                .description = "Suspend the agent.",
+                .parameters = std::span<const FunctionParameterSpec>{},
             },
-        };
-    }
-
-    static service::FunctionSchema function_schema_get_active_agent()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetActiveAgent),
-            .description = "Get active agent name.",
-            .return_value = service::FunctionReturnSchema{
-                .type = service::FunctionValueType::String,
-                .description = "Example: \"Coze\"",
+            {
+                .name = "Resume",
+                .description = "Resume the agent.",
+                .parameters = std::span<const FunctionParameterSpec>{},
             },
-        };
-    }
-
-    static service::FunctionSchema function_schema_trigger_general_action()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::TriggerGeneralAction),
-            .description = "Trigger a general action.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionTriggerGeneralActionParam::Action),
-                    .description = (boost::format("General action. Allowed values: %1%")
-                    % BROOKESIA_DESCRIBE_TO_STR(std::vector<GeneralAction>({
-                        GeneralAction::TimeSync, GeneralAction::Activate, GeneralAction::Start, GeneralAction::Stop,
-                        GeneralAction::Sleep, GeneralAction::WakeUp
-                    }))).str(),
-                    .type = service::FunctionValueType::String
-                }
-            }
-        };
-    }
-
-    static service::FunctionSchema function_schema_suspend()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::Suspend),
-            .description = "Suspend the agent.",
-        };
-    }
-
-    static service::FunctionSchema function_schema_resume()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::Resume),
-            .description = "Resume the agent.",
-        };
-    }
-
-    static service::FunctionSchema function_schema_trigger_interrupt_speaking()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::InterruptSpeaking),
-            .description = "Interrupt speaking; the agent stops and keeps listening.",
-        };
-    }
-
-    static service::FunctionSchema function_schema_manual_start_listening()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::ManualStartListening),
-            .description = "Manually start listening. Only in `Manual` mode.",
-        };
-    }
-
-    static service::FunctionSchema function_schema_manual_stop_listening()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::ManualStopListening),
-            .description = "Manually stop listening. Only in `Manual` mode.",
-        };
-    }
-
-    static service::FunctionSchema function_schema_get_general_state()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetGeneralState),
-            .description = "Get general state.",
-            .return_value = service::FunctionReturnSchema{
-                .type = service::FunctionValueType::String,
-                .description = (boost::format("Allowed values: %1%. Example: \"Started\"")
-                % BROOKESIA_DESCRIBE_TO_STR(std::vector<GeneralState>({
-                    GeneralState::TimeSyncing, GeneralState::Ready, GeneralState::Activating, GeneralState::Activated,
-                    GeneralState::Starting, GeneralState::Stopping, GeneralState::Started, GeneralState::Sleeping,
-                    GeneralState::WakingUp, GeneralState::Slept
-                }))).str(),
+            {
+                .name = "InterruptSpeaking",
+                .description = "Interrupt speaking; the agent stops and keeps listening.",
+                .parameters = std::span<const FunctionParameterSpec>{},
             },
-        };
-    }
-
-    static service::FunctionSchema function_schema_get_suspend_status()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetSuspendStatus),
-            .description = "Get suspend status.",
-            .return_value = service::FunctionReturnSchema{
-                .type = service::FunctionValueType::Boolean,
-                .description = "Example: false",
+            {
+                .name = "ManualStartListening",
+                .description = "Manually start listening. Only in `Manual` mode.",
+                .parameters = std::span<const FunctionParameterSpec>{},
             },
-        };
-    }
-
-    static service::FunctionSchema function_schema_reset_data()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::ResetData),
-            .description = "Reset manager and agent data.",
-        };
-    }
-
-    static service::FunctionSchema function_schema_load_data()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::LoadData),
-            .description = "Load persisted manager data.",
-        };
-    }
-
-    static service::FunctionSchema function_schema_get_speaking_status()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetSpeakingStatus),
-            .description = "Get speaking status.",
-            .return_value = service::FunctionReturnSchema{
-                .type = service::FunctionValueType::Boolean,
-                .description = "Example: true",
+            {
+                .name = "ManualStopListening",
+                .description = "Manually stop listening. Only in `Manual` mode.",
+                .parameters = std::span<const FunctionParameterSpec>{},
             },
-        };
-    }
-
-    static service::FunctionSchema function_schema_get_listening_status()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetListeningStatus),
-            .description = "Get listening status.",
-            .return_value = service::FunctionReturnSchema{
-                .type = service::FunctionValueType::Boolean,
-                .description = "Example: true",
+            {
+                .name = "GetGeneralState",
+                .description = "Get general state.",
+                .parameters = std::span<const FunctionParameterSpec>{},
+                .return_value = FunctionReturnSpec{
+                    .type = service::FunctionValueType::String,
+                    .description =
+                    "Allowed values: [TimeSyncing, Ready, Activating, Activated, Starting, Stopping, Started, "
+                    "Sleeping, WakingUp, Slept]. Example: \"Started\"",
+                },
             },
-        };
-    }
+            {
+                .name = "GetSuspendStatus",
+                .description = "Get suspend status.",
+                .parameters = std::span<const FunctionParameterSpec>{},
+                .return_value = FunctionReturnSpec{
+                    .type = service::FunctionValueType::Boolean,
+                    .description = "Example: false",
+                },
+            },
+            {
+                .name = "GetSpeakingStatus",
+                .description = "Get speaking status.",
+                .parameters = std::span<const FunctionParameterSpec>{},
+                .return_value = FunctionReturnSpec{
+                    .type = service::FunctionValueType::Boolean,
+                    .description = "Example: true",
+                },
+            },
+            {
+                .name = "GetListeningStatus",
+                .description = "Get listening status.",
+                .parameters = std::span<const FunctionParameterSpec>{},
+                .return_value = FunctionReturnSpec{
+                    .type = service::FunctionValueType::Boolean,
+                    .description = "Example: true",
+                },
+            },
+            {
+                .name = "LoadData",
+                .description = "Load persisted manager data.",
+                .parameters = std::span<const FunctionParameterSpec>{},
+            },
+            {
+                .name = "ResetData",
+                .description = "Reset manager and agent data.",
+                .parameters = std::span<const FunctionParameterSpec>{},
+            },
+        }
+    };
+    static_assert(FUNCTION_SPECS.size() == static_cast<size_t>(FunctionId::Max));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////// The following are the event schemas /////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    static service::EventSchema event_schema_general_action_triggered()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EventId::GeneralActionTriggered),
-            .description = "Emitted when a general action is triggered.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventGeneralActionTriggeredParam::Action),
-                    .description = (boost::format("General action. Allowed values: %1%")
-                    % BROOKESIA_DESCRIBE_TO_STR(std::vector<GeneralAction>({
-                        GeneralAction::TimeSync, GeneralAction::Activate, GeneralAction::Start, GeneralAction::Stop,
-                        GeneralAction::Sleep, GeneralAction::WakeUp
-                    }))).str(),
-                    .type = service::EventItemType::String
-                }
-            }
-        };
-    }
+    using EventItemSpec = service::detail::static_schema::EventItemSpec;
+    using EventSpec = service::detail::static_schema::EventSpec;
 
-    static service::EventSchema event_schema_general_event_happened()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EventId::GeneralEventHappened),
-            .description = "Emitted when a general event occurs.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventGeneralEventHappenedParam::Event),
-                    .description = (boost::format("General event. Allowed values: %1%")
-                    % BROOKESIA_DESCRIBE_TO_STR(std::vector<GeneralEvent>({
-                        GeneralEvent::TimeSynced, GeneralEvent::Activated, GeneralEvent::Started, GeneralEvent::Stopped,
-                        GeneralEvent::Slept, GeneralEvent::Awake
-                    }))).str(),
-                    .type = service::EventItemType::String
-                },
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventGeneralEventHappenedParam::IsUnexpected),
-                    .description = "Whether the event was unexpected.",
-                    .type = service::EventItemType::Boolean
-                }
-            }
-        };
-    }
+    inline static constexpr std::array<EventItemSpec, 1> GENERAL_ACTION_TRIGGERED_ITEMS = {{
+            {
+                "Action", "General action. Allowed values: [TimeSync, Activate, Start, Stop, Sleep, WakeUp]",
+                service::EventItemType::String
+            },
+        }
+    };
 
-    static service::EventSchema event_schema_suspend_status_changed()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EventId::SuspendStatusChanged),
-            .description = "Emitted when suspend status changes.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventSuspendStatusChangedParam::IsSuspended),
-                    .description = "Whether the agent is suspended.",
-                    .type = service::EventItemType::Boolean
-                }
-            }
-        };
-    }
+    inline static constexpr std::array<EventItemSpec, 2> GENERAL_EVENT_HAPPENED_ITEMS = {{
+            {
+                "Event", "General event. Allowed values: [TimeSynced, Activated, Started, Stopped, Slept, Awake]",
+                service::EventItemType::String
+            },
+            {"IsUnexpected", "Whether the event was unexpected.", service::EventItemType::Boolean},
+        }
+    };
 
-    static service::EventSchema event_schema_speaking_status_changed()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EventId::SpeakingStatusChanged),
-            .description = "Emitted when speaking status changes.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventSpeakingStatusChangedParam::IsSpeaking),
-                    .description = "Whether the agent is speaking.",
-                    .type = service::EventItemType::Boolean
-                }
-            }
-        };
-    }
+    inline static constexpr std::array<EventItemSpec, 1> SUSPEND_STATUS_CHANGED_ITEMS = {{
+            {"IsSuspended", "Whether the agent is suspended.", service::EventItemType::Boolean},
+        }
+    };
 
-    static service::EventSchema event_schema_listening_status_changed()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EventId::ListeningStatusChanged),
-            .description = "Emitted when listening status changes.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventListeningStatusChangedParam::IsListening),
-                    .description = "Whether the agent is listening.",
-                    .type = service::EventItemType::Boolean
-                }
-            }
-        };
-    }
+    inline static constexpr std::array<EventItemSpec, 1> SPEAKING_STATUS_CHANGED_ITEMS = {{
+            {"IsSpeaking", "Whether the agent is speaking.", service::EventItemType::Boolean},
+        }
+    };
 
-    static service::EventSchema event_schema_agent_speaking_text_got()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EventId::AgentSpeakingTextGot),
-            .description = "Emitted when the agent speaks text.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventAgentSpeakingTextGotParam::Text),
-                    .description = "Spoken text.",
-                    .type = service::EventItemType::String
-                }
-            }
-        };
-    }
+    inline static constexpr std::array<EventItemSpec, 1> LISTENING_STATUS_CHANGED_ITEMS = {{
+            {"IsListening", "Whether the agent is listening.", service::EventItemType::Boolean},
+        }
+    };
 
-    static service::EventSchema event_schema_user_speaking_text_got()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EventId::UserSpeakingTextGot),
-            .description = "Emitted when the user speaks text.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventUserSpeakingTextGotParam::Text),
-                    .description = "User text.",
-                    .type = service::EventItemType::String
-                }
-            }
-        };
-    }
+    inline static constexpr std::array<EventItemSpec, 1> AGENT_SPEAKING_TEXT_GOT_ITEMS = {{
+            {"Text", "Spoken text.", service::EventItemType::String},
+        }
+    };
 
-    static service::EventSchema event_schema_emote_got()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EventId::EmoteGot),
-            .description = "Emitted when the agent shows an emote.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventEmoteGotParam::Emote),
-                    .description = "Emote name.",
-                    .type = service::EventItemType::String
-                }
-            }
-        };
-    }
+    inline static constexpr std::array<EventItemSpec, 1> USER_SPEAKING_TEXT_GOT_ITEMS = {{
+            {"Text", "User text.", service::EventItemType::String},
+        }
+    };
+
+    inline static constexpr std::array<EventItemSpec, 1> EMOTE_GOT_ITEMS = {{
+            {"Emote", "Emote name.", service::EventItemType::String},
+        }
+    };
+
+    inline static constexpr std::array<EventSpec, static_cast<size_t>(EventId::Max)> EVENT_SPECS = {{
+            {
+                .name = "GeneralActionTriggered",
+                .description = "Emitted when a general action is triggered.",
+                .items = GENERAL_ACTION_TRIGGERED_ITEMS,
+            },
+            {
+                .name = "GeneralEventHappened",
+                .description = "Emitted when a general event occurs.",
+                .items = GENERAL_EVENT_HAPPENED_ITEMS,
+            },
+            {
+                .name = "SuspendStatusChanged",
+                .description = "Emitted when suspend status changes.",
+                .items = SUSPEND_STATUS_CHANGED_ITEMS,
+            },
+            {
+                .name = "SpeakingStatusChanged",
+                .description = "Emitted when speaking status changes.",
+                .items = SPEAKING_STATUS_CHANGED_ITEMS,
+            },
+            {
+                .name = "ListeningStatusChanged",
+                .description = "Emitted when listening status changes.",
+                .items = LISTENING_STATUS_CHANGED_ITEMS,
+            },
+            {
+                .name = "AgentSpeakingTextGot",
+                .description = "Emitted when the agent speaks text.",
+                .items = AGENT_SPEAKING_TEXT_GOT_ITEMS,
+            },
+            {
+                .name = "UserSpeakingTextGot",
+                .description = "Emitted when the user speaks text.",
+                .items = USER_SPEAKING_TEXT_GOT_ITEMS,
+            },
+            {
+                .name = "EmoteGot",
+                .description = "Emitted when the agent shows an emote.",
+                .items = EMOTE_GOT_ITEMS,
+            },
+        }
+    };
+    static_assert(EVENT_SPECS.size() == static_cast<size_t>(EventId::Max));
 
 public:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -664,47 +535,24 @@ public:
 
     static std::span<const service::FunctionSchema> get_function_schemas()
     {
-        static const std::array<service::FunctionSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(FunctionId::Max)>
-        FUNCTION_SCHEMAS = {{
-                function_schema_set_agent_info(),
-                function_schema_set_chat_mode(),
-                function_schema_set_target_agent(),
-                function_schema_get_target_agent(),
-                function_schema_get_agent_names(),
-                function_schema_get_agent_attributes(),
-                function_schema_get_chat_mode(),
-                function_schema_get_active_agent(),
-                function_schema_trigger_general_action(),
-                function_schema_suspend(),
-                function_schema_resume(),
-                function_schema_trigger_interrupt_speaking(),
-                function_schema_manual_start_listening(),
-                function_schema_manual_stop_listening(),
-                function_schema_get_general_state(),
-                function_schema_get_suspend_status(),
-                function_schema_get_speaking_status(),
-                function_schema_get_listening_status(),
-                function_schema_load_data(),
-                function_schema_reset_data(),
-            }
-        };
-        return std::span<const service::FunctionSchema>(FUNCTION_SCHEMAS);
+        static std::array<service::FunctionSchema, FUNCTION_SPECS.size()> schemas;
+        static const bool initialized = [] {
+            service::detail::static_schema::materialize_function_schemas(FUNCTION_SPECS, schemas);
+            return true;
+        }();
+        static_cast<void>(initialized);
+        return schemas;
     }
 
     static std::span<const service::EventSchema> get_event_schemas()
     {
-        static const std::array<service::EventSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(EventId::Max)> EVENT_SCHEMAS = {{
-                event_schema_general_action_triggered(),
-                event_schema_general_event_happened(),
-                event_schema_suspend_status_changed(),
-                event_schema_speaking_status_changed(),
-                event_schema_listening_status_changed(),
-                event_schema_agent_speaking_text_got(),
-                event_schema_user_speaking_text_got(),
-                event_schema_emote_got(),
-            }
-        };
-        return std::span<const service::EventSchema>(EVENT_SCHEMAS);
+        static std::array<service::EventSchema, EVENT_SPECS.size()> schemas;
+        static const bool initialized = [] {
+            service::detail::static_schema::materialize_event_schemas(EVENT_SPECS, schemas);
+            return true;
+        }();
+        static_cast<void>(initialized);
+        return schemas;
     }
 };
 
@@ -744,11 +592,6 @@ BROOKESIA_DESCRIBE_ENUM(
     LoadData, ResetData,
     Max
 );
-BROOKESIA_DESCRIBE_ENUM(AgentManager::FunctionSetAgentInfoParam, Name, Info);
-BROOKESIA_DESCRIBE_ENUM(AgentManager::FunctionSetChatModeParam, Mode);
-BROOKESIA_DESCRIBE_ENUM(AgentManager::FunctionSetTargetAgentParam, Name);
-BROOKESIA_DESCRIBE_ENUM(AgentManager::FunctionGetAgentAttributesParam, Name);
-BROOKESIA_DESCRIBE_ENUM(AgentManager::FunctionTriggerGeneralActionParam, Action);
 
 /**
  * @brief  Event related
@@ -757,13 +600,5 @@ BROOKESIA_DESCRIBE_ENUM(
     AgentManager::EventId, GeneralActionTriggered, GeneralEventHappened, SuspendStatusChanged,
     SpeakingStatusChanged, ListeningStatusChanged, AgentSpeakingTextGot, UserSpeakingTextGot, EmoteGot, Max
 );
-BROOKESIA_DESCRIBE_ENUM(AgentManager::EventGeneralActionTriggeredParam, Action);
-BROOKESIA_DESCRIBE_ENUM(AgentManager::EventGeneralEventHappenedParam, Event, IsUnexpected);
-BROOKESIA_DESCRIBE_ENUM(AgentManager::EventSuspendStatusChangedParam, IsSuspended);
-BROOKESIA_DESCRIBE_ENUM(AgentManager::EventAgentSpeakingTextGotParam, Text);
-BROOKESIA_DESCRIBE_ENUM(AgentManager::EventUserSpeakingTextGotParam, Text);
-BROOKESIA_DESCRIBE_ENUM(AgentManager::EventEmoteGotParam, Emote);
-BROOKESIA_DESCRIBE_ENUM(AgentManager::EventSpeakingStatusChangedParam, IsSpeaking);
-BROOKESIA_DESCRIBE_ENUM(AgentManager::EventListeningStatusChangedParam, IsListening);
 
 } // namespace esp_brookesia::service::helper

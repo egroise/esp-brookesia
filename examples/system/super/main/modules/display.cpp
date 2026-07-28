@@ -13,8 +13,10 @@
 
 #include "private/utils.hpp"
 #include "brookesia/gui_lvgl.hpp"
-#include "brookesia/lib_utils.hpp"
-#include "brookesia/service_helper.hpp"
+#include "brookesia/lib_utils/describe_helpers.hpp"
+#include "brookesia/service_helper/media/display.hpp"
+#include "brookesia/service_manager/helper/base.hpp"
+#include "brookesia/service_manager/service/manager.hpp"
 #include "display.hpp"
 
 using namespace esp_brookesia;

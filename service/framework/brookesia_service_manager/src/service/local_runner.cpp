@@ -1,11 +1,14 @@
 /*
- * SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2025-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 #include "boost/chrono.hpp"
 #include "boost/thread/thread.hpp"
-#include "brookesia/lib_utils.hpp"
+#include "brookesia/lib_utils/check.hpp"
+#include "brookesia/lib_utils/describe_helpers.hpp"
+#include "brookesia/lib_utils/log.hpp"
+#include "brookesia/lib_utils/time_profiler.hpp"
 #include "brookesia/service_manager/service/manager.hpp"
 #include "brookesia/service_manager/service/local_runner.hpp"
 

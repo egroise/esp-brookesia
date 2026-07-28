@@ -168,7 +168,7 @@ private:
     std::vector<std::shared_ptr<GeneralStateClass>> state_classes_;
 
     std::queue<GeneralAction> general_action_queue_;
-    lib_utils::TaskScheduler::TaskId  general_action_queue_task_ = 0;
+    lib_utils::TaskSchedulerTaskId  general_action_queue_task_ = 0;
 };
 
 } // namespace esp_brookesia::agent

@@ -26,6 +26,7 @@
 #include "boost/json.hpp"
 
 #include "brookesia/hal_interface.hpp"
+#include "brookesia/hal_interface/interfaces/system/general.hpp"
 #include "brookesia/lib_utils/function_guard.hpp"
 #include "brookesia/lib_utils/memory_profiler.hpp"
 #include "brookesia/service_helper/media/audio.hpp"
@@ -45,7 +46,7 @@
 #endif
 
 namespace esp_brookesia::app::settings {
-namespace {
+namespace detail {
 
 using AudioPlaybackHelper = service::helper::AudioPlayback;
 using DeviceHelper = service::helper::Device;
@@ -183,8 +184,6 @@ static constexpr const char *ACTION_DEBUG_THREAD_IDLE_CPU =
     "settings.debug.thread.idle_cpu";
 static constexpr const char *ACTION_DEBUG_THREAD_STACK_HWM =
     "settings.debug.thread.stack_hwm";
-static constexpr const char *LANGUAGE_SWITCH_TIMER_NAME = "settings.language.switch";
-static constexpr const char *THEME_SWITCH_TIMER_NAME = "settings.theme.switch";
 static constexpr const char *WIFI_SCAN_RETRY_TIMER_NAME = "settings.wifi.scan.retry";
 static constexpr const char *WIFI_CONNECTED_HIDE_TIMER_NAME = "settings.wifi.connected.hide";
 static constexpr const char *WIFI_CONNECTED_SCROLL_TIMER_NAME = "settings.wifi.connected.scroll";
@@ -260,7 +259,6 @@ static constexpr const char *DEBUG_THREAD_STACK_ROW_PATH =
     "/debug/page/thread_card/thread_stack";
 static constexpr const char *DEBUG_THREAD_STACK_SLIDER_PATH =
     "/debug/page/thread_card/thread_stack/slider";
-static constexpr int SETTINGS_SWITCH_DEFER_MS = 32;
 static constexpr int WIFI_CONNECTED_SCROLL_DELAY_MS = 50;
 static constexpr int DEBUG_ENTRY_CLICK_TIMEOUT_MS = 1500;
 static constexpr size_t DEBUG_ENTRY_CLICK_COUNT = 3;
@@ -1085,7 +1083,8 @@ void add_theme_mode_updates(
     std::string_view path,
     bool selected,
     const SelectableThemeTokens &tokens,
-    std::string_view preview_bg_color
+    std::string_view preview_bg_color,
+    std::string label
 )
 {
     const std::string path_string(path);
@@ -1118,6 +1117,12 @@ void add_theme_mode_updates(
         path_string + "/label",
         "textColor",
         selected ? tokens.selected_label_color : tokens.label_color
+    );
+    add_binding_update(
+        updates,
+        path_string + "/label",
+        "labelProps.text",
+        std::move(label)
     );
 }
 
@@ -1177,216 +1182,20 @@ std::string localized_text_or(std::string_view locale, std::string_view key, std
     return std::string(fallback);
 }
 
-} // namespace
-
-struct SettingsApp::Impl {
-    system::core::AppContext *context = nullptr;
-    std::vector<std::string> dynamic_wifi_paths;
-    std::vector<std::string> dynamic_hardware_group_paths;
-    size_t saved_wifi_slot_count = 0;
-    size_t available_wifi_slot_count = 0;
-    size_t saved_wifi_page = 0;
-    size_t available_wifi_page = 0;
-    std::vector<std::string> dynamic_language_paths;
-    std::unordered_map<std::string, WifiNetworkState> wifi_instance_to_network;
-    std::unordered_map<std::string, std::string> language_instance_to_locale;
-    std::optional<WifiNetworkState> selected_wifi_network;
-    std::string wifi_forget_click_suppression_id;
-    std::string wifi_forget_click_suppression_ssid;
-    std::string wifi_connect_password;
-    std::string connected_wifi_ssid;
-    std::vector<gui::ScopedConnection> action_handler_connections;
-    service::ServiceBinding storage_service_binding;
-    service::ServiceBinding device_service_binding;
-    service::ServiceBinding display_service_binding;
-    service::ServiceBinding audio_playback_service_binding;
-    service::ServiceBinding wifi_service_binding;
-    service::ServiceBinding sntp_service_binding;
-    service::ServiceBinding utils_debug_service_binding;
-    std::vector<esp_brookesia::lib_utils::scoped_connection> device_event_connections;
-    std::vector<esp_brookesia::lib_utils::scoped_connection> wifi_event_connections;
-    std::vector<esp_brookesia::lib_utils::scoped_connection> sntp_event_connections;
-    uint64_t wifi_operation_generation = 0;
-    DeviceUiState device_ui_state;
-    WifiUiState wifi_ui_state;
-    TimeZoneUiState time_zone_ui_state;
-    DebugUiState debug_ui_state;
-    UtilsHelper::DebugCapabilities utils_debug_capabilities;
-    std::vector<WifiNetworkState> saved_wifi_networks;
-    std::vector<WifiNetworkState> available_wifi_networks;
-    std::vector<WifiHelper::ScanApInfo> last_wifi_scan_ap_infos;
-    bool saved_wifi_networks_loaded = false;
-    bool saved_wifi_networks_refreshing = false;
-    bool available_wifi_rows_hidden_for_scan = false;
-    bool available_wifi_scan_results_ready = false;
-    bool wifi_scan_stop_after_first_result = false;
-    size_t wifi_scan_retry_remaining = 0;
-    std::string pending_language_locale;
-    std::string pending_theme_id;
-    system::core::TimerId pending_language_timer_id = system::core::INVALID_TIMER_ID;
-    system::core::TimerId pending_theme_timer_id = system::core::INVALID_TIMER_ID;
-    system::core::TimerId pending_wifi_scan_retry_timer_id = system::core::INVALID_TIMER_ID;
-    uint64_t pending_wifi_scan_retry_generation = 0;
-    system::core::TimerId pending_wifi_connected_hide_timer_id = system::core::INVALID_TIMER_ID;
-    system::core::TimerId pending_wifi_connected_scroll_timer_id = system::core::INVALID_TIMER_ID;
-    system::core::MessageDialogRequestId message_dialog_request_id =
-        system::core::INVALID_MESSAGE_DIALOG_REQUEST_ID;
-    system::core::KeyboardRequestId wifi_keyboard_request_id =
-        system::core::INVALID_KEYBOARD_REQUEST_ID;
-    gui::SubscriptionId wifi_refresh_animation_id = 0;
-    std::string current_page;
-    std::string current_locale;
-    std::string current_theme_id;
-    size_t debug_entry_click_count = 0;
-    SteadyTimePoint debug_entry_last_click_at{};
-    bool language_switch_in_progress = false;
-    bool theme_switch_in_progress = false;
-    bool language_loading_visible = false;
-    bool theme_loading_visible = false;
-    bool utils_debug_unavailable_logged = false;
-};
-
-SettingsApp::SettingsApp()
-    : impl_(std::make_unique<Impl>())
+const service::EventItem *find_event_item(
+    const service::EventItemMap &items, std::string_view name
+)
 {
+    // Raw event slots validate their fixed fields with this shared lookup so
+    // Settings does not instantiate a typed adapter for every subscription.
+    for (const auto &[item_name, item] : items) {
+        if (item_name == name) {
+            return &item;
+        }
+    }
+    return nullptr;
 }
 
-SettingsApp::~SettingsApp() = default;
-
-#define context_ impl_->context
-#define dynamic_wifi_paths_ impl_->dynamic_wifi_paths
-#define dynamic_hardware_group_paths_ impl_->dynamic_hardware_group_paths
-#define saved_wifi_slot_count_ impl_->saved_wifi_slot_count
-#define available_wifi_slot_count_ impl_->available_wifi_slot_count
-#define saved_wifi_page_ impl_->saved_wifi_page
-#define available_wifi_page_ impl_->available_wifi_page
-#define dynamic_language_paths_ impl_->dynamic_language_paths
-#define wifi_instance_to_network_ impl_->wifi_instance_to_network
-#define language_instance_to_locale_ impl_->language_instance_to_locale
-#define selected_wifi_network_ impl_->selected_wifi_network
-#define wifi_forget_click_suppression_id_ impl_->wifi_forget_click_suppression_id
-#define wifi_forget_click_suppression_ssid_ impl_->wifi_forget_click_suppression_ssid
-#define wifi_connect_password_ impl_->wifi_connect_password
-#define connected_wifi_ssid_ impl_->connected_wifi_ssid
-#define action_handler_connections_ impl_->action_handler_connections
-#define storage_service_binding_ impl_->storage_service_binding
-#define device_service_binding_ impl_->device_service_binding
-#define display_service_binding_ impl_->display_service_binding
-#define audio_playback_service_binding_ impl_->audio_playback_service_binding
-#define wifi_service_binding_ impl_->wifi_service_binding
-#define sntp_service_binding_ impl_->sntp_service_binding
-#define utils_debug_service_binding_ impl_->utils_debug_service_binding
-#define device_event_connections_ impl_->device_event_connections
-#define wifi_event_connections_ impl_->wifi_event_connections
-#define sntp_event_connections_ impl_->sntp_event_connections
-#define wifi_operation_generation_ impl_->wifi_operation_generation
-#define device_ui_state_ impl_->device_ui_state
-#define wifi_ui_state_ impl_->wifi_ui_state
-#define time_zone_ui_state_ impl_->time_zone_ui_state
-#define debug_ui_state_ impl_->debug_ui_state
-#define utils_debug_capabilities_ impl_->utils_debug_capabilities
-#define saved_wifi_networks_ impl_->saved_wifi_networks
-#define available_wifi_networks_ impl_->available_wifi_networks
-#define last_wifi_scan_ap_infos_ impl_->last_wifi_scan_ap_infos
-#define saved_wifi_networks_loaded_ impl_->saved_wifi_networks_loaded
-#define saved_wifi_networks_refreshing_ impl_->saved_wifi_networks_refreshing
-#define available_wifi_rows_hidden_for_scan_ impl_->available_wifi_rows_hidden_for_scan
-#define available_wifi_scan_results_ready_ impl_->available_wifi_scan_results_ready
-#define wifi_scan_stop_after_first_result_ impl_->wifi_scan_stop_after_first_result
-#define wifi_scan_retry_remaining_ impl_->wifi_scan_retry_remaining
-#define pending_language_locale_ impl_->pending_language_locale
-#define pending_theme_id_ impl_->pending_theme_id
-#define pending_language_timer_id_ impl_->pending_language_timer_id
-#define pending_theme_timer_id_ impl_->pending_theme_timer_id
-#define pending_wifi_scan_retry_timer_id_ impl_->pending_wifi_scan_retry_timer_id
-#define pending_wifi_scan_retry_generation_ impl_->pending_wifi_scan_retry_generation
-#define pending_wifi_connected_hide_timer_id_ impl_->pending_wifi_connected_hide_timer_id
-#define pending_wifi_connected_scroll_timer_id_ impl_->pending_wifi_connected_scroll_timer_id
-#define message_dialog_request_id_ impl_->message_dialog_request_id
-#define wifi_keyboard_request_id_ impl_->wifi_keyboard_request_id
-#define wifi_refresh_animation_id_ impl_->wifi_refresh_animation_id
-#define current_page_ impl_->current_page
-#define current_locale_ impl_->current_locale
-#define current_theme_id_ impl_->current_theme_id
-#define debug_entry_click_count_ impl_->debug_entry_click_count
-#define debug_entry_last_click_at_ impl_->debug_entry_last_click_at
-#define language_switch_in_progress_ impl_->language_switch_in_progress
-#define theme_switch_in_progress_ impl_->theme_switch_in_progress
-#define language_loading_visible_ impl_->language_loading_visible
-#define theme_loading_visible_ impl_->theme_loading_visible
-#define utils_debug_unavailable_logged_ impl_->utils_debug_unavailable_logged
-
-#include "app/lifecycle.ipp"
-#include "i18n/locale.ipp"
-#include "screen/common.ipp"
-#include "screen/debug.ipp"
-#include "service/device.ipp"
-#include "service/services.ipp"
-#include "i18n/language_theme.ipp"
-#include "dialog/message.ipp"
-#include "service/wifi.ipp"
-
-#undef context_
-#undef dynamic_wifi_paths_
-#undef dynamic_hardware_group_paths_
-#undef saved_wifi_slot_count_
-#undef available_wifi_slot_count_
-#undef saved_wifi_page_
-#undef available_wifi_page_
-#undef dynamic_language_paths_
-#undef wifi_instance_to_network_
-#undef language_instance_to_locale_
-#undef selected_wifi_network_
-#undef wifi_forget_click_suppression_id_
-#undef wifi_forget_click_suppression_ssid_
-#undef wifi_connect_password_
-#undef connected_wifi_ssid_
-#undef action_handler_connections_
-#undef storage_service_binding_
-#undef device_service_binding_
-#undef display_service_binding_
-#undef audio_playback_service_binding_
-#undef wifi_service_binding_
-#undef sntp_service_binding_
-#undef utils_debug_service_binding_
-#undef device_event_connections_
-#undef wifi_event_connections_
-#undef sntp_event_connections_
-#undef wifi_operation_generation_
-#undef device_ui_state_
-#undef wifi_ui_state_
-#undef time_zone_ui_state_
-#undef debug_ui_state_
-#undef utils_debug_capabilities_
-#undef saved_wifi_networks_
-#undef available_wifi_networks_
-#undef last_wifi_scan_ap_infos_
-#undef saved_wifi_networks_loaded_
-#undef saved_wifi_networks_refreshing_
-#undef available_wifi_rows_hidden_for_scan_
-#undef available_wifi_scan_results_ready_
-#undef wifi_scan_stop_after_first_result_
-#undef wifi_scan_retry_remaining_
-#undef pending_language_locale_
-#undef pending_theme_id_
-#undef pending_language_timer_id_
-#undef pending_theme_timer_id_
-#undef pending_wifi_scan_retry_timer_id_
-#undef pending_wifi_scan_retry_generation_
-#undef pending_wifi_connected_hide_timer_id_
-#undef pending_wifi_connected_scroll_timer_id_
-#undef message_dialog_request_id_
-#undef wifi_keyboard_request_id_
-#undef wifi_refresh_animation_id_
-#undef current_page_
-#undef current_locale_
-#undef current_theme_id_
-#undef debug_entry_click_count_
-#undef debug_entry_last_click_at_
-#undef language_switch_in_progress_
-#undef theme_switch_in_progress_
-#undef language_loading_visible_
-#undef theme_loading_visible_
-#undef utils_debug_unavailable_logged_
+} // namespace detail
 
 } // namespace esp_brookesia::app::settings

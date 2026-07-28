@@ -89,7 +89,20 @@ std::expected<void, std::string> SettingsApp::sync_wifi_network_section(
         slot_id += std::to_string(i);
         auto created = context.gui().create_view(WIFI_TEMPLATE_ID, parent, slot_id);
         if (!created) {
-            return std::unexpected(created.error());
+            const auto instance_path = join_path(parent, slot_id);
+            if (!created.error().starts_with("View already exists:")) {
+                return std::unexpected(created.error());
+            }
+            // The page may have been reconstructed before an asynchronous Wi-Fi
+            // update arrived. Remove the stale row that is no longer tracked,
+            // then recreate it so slot_count remains consistent with the GUI.
+            if (!context.gui().destroy_view(instance_path)) {
+                return std::unexpected(created.error());
+            }
+            created = context.gui().create_view(WIFI_TEMPLATE_ID, parent, slot_id);
+            if (!created) {
+                return std::unexpected(created.error());
+            }
         }
 
         dynamic_wifi_paths_.push_back(join_path(parent, slot_id));
@@ -453,7 +466,7 @@ std::expected<void, std::string> SettingsApp::start_wifi_scan(
         return refresh_result;
     }
 
-    auto scan_start_handler = [this, generation](service::FunctionResult && result) {
+    service::ServiceBase::FunctionResultHandler scan_start_handler = [this, generation](service::FunctionResult && result) {
         if (context_ == nullptr || generation != wifi_operation_generation_ || !wifi_ui_state_.enabled) {
             return;
         }
@@ -472,7 +485,9 @@ std::expected<void, std::string> SettingsApp::start_wifi_scan(
             BROOKESIA_LOGW("Failed to refresh Wi-Fi lists after scan start failure: %1%", list_result.error());
         }
     };
-    auto set_params_handler = [this, scan_start_handler, generation](service::FunctionResult && result) {
+    service::ServiceBase::FunctionResultHandler set_params_handler = [this, scan_start_handler, generation](
+        service::FunctionResult && result
+    ) {
         if (context_ == nullptr || generation != wifi_operation_generation_ || !wifi_ui_state_.enabled) {
             return;
         }
@@ -571,7 +586,7 @@ void SettingsApp::stop_wifi_scan_after_first_result()
     }
     wifi_scan_stop_after_first_result_ = false;
 
-    auto scan_stop_handler = [](service::FunctionResult && result) {
+    service::ServiceBase::FunctionResultHandler scan_stop_handler = [](service::FunctionResult && result) {
         if (result.success) {
             return;
         }

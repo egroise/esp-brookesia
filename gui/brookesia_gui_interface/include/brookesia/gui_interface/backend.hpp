@@ -175,6 +175,12 @@ public:
     {
         return std::nullopt;
     }
+    /**
+     * Create one backend node from a call-scoped snapshot.
+     *
+     * The Runtime creates descendants with separate calls, so implementations must not inspect
+     * `node.children` or retain a reference to `node` after this function returns.
+     */
     virtual BackendHandle create_node(
         const Node &node,
         BackendHandle parent,
@@ -182,6 +188,12 @@ public:
         std::string_view scope_root_absolute_path
     ) = 0;
     virtual void destroy_node(BackendHandle handle) = 0;
+    /**
+     * Apply only the property domains selected by `mask` from a call-scoped snapshot.
+     *
+     * Implementations must not inspect properties outside `mask` or retain a reference to `node`
+     * after this function returns. Runtime may provide a compact snapshot for partial updates.
+     */
     virtual void apply_props(
         BackendHandle handle, const Node &node, PropsApplyMask mask = PropsApplyMask::All
     ) = 0;

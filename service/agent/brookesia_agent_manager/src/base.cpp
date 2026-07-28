@@ -6,6 +6,9 @@
 #include <chrono>
 #include <condition_variable>
 #include <mutex>
+#include <span>
+#include <utility>
+#include <variant>
 
 #include "brookesia/agent_manager/macro_configs.h"
 #if !BROOKESIA_AGENT_MANAGER_BASE_ENABLE_DEBUG_LOG
@@ -13,24 +16,79 @@
 #endif
 #include "private/utils.hpp"
 #include "brookesia/service_helper/media/audio.hpp"
-#include "brookesia/service_audio/service_audio.hpp"
 #include "brookesia/lib_utils/function_guard.hpp"
+#include "brookesia/service_manager/dataflow/registry.hpp"
+#include "brookesia/service_manager/service/manager.hpp"
 #include "brookesia/agent_manager/manager.hpp"
 #include "brookesia/agent_manager/base.hpp"
 
 namespace esp_brookesia::agent {
 
-using AudioHelper = service::helper::Audio;
-using AudioEncoderHelper = service::helper::AudioEncoder<0>;
-using AudioDecoderHelper = service::helper::AudioDecoder<0>;
 using ManagerHelper = service::helper::AgentManager;
+
+namespace df = service::dataflow;
 
 namespace {
 constexpr const char *AGENT_AUDIO_SOURCE_NAME = "Agent";
 constexpr const char *AGENT_AUDIO_SOURCE_ROLE = "agent";
 constexpr const char *AGENT_AUDIO_OUTPUT_NAME = "Speaker0";
+constexpr const char *AGENT_AUDIO_DECODER_PROVIDER_ID = "audio.decoder.0";
+constexpr const char *AGENT_AUDIO_ENCODER_PROVIDER_ID = "audio.encoder.0";
 constexpr uint32_t AGENT_AUDIO_WRITE_TIMEOUT_MS = 20;
 constexpr uint32_t AGENT_AUDIO_WRITE_COMPLETION_TIMEOUT_MS = 200;
+
+df::AudioCodecFormat to_dataflow_audio_codec_format(service::helper::Audio::CodecFormat format)
+{
+    switch (format) {
+    case service::helper::Audio::CodecFormat::PCM:
+        return df::AudioCodecFormat::PCM;
+    case service::helper::Audio::CodecFormat::OPUS:
+        return df::AudioCodecFormat::OPUS;
+    case service::helper::Audio::CodecFormat::G711A:
+        return df::AudioCodecFormat::G711A;
+    case service::helper::Audio::CodecFormat::Max:
+    default:
+        return df::AudioCodecFormat::Unknown;
+    }
+}
+
+df::AudioGeneralConfig to_dataflow_audio_general_config(const service::helper::Audio::CodecGeneralConfig &config)
+{
+    return {
+        .channels = config.channels,
+        .sample_bits = config.sample_bits,
+        .sample_rate = config.sample_rate,
+        .frame_duration = config.frame_duration,
+    };
+}
+
+df::AudioStreamConfig to_dataflow_audio_stream_config(const service::helper::Audio::DecoderDynamicConfig &config)
+{
+    return {
+        .type = to_dataflow_audio_codec_format(config.type),
+        .general = to_dataflow_audio_general_config(config.general),
+    };
+}
+
+df::AudioCaptureConfig to_dataflow_audio_capture_config(const service::helper::Audio::EncoderDynamicConfig &config)
+{
+    df::AudioCaptureConfig capture_config{
+        .type = to_dataflow_audio_codec_format(config.type),
+        .general = to_dataflow_audio_general_config(config.general),
+        .fetch_interval_ms = config.fetch_interval_ms,
+        .fetch_data_size = config.fetch_data_size,
+        .enable_afe = config.enable_afe,
+        .afe_wake_start_timeout_ms = config.afe_wake_start_timeout_ms,
+        .afe_wake_end_timeout_ms = config.afe_wake_end_timeout_ms,
+    };
+    if (const auto *opus = std::get_if<service::helper::Audio::EncoderExtraConfigOpus>(&config.extra)) {
+        capture_config.opus = df::AudioEncoderExtraConfigOpus{
+            .enable_vbr = opus->enable_vbr,
+            .bitrate = opus->bitrate,
+        };
+    }
+    return capture_config;
+}
 } // namespace
 
 std::string Base::get_state_task_group() const
@@ -67,9 +125,15 @@ bool Base::set_speaking(bool speaking)
     }
 
     is_speaking_ = speaking;
-    AudioEncoderHelper::call_function_async(
-        speaking ? AudioEncoderHelper::FunctionId::PauseWakeEnd : AudioEncoderHelper::FunctionId::ResumeWakeEnd
-    );
+    if (audio_capture_operation_ && audio_capture_operation_->is_available()) {
+        if (speaking) {
+            audio_capture_operation_->pause_wake_end();
+        } else {
+            audio_capture_operation_->resume_wake_end();
+        }
+    } else {
+        BROOKESIA_LOGD("Audio capture operation is not available, skip WakeEnd control");
+    }
 
     if (!get_attributes().is_general_events_supported(ManagerHelper::AgentGeneralEvent::SpeakingStatusChanged)) {
         BROOKESIA_LOGD(
@@ -81,7 +145,7 @@ bool Base::set_speaking(bool speaking)
 
     auto result = Manager::get_instance().publish_event(
     BROOKESIA_DESCRIBE_ENUM_TO_STR(ManagerHelper::EventId::SpeakingStatusChanged), service::EventItemMap{
-        {BROOKESIA_DESCRIBE_TO_STR(ManagerHelper::EventSpeakingStatusChangedParam::IsSpeaking), speaking}
+        {"IsSpeaking", speaking}
     });
     BROOKESIA_CHECK_FALSE_RETURN(result, false, "Failed to publish speaking status changed event");
 
@@ -116,7 +180,7 @@ bool Base::set_listening(bool listening)
 
     auto result = Manager::get_instance().publish_event(
     BROOKESIA_DESCRIBE_ENUM_TO_STR(ManagerHelper::EventId::ListeningStatusChanged), service::EventItemMap{
-        {BROOKESIA_DESCRIBE_TO_STR(ManagerHelper::EventListeningStatusChangedParam::IsListening), listening}
+        {"IsListening", listening}
     });
     BROOKESIA_CHECK_FALSE_RETURN(result, false, "Failed to publish listening status changed event");
 
@@ -138,8 +202,15 @@ void Base::set_encoder_paused(bool paused)
 
     BROOKESIA_LOGD("Params: paused(%1%)", paused);
 
-    auto function_id = paused ? AudioEncoderHelper::FunctionId::Pause : AudioEncoderHelper::FunctionId::Resume;
-    AudioEncoderHelper::call_function_async(function_id);
+    if (!audio_capture_operation_ || !audio_capture_operation_->is_available()) {
+        BROOKESIA_LOGD("Audio capture operation is not available, skip pause control");
+        return;
+    }
+    if (paused) {
+        audio_capture_operation_->pause();
+    } else {
+        audio_capture_operation_->resume();
+    }
 }
 
 bool Base::set_emote(const std::string emote)
@@ -158,7 +229,7 @@ bool Base::set_emote(const std::string emote)
 
     auto result = Manager::get_instance().publish_event(
     BROOKESIA_DESCRIBE_ENUM_TO_STR(ManagerHelper::EventId::EmoteGot), service::EventItemMap{
-        {BROOKESIA_DESCRIBE_TO_STR(ManagerHelper::EventEmoteGotParam::Emote), emote}
+        {"Emote", emote}
     });
     BROOKESIA_CHECK_FALSE_RETURN(result, false, "Failed to publish emote got event");
 
@@ -181,7 +252,7 @@ bool Base::set_agent_speaking_text(const std::string text)
 
     auto result = Manager::get_instance().publish_event(
     BROOKESIA_DESCRIBE_ENUM_TO_STR(ManagerHelper::EventId::AgentSpeakingTextGot), service::EventItemMap{
-        {BROOKESIA_DESCRIBE_TO_STR(ManagerHelper::EventAgentSpeakingTextGotParam::Text), text}
+        {"Text", text}
     });
     BROOKESIA_CHECK_FALSE_RETURN(result, false, "Failed to publish agent speaking text event");
 
@@ -204,7 +275,7 @@ bool Base::set_user_speaking_text(const std::string text)
 
     auto result = Manager::get_instance().publish_event(
     BROOKESIA_DESCRIBE_ENUM_TO_STR(ManagerHelper::EventId::UserSpeakingTextGot), service::EventItemMap{
-        {BROOKESIA_DESCRIBE_TO_STR(ManagerHelper::EventUserSpeakingTextGotParam::Text), text}
+        {"Text", text}
     });
     BROOKESIA_CHECK_FALSE_RETURN(result, false, "Failed to publish user speaking text event");
 
@@ -265,15 +336,15 @@ void Base::trigger_general_event(GeneralEvent event)
     if (!Manager::get_instance().publish_event(
     BROOKESIA_DESCRIBE_ENUM_TO_STR(ManagerHelper::EventId::GeneralEventHappened), service::EventItemMap{
     {
-        BROOKESIA_DESCRIBE_TO_STR(ManagerHelper::EventGeneralEventHappenedParam::Event),
-            event_str
-        },
-        {
-            BROOKESIA_DESCRIBE_TO_STR(ManagerHelper::EventGeneralEventHappenedParam::IsUnexpected),
-            is_unexpected_event
-        }
+        "Event",
+        event_str
+    },
+    {
+        "IsUnexpected",
+        is_unexpected_event
     }
-            )) {
+}
+        )) {
         BROOKESIA_LOGE("Failed to publish general event: %1%", event_str);
     }
 }
@@ -295,32 +366,32 @@ bool Base::feed_audio_decoder_data(const uint8_t *data, size_t data_size)
         return true;
     }
 
-    auto *decoder = service::AudioDecoder::get_instance(0);
-    if (decoder == nullptr) {
-        BROOKESIA_LOGE("Audio decoder service instance is not available");
+    auto operation = audio_playback_operation_;
+    if (!operation || !operation->is_available()) {
+        BROOKESIA_LOGE("Audio playback DataFlow operation is not available");
         return false;
     }
 
     struct WaitContext {
         std::mutex mutex;
         std::condition_variable cv;
-        service::AudioWriteResult result = service::AudioWriteResult::Error;
+        df::AudioWriteResult result = df::AudioWriteResult::Error;
         bool done = false;
     };
     WaitContext wait_context;
 
-    auto release_callback = [&wait_context](service::AudioWriteResult result) {
+    auto release_callback = [&wait_context](df::AudioWriteResult result) {
         std::lock_guard lock(wait_context.mutex);
         wait_context.result = result;
         wait_context.done = true;
         wait_context.cv.notify_one();
     };
 
-    auto result = decoder->write_stream_borrowed(
-                      AGENT_AUDIO_SOURCE_NAME, AGENT_AUDIO_OUTPUT_NAME, service::RawBuffer(data, data_size),
-                      std::move(release_callback), AGENT_AUDIO_WRITE_TIMEOUT_MS
+    auto result = operation->write_borrowed(
+                      AGENT_AUDIO_OUTPUT_NAME, std::span<const uint8_t>(data, data_size), std::move(release_callback),
+                      AGENT_AUDIO_WRITE_TIMEOUT_MS
                   );
-    if (result != service::AudioWriteResult::Written) {
+    if (result != df::AudioWriteResult::Written) {
         BROOKESIA_LOGE("Failed to write audio stream data: %1%", BROOKESIA_DESCRIBE_TO_STR(result));
         return false;
     }
@@ -337,7 +408,7 @@ bool Base::feed_audio_decoder_data(const uint8_t *data, size_t data_size)
         BROOKESIA_LOGW(
             "Timed out waiting for agent audio write completion; resetting decoder stream"
         );
-        auto close_result = decoder->close_stream(AGENT_AUDIO_SOURCE_NAME, AGENT_AUDIO_OUTPUT_NAME);
+        auto close_result = operation->close_stream(AGENT_AUDIO_OUTPUT_NAME);
         if (!close_result) {
             BROOKESIA_LOGW("Failed to close agent audio stream after timeout: %1%", close_result.error());
         }
@@ -348,11 +419,9 @@ bool Base::feed_audio_decoder_data(const uint8_t *data, size_t data_size)
         lock.unlock();
 
         auto &decoder_config = get_audio_config().decoder;
-        service::AudioStreamConfig stream_config = {
-            .type = decoder_config.type,
-            .general = decoder_config.general,
-        };
-        auto open_result = decoder->open_stream(AGENT_AUDIO_SOURCE_NAME, AGENT_AUDIO_OUTPUT_NAME, stream_config);
+        auto open_result = operation->open_stream(
+                               AGENT_AUDIO_OUTPUT_NAME, to_dataflow_audio_stream_config(decoder_config)
+                           );
         if (!open_result) {
             BROOKESIA_LOGW("Failed to reopen agent audio stream after timeout: %1%", open_result.error());
         }
@@ -361,7 +430,7 @@ bool Base::feed_audio_decoder_data(const uint8_t *data, size_t data_size)
     const auto complete_result = wait_context.result;
     lock.unlock();
 
-    if (complete_result != service::AudioWriteResult::Written) {
+    if (complete_result != df::AudioWriteResult::Written) {
         BROOKESIA_LOGE("Failed to complete audio stream write: %1%", BROOKESIA_DESCRIBE_TO_STR(complete_result));
         return false;
     }
@@ -387,14 +456,20 @@ bool Base::on_start()
         .parent_group = Manager::get_instance().get_request_task_group(),
     }), false, "Failed to configure request task group");
 
-    // Try to get wakeup words
-    auto get_wake_words_result = AudioEncoderHelper::call_function_sync<boost::json::array>(
-                                     AudioEncoderHelper::FunctionId::GetAFEWakeWords
-                                 );
+    df::AudioCaptureOperationConfig capture_operation_config{};
+    capture_operation_config.owner = get_attributes().name;
+    capture_operation_config.provider_id = AGENT_AUDIO_ENCODER_PROVIDER_ID;
+    capture_operation_config.model = df::Model::AudioCapture;
+    capture_operation_config.capture = to_dataflow_audio_capture_config(get_audio_config().encoder);
+    auto operation_result = service::ServiceManager::get_instance().get_dataflow_registry().open_audio_capture_operation(
+                                std::move(capture_operation_config)
+                            );
     BROOKESIA_CHECK_FALSE_RETURN(
-        get_wake_words_result, false, "Failed to get wakeup words: %1%", get_wake_words_result.error()
+        operation_result, false, "Failed to open agent audio capture operation: %1%", operation_result.error()
     );
-    BROOKESIA_DESCRIBE_FROM_JSON(get_wake_words_result.value(), wake_words_);
+    audio_capture_operation_ = std::move(operation_result.value());
+
+    wake_words_ = audio_capture_operation_->get_afe_wake_words();
     if (!wake_words_.empty()) {
         BROOKESIA_LOGI("Detected wakeup words: %1%", wake_words_);
     }
@@ -415,6 +490,15 @@ void Base::on_stop()
     clear_general_state_flag_bits();
 
     is_unexpected_event_processing_ = false;
+
+    if (audio_playback_operation_) {
+        audio_playback_operation_->close();
+        audio_playback_operation_.reset();
+    }
+    if (audio_capture_operation_) {
+        audio_capture_operation_->close();
+        audio_capture_operation_.reset();
+    }
 }
 
 bool Base::do_activate()
@@ -562,10 +646,10 @@ bool Base::do_general_action(GeneralAction action, bool is_force)
     if (!Manager::get_instance().publish_event(
     BROOKESIA_DESCRIBE_ENUM_TO_STR(ManagerHelper::EventId::GeneralActionTriggered), service::EventItemMap{
     {
-        BROOKESIA_DESCRIBE_TO_STR(ManagerHelper::EventGeneralActionTriggeredParam::Action), action_str
-        }
+        "Action", action_str
     }
-            )) {
+}
+        )) {
         BROOKESIA_LOGE("Failed to publish general action triggered event");
     }
 
@@ -641,9 +725,9 @@ bool Base::do_suspend()
 
     if (!Manager::get_instance().publish_event(
     BROOKESIA_DESCRIBE_ENUM_TO_STR(ManagerHelper::EventId::SuspendStatusChanged), service::EventItemMap{
-    {BROOKESIA_DESCRIBE_TO_STR(ManagerHelper::EventSuspendStatusChangedParam::IsSuspended), true}
-    }
-            )) {
+    {"IsSuspended", true}
+}
+        )) {
         BROOKESIA_LOGE("Failed to publish suspend status changed event");
     }
 
@@ -686,9 +770,9 @@ bool Base::do_resume()
 
     if (!Manager::get_instance().publish_event(
     BROOKESIA_DESCRIBE_ENUM_TO_STR(ManagerHelper::EventId::SuspendStatusChanged), service::EventItemMap{
-    {BROOKESIA_DESCRIBE_TO_STR(ManagerHelper::EventSuspendStatusChangedParam::IsSuspended), false}
-    }
-            )) {
+    {"IsSuspended", false}
+}
+        )) {
         BROOKESIA_LOGE("Failed to publish suspend status changed event");
     }
 
@@ -796,40 +880,28 @@ bool Base::start_audio_decoder()
         return true;
     }
 
-    auto *decoder = service::AudioDecoder::get_instance(0);
-    BROOKESIA_CHECK_NULL_RETURN(decoder, false, "Audio decoder service instance is not available");
-
-    auto unregister_result = decoder->unregister_source(AGENT_AUDIO_SOURCE_NAME);
-    if (!unregister_result) {
-        BROOKESIA_LOGD("Agent audio source was not registered before start: %1%", unregister_result.error());
-    }
-
-    service::AudioSourceInfo source_info = {
+    df::AudioPlaybackOperationConfig playback_operation_config{};
+    playback_operation_config.owner = get_attributes().name;
+    playback_operation_config.provider_id = AGENT_AUDIO_DECODER_PROVIDER_ID;
+    playback_operation_config.model = df::Model::AudioPlayback;
+    playback_operation_config.source = {
         .name = AGENT_AUDIO_SOURCE_NAME,
         .role = AGENT_AUDIO_SOURCE_ROLE,
         .preferred_outputs = {AGENT_AUDIO_OUTPUT_NAME},
         .priority = 10,
     };
-    auto register_result = decoder->register_source(std::move(source_info));
-    BROOKESIA_CHECK_FALSE_RETURN(register_result, false, "Failed to register agent audio source: %1%",
-                                 register_result.error());
-
-    auto request_result = decoder->request_output(register_result.value(), AGENT_AUDIO_OUTPUT_NAME);
-    BROOKESIA_CHECK_FALSE_RETURN(request_result, false, "Failed to request agent audio output: %1%",
-                                 request_result.error());
-
-    auto active_result = decoder->set_active_source(AGENT_AUDIO_OUTPUT_NAME, AGENT_AUDIO_SOURCE_NAME);
-    BROOKESIA_CHECK_FALSE_RETURN(active_result, false, "Failed to set active agent audio source: %1%",
-                                 active_result.error());
-
-    auto &decoder_config = get_audio_config().decoder;
-    service::AudioStreamConfig stream_config = {
-        .type = decoder_config.type,
-        .general = decoder_config.general,
-    };
-    auto open_result = decoder->open_stream(register_result.value(), AGENT_AUDIO_OUTPUT_NAME, stream_config);
-    BROOKESIA_CHECK_FALSE_RETURN(open_result, false, "Failed to open agent audio stream: %1%",
-                                 open_result.error());
+    playback_operation_config.output_name = AGENT_AUDIO_OUTPUT_NAME;
+    playback_operation_config.request_output = true;
+    playback_operation_config.activate_source = true;
+    playback_operation_config.stream = to_dataflow_audio_stream_config(get_audio_config().decoder);
+    playback_operation_config.open_stream = true;
+    auto operation_result = service::ServiceManager::get_instance().get_dataflow_registry().open_audio_playback_operation(
+                                std::move(playback_operation_config)
+                            );
+    BROOKESIA_CHECK_FALSE_RETURN(
+        operation_result, false, "Failed to open agent audio playback operation: %1%", operation_result.error()
+    );
+    audio_playback_operation_ = std::move(operation_result.value());
 
     is_decoder_started_ = true;
 
@@ -840,25 +912,11 @@ void Base::stop_audio_decoder()
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
-    if (!is_decoder_started()) {
+    if (audio_playback_operation_) {
+        audio_playback_operation_->close();
+        audio_playback_operation_.reset();
+    } else if (!is_decoder_started()) {
         BROOKESIA_LOGD("Not started, skip");
-        return;
-    }
-
-    auto *decoder = service::AudioDecoder::get_instance(0);
-    if (decoder != nullptr) {
-        auto close_result = decoder->close_stream(AGENT_AUDIO_SOURCE_NAME, AGENT_AUDIO_OUTPUT_NAME);
-        if (!close_result) {
-            BROOKESIA_LOGW("Failed to close agent audio stream: %1%", close_result.error());
-        }
-        auto release_result = decoder->release_output(AGENT_AUDIO_SOURCE_NAME, AGENT_AUDIO_OUTPUT_NAME);
-        if (!release_result) {
-            BROOKESIA_LOGW("Failed to release agent audio output: %1%", release_result.error());
-        }
-        auto unregister_result = decoder->unregister_source(AGENT_AUDIO_SOURCE_NAME);
-        if (!unregister_result) {
-            BROOKESIA_LOGW("Failed to unregister agent audio source: %1%", unregister_result.error());
-        }
     }
     is_decoder_started_ = false;
 }
@@ -872,11 +930,12 @@ bool Base::start_audio_encoder()
         return true;
     }
 
-    // Subscribe to the recorder data ready event
-    auto *encoder = service::AudioEncoder::get_instance(0);
-    BROOKESIA_CHECK_NULL_RETURN(encoder, false, "Audio encoder service instance is not available");
+    auto operation = audio_capture_operation_;
+    BROOKESIA_CHECK_FALSE_RETURN(
+        operation && operation->is_available(), false, "Audio capture DataFlow operation is not available"
+    );
 
-    auto encoder_data_ready_slot = [this](const service::RawBuffer & item) {
+    auto encoder_data_ready_slot = [this](std::span<const uint8_t> data) {
         // BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
         // BROOKESIA_LOGD("Params: item(%1%)", BROOKESIA_DESCRIBE_TO_STR(item));
@@ -892,28 +951,26 @@ bool Base::start_audio_encoder()
         }
 
         BROOKESIA_CHECK_FALSE_EXIT(
-            on_encoder_data_ready(item.to_const_ptr<uint8_t>(), item.data_size), "Failed to handle encoder data ready"
+            on_encoder_data_ready(data.data(), data.size()), "Failed to handle encoder data ready"
         );
     };
-    encoder_data_ready_connection_ = encoder->connect_encoded_data(encoder_data_ready_slot);
+    encoder_data_ready_connection_ = operation->connect_data(encoder_data_ready_slot);
     BROOKESIA_CHECK_FALSE_RETURN(
         encoder_data_ready_connection_.connected(), false, "Failed to subscribe to encoder data ready event"
     );
+    lib_utils::FunctionGuard disconnect_connections_guard([this]() {
+        afe_event_happened_connection_.disconnect();
+        encoder_data_ready_connection_.disconnect();
+    });
 
 #if BROOKESIA_AGENT_MANAGER_ENABLE_AFE_EVENT_PROCESSING
-    // Subscribe to the afe event
-    auto afe_event_happened_slot = [this](const std::string & event_name, const std::string & event) {
+    auto afe_event_happened_slot = [this](df::AudioAfeEvent afe_event) {
         BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
-        BROOKESIA_LOGD("Params: event_name(%1%), event(%2%)", event_name, event);
-
-        AudioHelper::AFE_Event afe_event;
-        BROOKESIA_CHECK_FALSE_EXIT(
-            BROOKESIA_DESCRIBE_STR_TO_ENUM(event, afe_event), "Failed to convert afe event: %1%", event
-        );
+        BROOKESIA_LOGD("Params: event(%1%)", BROOKESIA_DESCRIBE_TO_STR(afe_event));
 
         switch (afe_event) {
-        case AudioHelper::AFE_Event::WakeStart: {
+        case df::AudioAfeEvent::WakeStart: {
             const bool supports_interrupt =
                 get_attributes().is_general_functions_supported(ManagerHelper::AgentGeneralFunction::InterruptSpeaking);
             BROOKESIA_LOGI(
@@ -938,12 +995,12 @@ bool Base::start_audio_encoder()
             }
             if (is_general_event_ready(GeneralEvent::Slept) || is_general_action_running(GeneralAction::Sleep)) {
                 if (callbacks_.afe_event_happened) {
-                    callbacks_.afe_event_happened(AudioHelper::AFE_Event::WakeStart);
+                    callbacks_.afe_event_happened(df::AudioAfeEvent::WakeStart);
                 }
             }
             break;
         }
-        case AudioHelper::AFE_Event::WakeEnd:
+        case df::AudioAfeEvent::WakeEnd:
             BROOKESIA_LOGI(
                 "AFE WakeEnd: suspended(%1%), listening(%2%), speaking(%3%), chat_mode(%4%)",
                 is_suspended(), is_listening(), is_speaking(), BROOKESIA_DESCRIBE_TO_STR(get_chat_mode())
@@ -961,32 +1018,31 @@ bool Base::start_audio_encoder()
                 return;
             }
             if (callbacks_.afe_event_happened) {
-                callbacks_.afe_event_happened(AudioHelper::AFE_Event::WakeEnd);
+                callbacks_.afe_event_happened(df::AudioAfeEvent::WakeEnd);
             }
             break;
-        case AudioHelper::AFE_Event::VAD_Start:
+        case df::AudioAfeEvent::VadStart:
             break;
-        case AudioHelper::AFE_Event::VAD_End:
+        case df::AudioAfeEvent::VadEnd:
+        case df::AudioAfeEvent::Unknown:
             break;
         default:
             break;
         }
     };
-    afe_event_happened_connection_ = AudioEncoderHelper::subscribe_event(
-                                         AudioEncoderHelper::EventId::AFEEventHappened, afe_event_happened_slot
-                                     );
+    afe_event_happened_connection_ = operation->connect_afe_event(afe_event_happened_slot);
     BROOKESIA_CHECK_FALSE_RETURN(
         afe_event_happened_connection_.connected(), false, "Failed to subscribe to afe event"
     );
 #endif
 
-    // Start the encoder
-    auto &encoder_config = get_audio_config().encoder;
-    AudioEncoderHelper::call_function_async(
-        AudioEncoderHelper::FunctionId::Start, BROOKESIA_DESCRIBE_TO_JSON(encoder_config).as_object()
+    auto start_result = operation->start(to_dataflow_audio_capture_config(get_audio_config().encoder));
+    BROOKESIA_CHECK_FALSE_RETURN(
+        start_result, false, "Failed to start agent audio capture operation: %1%", start_result.error()
     );
 
     is_encoder_started_ = true;
+    disconnect_connections_guard.release();
 
     return true;
 }
@@ -1002,7 +1058,11 @@ void Base::stop_audio_encoder()
 
     afe_event_happened_connection_.disconnect();
     encoder_data_ready_connection_.disconnect();
-    AudioEncoderHelper::call_function_async(AudioEncoderHelper::FunctionId::Stop);
+    if (audio_capture_operation_) {
+        audio_capture_operation_->stop();
+    } else {
+        BROOKESIA_LOGW("Audio capture DataFlow operation is not available while stopping");
+    }
 
     is_encoder_started_ = false;
 }

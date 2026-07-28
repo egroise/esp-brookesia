@@ -96,4 +96,11 @@ Events
 - Encoder events.
 - Encoded data ready.
 
+.. _service-audio-sec-08:
+
+Dataflow Integration
+^^^^^^^^^^^^^^^^^^^^
+
+Audio providers register playback and capture operations with the Service Manager. Applications can discover providers and create owner-scoped operations through the typed DataFlow interfaces or the ``DataFlow`` helper, keeping codec and device implementations replaceable.
+
 .. include-build-file:: contract_guides/service/audio.inc

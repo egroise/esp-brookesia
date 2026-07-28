@@ -5,8 +5,6 @@ idf_component_register(
     REQUIRES
         brookesia_service_manager
         brookesia_service_helper
-        brookesia_service_display
-        brookesia_service_audio
         brookesia_lib_utils
         ${COMPONENT_REQUIRES}
     PRIV_REQUIRES ${COMPONENT_PRIV_REQUIRES}

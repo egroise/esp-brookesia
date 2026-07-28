@@ -12,6 +12,7 @@
 #include "brookesia/lib_utils/log.hpp"
 #include "brookesia/lib_utils/describe_helpers.hpp"
 #include "brookesia/lib_utils/time_profiler.hpp"
+#include "plain_enum_fixture.hpp"
 
 class LogTestClass {
 public:
@@ -59,6 +60,23 @@ TEST_CASE("Test basic functions", "[utils][log][basic]")
     BROOKESIA_LOGI("This is an info message");
     BROOKESIA_LOGW("This is a warning message");
     BROOKESIA_LOGE("This is an error message");
+}
+
+TEST_CASE("Plain enum formatting is independent of describe includes", "[utils][log][enum]")
+{
+    using esp_brookesia::lib_utils::FormatArg;
+    using esp_brookesia::lib_utils::make_format_arg;
+    using esp_brookesia::lib_utils::test::PlainEnum;
+
+    const auto with_describe = make_format_arg(PlainEnum::Value);
+    TEST_ASSERT_EQUAL_INT(static_cast<int>(FormatArg::Type::Int), static_cast<int>(with_describe.type));
+    // The ESP Unity configuration used by this test does not enable 64-bit assertions.
+    TEST_ASSERT_EQUAL_INT(7, static_cast<int>(with_describe.i));
+
+    const auto without_describe =
+        esp_brookesia::lib_utils::test::make_plain_enum_format_arg_without_describe();
+    TEST_ASSERT_EQUAL_INT(static_cast<int>(FormatArg::Type::Int), static_cast<int>(without_describe.type));
+    TEST_ASSERT_EQUAL_INT(7, static_cast<int>(without_describe.i));
 }
 
 TEST_CASE("Test log level filtering", "[utils][log][level]")

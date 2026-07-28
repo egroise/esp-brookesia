@@ -26,7 +26,7 @@
 #endif
 #include "brookesia/lib_utils/function_guard.hpp"
 #include "brookesia/service_display.hpp"
-#include "brookesia/service_manager.hpp"
+#include "brookesia/service_manager/service/manager.hpp"
 #include "lvgl/lvgl.h"
 #include "port/private/multi_touch_pointer.hpp"
 #include "port/private/threading.hpp"

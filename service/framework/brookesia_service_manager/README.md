@@ -8,6 +8,12 @@
 
 For more information, see the [ESP-Brookesia Programming Guide](https://docs.espressif.com/projects/esp-brookesia/en/latest/service/framework/manager/index.html).
 
+## DataFlow Integration
+
+The built-in `DataFlow` service discovers provider-owned visual, audio playback, and audio capture operations. Applications can list providers and outputs, create owner-scoped operations, and release them without depending on a concrete media provider.
+
+Native frame, PCM, and mapped-buffer access remains available through the typed C++ operation interfaces; the service helper exposes the control-plane schemas and routing operations.
+
 ## How to Use
 
 ### Environment Requirements

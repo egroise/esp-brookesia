@@ -17,10 +17,9 @@
 #   define BROOKESIA_LOG_DISABLE_DEBUG_TRACE 1
 #endif
 #include "private/utils.hpp"
-#include "brookesia/lib_utils/describe_helpers.hpp"
 #include "brookesia/lib_utils/log.hpp"
 #include "brookesia/lib_utils/check.hpp"
-#include "brookesia/lib_utils/thread_config.hpp"
+#include "brookesia/lib_utils/thread_config_describe.hpp"
 
 namespace esp_brookesia::lib_utils {
 

@@ -48,7 +48,7 @@ private:
     using PowerBatteryState = Helper::PowerBatteryState;
 
     struct PowerState {
-        lib_utils::TaskScheduler::TaskId poll_task_id = 0;
+        lib_utils::TaskSchedulerTaskId poll_task_id = 0;
         bool polling_requested = false;
         std::optional<PowerBatteryState> cached_state;
         std::optional<PowerBatteryChargeConfig> cached_charge_config;
@@ -61,7 +61,7 @@ private:
         .description = "Expose board capabilities and device controls.",
         .version = get_component_version(),
 #if BROOKESIA_SERVICE_DEVICE_ENABLE_WORKER
-        .task_scheduler_config = lib_utils::TaskScheduler::StartConfig{
+        .task_scheduler_config = lib_utils::TaskSchedulerStartConfig{
             .worker_configs = {
                 lib_utils::ThreadConfig{
                     .name = BROOKESIA_SERVICE_DEVICE_WORKER_NAME,

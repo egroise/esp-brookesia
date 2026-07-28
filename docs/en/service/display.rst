@@ -18,6 +18,10 @@ Display Service
 - Provides service functions for output/source discovery and active-source selection.
 - Exposes touch gesture events and output-bound backlight operations.
 
+.. rubric:: DataFlow Integration
+
+The display service registers a visual DataFlow provider. Video and other consumers can discover outputs, select active sources, and present frames through the provider-neutral visual operation contract.
+
 .. rubric:: Integration Position
 
 This component is an independent ESP-Brookesia release component. It can be integrated through ESP-IDF component dependencies and combined with peer framework components as needed.

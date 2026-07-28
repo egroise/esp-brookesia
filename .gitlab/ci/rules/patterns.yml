@@ -319,6 +319,39 @@
   - "service/media/brookesia_service_audio/README*.md"
   - "service/media/brookesia_service_audio/CHANGELOG.md"
   - "service/media/brookesia_service_audio/docs/**/*"
+# brookesia_service_ble
+.patterns-component_brookesia_service_ble:
+  - "service/network/brookesia_service_ble/include/**/*"
+  - "service/network/brookesia_service_ble/src/**/*"
+  - "service/network/brookesia_service_ble/cmake/**/*"
+  - "service/network/brookesia_service_ble/CMakeLists.txt"
+  - "service/network/brookesia_service_ble/idf_component.yml"
+  - "service/network/brookesia_service_ble/Kconfig"
+  - "service/network/brookesia_service_ble/README*.md"
+  - "service/network/brookesia_service_ble/CHANGELOG.md"
+  - "service/network/brookesia_service_ble/docs/**/*"
+# brookesia_service_bt
+.patterns-component_brookesia_service_bt:
+  - "service/network/brookesia_service_bt/include/**/*"
+  - "service/network/brookesia_service_bt/src/**/*"
+  - "service/network/brookesia_service_bt/cmake/**/*"
+  - "service/network/brookesia_service_bt/CMakeLists.txt"
+  - "service/network/brookesia_service_bt/idf_component.yml"
+  - "service/network/brookesia_service_bt/Kconfig"
+  - "service/network/brookesia_service_bt/README*.md"
+  - "service/network/brookesia_service_bt/CHANGELOG.md"
+  - "service/network/brookesia_service_bt/docs/**/*"
+# brookesia_service_bt_speaker
+.patterns-component_brookesia_service_bt_speaker:
+  - "service/media/brookesia_service_bt_speaker/include/**/*"
+  - "service/media/brookesia_service_bt_speaker/src/**/*"
+  - "service/media/brookesia_service_bt_speaker/cmake/**/*"
+  - "service/media/brookesia_service_bt_speaker/CMakeLists.txt"
+  - "service/media/brookesia_service_bt_speaker/idf_component.yml"
+  - "service/media/brookesia_service_bt_speaker/Kconfig"
+  - "service/media/brookesia_service_bt_speaker/README*.md"
+  - "service/media/brookesia_service_bt_speaker/CHANGELOG.md"
+  - "service/media/brookesia_service_bt_speaker/docs/**/*"
 # brookesia_service_custom
 .patterns-component_brookesia_service_custom:
   - "service/framework/brookesia_service_custom/include/**/*"
@@ -569,6 +602,15 @@
 # brookesia_service_audio
 .patterns-test_apps_brookesia_service_audio:
   - "service/media/brookesia_service_audio/test_apps/**/*"
+# brookesia_service_ble
+.patterns-test_apps_brookesia_service_ble:
+  - "service/network/brookesia_service_ble/test_apps/**/*"
+# brookesia_service_bt
+.patterns-test_apps_brookesia_service_bt:
+  - "service/network/brookesia_service_bt/test_apps/**/*"
+# brookesia_service_bt_speaker
+.patterns-test_apps_brookesia_service_bt_speaker:
+  - "service/media/brookesia_service_bt_speaker/test_apps/**/*"
 # brookesia_service_helper
 .patterns-test_apps_brookesia_service_helper:
   - "service/framework/brookesia_service_helper/test_apps/**/*"

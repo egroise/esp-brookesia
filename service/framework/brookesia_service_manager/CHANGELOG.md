@@ -1,5 +1,19 @@
 # ChangeLog
 
+## v0.8.2 - 2026-07-22
+
+### Breaking Changes:
+
+- break(abi): require rebuilding binary consumers after the `ServiceBase` private-implementation migration.
+- break(headers): require `service/base_describe.hpp` when reflection metadata is used with the direct base header.
+
+### Enhancements:
+
+- feat(dataflow): add provider-neutral visual and audio operation discovery and lifecycle controls.
+- feat(service): hide lifecycle state, locks, schedulers, and registries behind the `ServiceBase` private implementation.
+- feat(headers): separate service describe metadata from the base API and expose lightweight function and event definitions without registry internals.
+- feat(build): reduce transitive Boost and scheduler implementation parsing for service consumers.
+
 ## v0.8.1 - 2026-07-13
 
 ### Breaking Changes:

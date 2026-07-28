@@ -11,6 +11,7 @@
 #if !BROOKESIA_SYSTEM_CORE_SYSTEM_ENABLE_DEBUG_LOG
 #   define BROOKESIA_LOG_DISABLE_DEBUG_TRACE 1
 #endif
+#include "brookesia/lib_utils/function_guard.hpp"
 #include "private/utils.hpp"
 #include "private/system/impl.hpp"
 

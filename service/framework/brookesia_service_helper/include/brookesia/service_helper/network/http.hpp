@@ -9,8 +9,10 @@
 #include <span>
 #include <string>
 #include <vector>
+
 #include "brookesia/lib_utils/describe_helpers.hpp"
 #include "brookesia/hal_interface/interfaces/network/http_client.hpp"
+#include "brookesia/service_manager/detail/static_schema.hpp"
 #include "brookesia/service_manager/helper/base.hpp"
 
 namespace esp_brookesia::service::helper {
@@ -110,238 +112,146 @@ public:
         Max,
     };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the function parameter types ////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    enum class FunctionRequestParam {
-        Request,
-    };
 
-    enum class FunctionRequestAsyncParam {
-        Request,
-    };
 
-    enum class FunctionCancelRequestParam {
-        RequestId,
-    };
 
-    enum class FunctionGetRequestStateParam {
-        RequestId,
-    };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the event parameter types ///////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    enum class EventRequestParam {
-        RequestId,
-        State,
-        Response,
-        Progress,
-        Error,
-    };
 
-    enum class EventGeneralStateChangedParam {
-        State,
-    };
 
 private:
-    static FunctionSchema function_schema_request()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::Request),
-            .description = "Submit an HTTP request and wait for the response.",
-            .parameters = {{
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionRequestParam::Request),
-                    .description = "HTTP request object.",
-                    .type = FunctionValueType::Object
-                }
-            },
-            .require_scheduler = false,
-            .return_value = FunctionReturnSchema{
-                .type = FunctionValueType::Object,
-                .description = (boost::format("Example: %1%")
-                % BROOKESIA_DESCRIBE_JSON_SERIALIZE((HttpResponse{
-                    .request_id = 1,
-                    .status_code = 200,
-                    .body = "{\"ok\":true}",
-                    .file_path = "",
-                    .error = ErrorCode::Ok,
-                    .error_message = "",
-                }))).str(),
-            },
-        };
-    }
+    using FunctionParameterSpec = detail::static_schema::FunctionParameterSpec;
+    using FunctionReturnSpec = detail::static_schema::FunctionReturnSpec;
+    using FunctionSpec = detail::static_schema::FunctionSpec;
 
-    static FunctionSchema function_schema_request_async()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::RequestAsync),
-            .description = "Submit an HTTP request asynchronously.",
-            .parameters = {{
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionRequestAsyncParam::Request),
-                    .description = "HTTP request object.",
-                    .type = FunctionValueType::Object
-                }
+    inline static constexpr std::array<FunctionParameterSpec, 1> REQUEST_PARAMETERS = {{
+            {
+                .name = "Request",
+                .description = "HTTP request object.",
+                .type = FunctionValueType::Object,
             },
-            .require_scheduler = false,
-            .return_value = FunctionReturnSchema{
+        }
+    };
+
+    inline static constexpr std::array<FunctionParameterSpec, 1> REQUEST_ID_PARAMETERS = {{
+            {
+                .name = "RequestId",
+                .description = "Request id returned by RequestAsync.",
                 .type = FunctionValueType::Number,
-                .description = "Request id number.",
             },
-        };
-    }
+        }
+    };
 
-    static FunctionSchema function_schema_cancel_request()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::CancelRequest),
-            .description = "Cancel a pending or running HTTP request.",
-            .parameters = {{
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionCancelRequestParam::RequestId),
-                    .description = "Request id returned by RequestAsync.",
-                    .type = FunctionValueType::Number
-                }
-            },
-            .require_scheduler = false
-        };
-    }
-
-    static FunctionSchema function_schema_get_request_state()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetRequestState),
-            .description = "Get HTTP request state.",
-            .parameters = {{
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionGetRequestStateParam::RequestId),
-                    .description = "Request id returned by RequestAsync.",
-                    .type = FunctionValueType::Number
-                }
-            },
-            .require_scheduler = false,
-            .return_value = FunctionReturnSchema{
-                .type = FunctionValueType::Object,
-                .description = (boost::format("Example: %1%")
-                % BROOKESIA_DESCRIBE_JSON_SERIALIZE((RequestStateInfo{
-                    .request_id = 1,
-                    .state = RequestState::Completed,
-                    .error = ErrorCode::Ok,
-                    .status_code = 200,
-                    .downloaded = 128,
-                    .total = 128,
-                }))).str(),
-            },
-        };
-    }
-
-    static FunctionSchema function_schema_reset_statistics()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::ResetStatistics),
-            .description = "Reset HTTP service statistics.",
-            .require_scheduler = false
-        };
-    }
-
-    static EventSchema event_schema_request_started()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EventId::RequestStarted),
-            .description = "HTTP request started.",
-            .items = request_id_state_items(),
-        };
-    }
-
-    static EventSchema event_schema_request_progress()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EventId::RequestProgress),
-            .description = "HTTP request progress updated.",
-            .items = {{
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventRequestParam::RequestId),
-                    .description = "Request id.",
-                    .type = EventItemType::Number
+    inline static constexpr std::array<FunctionSpec, static_cast<size_t>(FunctionId::Max)> FUNCTION_SPECS = {{
+            {
+                .name = "Request",
+                .description = "Submit an HTTP request and wait for the response.",
+                .parameters = REQUEST_PARAMETERS,
+                .require_scheduler = false,
+                .return_value = FunctionReturnSpec{
+                    .type = FunctionValueType::Object,
+                    .description =
+                    "Example: {\"request_id\":1,\"status_code\":200,\"headers\":{},\"body\":\"{\\\"ok\\\":true}\","
+                    "\"file_path\":\"\",\"error\":\"Ok\",\"error_message\":\"\"}",
                 },
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventRequestParam::Progress),
-                    .description = "Progress object.",
-                    .type = EventItemType::Object
-                }
-            },
-        };
-    }
-
-    static EventSchema event_schema_request_completed()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EventId::RequestCompleted),
-            .description = "HTTP request completed.",
-            .items = request_id_response_items(),
-        };
-    }
-
-    static EventSchema event_schema_request_failed()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EventId::RequestFailed),
-            .description = "HTTP request failed.",
-            .items = request_id_response_items(),
-        };
-    }
-
-    static EventSchema event_schema_request_canceled()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EventId::RequestCanceled),
-            .description = "HTTP request canceled.",
-            .items = request_id_response_items(),
-        };
-    }
-
-    static EventSchema event_schema_general_state_changed()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EventId::GeneralStateChanged),
-            .description = "HTTP service general state changed.",
-            .items = {{
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventGeneralStateChangedParam::State),
-                    .description = "General state.",
-                    .type = EventItemType::String
-                }
-            },
-        };
-    }
-
-    static std::vector<EventItemSchema> request_id_state_items()
-    {
-        return {
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(EventRequestParam::RequestId),
-                .description = "Request id.",
-                .type = EventItemType::Number
             },
             {
-                .name = BROOKESIA_DESCRIBE_TO_STR(EventRequestParam::State),
-                .description = "Request state.",
-                .type = EventItemType::String
+                .name = "RequestAsync",
+                .description = "Submit an HTTP request asynchronously.",
+                .parameters = REQUEST_PARAMETERS,
+                .require_scheduler = false,
+                .return_value = FunctionReturnSpec{
+                    .type = FunctionValueType::Number,
+                    .description = "Request id number.",
+                },
             },
-        };
-    }
+            {
+                .name = "CancelRequest",
+                .description = "Cancel a pending or running HTTP request.",
+                .parameters = REQUEST_ID_PARAMETERS,
+                .require_scheduler = false,
+            },
+            {
+                .name = "GetRequestState",
+                .description = "Get HTTP request state.",
+                .parameters = REQUEST_ID_PARAMETERS,
+                .require_scheduler = false,
+                .return_value = FunctionReturnSpec{
+                    .type = FunctionValueType::Object,
+                    .description =
+                    "Example: {\"request_id\":1,\"state\":\"Completed\",\"error\":\"Ok\",\"status_code\":200,"
+                    "\"downloaded\":128,\"total\":128}",
+                },
+            },
+            {
+                .name = "ResetStatistics",
+                .description = "Reset HTTP service statistics.",
+                .parameters = std::span<const FunctionParameterSpec>{},
+                .require_scheduler = false,
+            },
+        }
+    };
+    static_assert(FUNCTION_SPECS.size() == static_cast<size_t>(FunctionId::Max));
 
-    static std::vector<EventItemSchema> request_id_response_items()
-    {
-        return {
+    using EventItemSpec = detail::static_schema::EventItemSpec;
+    using EventSpec = detail::static_schema::EventSpec;
+
+    inline static constexpr std::array<EventItemSpec, 2> REQUEST_ID_STATE_ITEMS = {{
+            {"RequestId", "Request id.", EventItemType::Number},
+            {"State", "Request state.", EventItemType::String},
+        }
+    };
+
+    inline static constexpr std::array<EventItemSpec, 2> REQUEST_ID_PROGRESS_ITEMS = {{
+            {"RequestId", "Request id.", EventItemType::Number},
+            {"Progress", "Progress object.", EventItemType::Object},
+        }
+    };
+
+    inline static constexpr std::array<EventItemSpec, 2> REQUEST_ID_RESPONSE_ITEMS = {{
+            {"RequestId", "Request id.", EventItemType::Number},
+            {"Response", "HTTP response object.", EventItemType::Object},
+        }
+    };
+
+    inline static constexpr std::array<EventItemSpec, 1> GENERAL_STATE_CHANGED_ITEMS = {{
+            {"State", "General state.", EventItemType::String},
+        }
+    };
+
+    inline static constexpr std::array<EventSpec, static_cast<size_t>(EventId::Max)> EVENT_SPECS = {{
             {
-                .name = BROOKESIA_DESCRIBE_TO_STR(EventRequestParam::RequestId),
-                .description = "Request id.",
-                .type = EventItemType::Number
+                .name = "RequestStarted",
+                .description = "HTTP request started.",
+                .items = REQUEST_ID_STATE_ITEMS,
             },
             {
-                .name = BROOKESIA_DESCRIBE_TO_STR(EventRequestParam::Response),
-                .description = "HTTP response object.",
-                .type = EventItemType::Object
+                .name = "RequestProgress",
+                .description = "HTTP request progress updated.",
+                .items = REQUEST_ID_PROGRESS_ITEMS,
             },
-        };
-    }
+            {
+                .name = "RequestCompleted",
+                .description = "HTTP request completed.",
+                .items = REQUEST_ID_RESPONSE_ITEMS,
+            },
+            {
+                .name = "RequestFailed",
+                .description = "HTTP request failed.",
+                .items = REQUEST_ID_RESPONSE_ITEMS,
+            },
+            {
+                .name = "RequestCanceled",
+                .description = "HTTP request canceled.",
+                .items = REQUEST_ID_RESPONSE_ITEMS,
+            },
+            {
+                .name = "GeneralStateChanged",
+                .description = "HTTP service general state changed.",
+                .items = GENERAL_STATE_CHANGED_ITEMS,
+            },
+        }
+    };
+    static_assert(EVENT_SPECS.size() == static_cast<size_t>(EventId::Max));
 
 public:
     static constexpr std::string_view get_name()
@@ -351,29 +261,24 @@ public:
 
     static std::span<const FunctionSchema> get_function_schemas()
     {
-        static const std::array<FunctionSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(FunctionId::Max)> FUNCTION_SCHEMAS = {{
-                function_schema_request(),
-                function_schema_request_async(),
-                function_schema_cancel_request(),
-                function_schema_get_request_state(),
-                function_schema_reset_statistics(),
-            }
-        };
-        return std::span<const FunctionSchema>(FUNCTION_SCHEMAS);
+        static std::array<FunctionSchema, FUNCTION_SPECS.size()> schemas;
+        static const bool initialized = [] {
+            detail::static_schema::materialize_function_schemas(FUNCTION_SPECS, schemas);
+            return true;
+        }();
+        static_cast<void>(initialized);
+        return schemas;
     }
 
     static std::span<const EventSchema> get_event_schemas()
     {
-        static const std::array<EventSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(EventId::Max)> EVENT_SCHEMAS = {{
-                event_schema_request_started(),
-                event_schema_request_progress(),
-                event_schema_request_completed(),
-                event_schema_request_failed(),
-                event_schema_request_canceled(),
-                event_schema_general_state_changed(),
-            }
-        };
-        return std::span<const EventSchema>(EVENT_SCHEMAS);
+        static std::array<EventSchema, EVENT_SPECS.size()> schemas;
+        static const bool initialized = [] {
+            detail::static_schema::materialize_event_schemas(EVENT_SPECS, schemas);
+            return true;
+        }();
+        static_cast<void>(initialized);
+        return schemas;
     }
 };
 
@@ -386,12 +291,6 @@ BROOKESIA_DESCRIBE_ENUM(
     Http::EventId, RequestStarted, RequestProgress, RequestCompleted, RequestFailed, RequestCanceled,
     GeneralStateChanged, Max
 );
-BROOKESIA_DESCRIBE_ENUM(Http::FunctionRequestParam, Request);
-BROOKESIA_DESCRIBE_ENUM(Http::FunctionRequestAsyncParam, Request);
-BROOKESIA_DESCRIBE_ENUM(Http::FunctionCancelRequestParam, RequestId);
-BROOKESIA_DESCRIBE_ENUM(Http::FunctionGetRequestStateParam, RequestId);
-BROOKESIA_DESCRIBE_ENUM(Http::EventRequestParam, RequestId, State, Response, Progress, Error);
-BROOKESIA_DESCRIBE_ENUM(Http::EventGeneralStateChangedParam, State);
 BROOKESIA_DESCRIBE_STRUCT(Http::RequestProgress, (), (request_id, downloaded, total));
 BROOKESIA_DESCRIBE_STRUCT(Http::RequestStateInfo, (), (request_id, state, error, status_code, downloaded, total));
 BROOKESIA_DESCRIBE_STRUCT(

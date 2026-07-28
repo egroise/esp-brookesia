@@ -7,6 +7,7 @@
 #include <mutex>
 #include <string>
 #include <string_view>
+#include "boost/format.hpp"
 #include "brookesia/lib_utils/log.hpp"
 
 namespace esp_brookesia::lib_utils {

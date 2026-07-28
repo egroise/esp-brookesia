@@ -1,5 +1,11 @@
 # ChangeLog
 
+## v0.8.2 - 2026-07-27
+
+### Enhancements:
+
+- feat(build): split App Store lifecycle, network, download, catalog, and storage modules.
+
 ## v0.8.1 - 2026-07-13
 
 ### Enhancements:

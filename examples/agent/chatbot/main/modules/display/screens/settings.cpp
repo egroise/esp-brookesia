@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: CC0-1.0
  */
+#include "boost/format.hpp"
 #include "esp_system.h"
 #include "private/utils.hpp"
 #include "modules/display/display.hpp"

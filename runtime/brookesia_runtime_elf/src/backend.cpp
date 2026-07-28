@@ -16,7 +16,7 @@
 #include "brookesia/lib_utils/plugin.hpp"
 #include "brookesia/runtime_elf/macro_configs.h"
 #include "brookesia/runtime_manager/detail/native_utils.hpp"
-#include "brookesia/service_helper.hpp"
+#include "brookesia/service_helper/system/storage.hpp"
 #if !BROOKESIA_RUNTIME_ELF_BACKEND_ENABLE_DEBUG_LOG
 #   define BROOKESIA_LOG_DISABLE_DEBUG_TRACE 1
 #endif

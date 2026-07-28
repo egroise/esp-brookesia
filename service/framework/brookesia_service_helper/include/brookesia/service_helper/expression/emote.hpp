@@ -5,7 +5,11 @@
  */
 #pragma once
 
+#include <array>
+#include <span>
+
 #include "brookesia/lib_utils/describe_helpers.hpp"
+#include "brookesia/service_manager/detail/static_schema.hpp"
 #include "brookesia/service_manager/helper/base.hpp"
 
 namespace esp_brookesia::service::helper {
@@ -104,286 +108,231 @@ public:
         Max,
     };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the function parameter types ////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    enum class FunctionSetConfigParam {
-        Config,
-    };
 
-    enum class FunctionLoadAssetsParam {
-        Source,
-    };
 
-    enum class FunctionSetEmojiParam {
-        Emoji,
-    };
 
-    enum class FunctionSetAnimationParam {
-        Animation,
-    };
 
-    enum class FunctionInsertAnimationParam {
-        Animation,
-        DurationMs,
-    };
 
-    enum class FunctionSetQrcodeParam {
-        Qrcode,
-    };
 
-    enum class FunctionWaitAnimationFrameDoneParam {
-        TimeoutMs,
-    };
 
-    enum class FunctionSetEventMessageParam {
-        Event,
-        Message,
-    };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the event parameter types ///////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    enum class EventFlushReadyParam {
-        Param,
-    };
 
 private:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the function schemas /////////////////////////////////////////////////////
+/////////////////////////// The following are the static schema specifications ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    static FunctionSchema function_schema_set_configs()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetConfig),
-            .description = "Set emote config.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionSetConfigParam::Config),
-                    .description = (boost::format("Config. Example: %1%")
-                    % BROOKESIA_DESCRIBE_JSON_SERIALIZE((Config{
-                        .h_res = 320,
-                        .v_res = 240,
-                        .buf_pixels = 320 * 24,
-                        .fps = 30,
-                        .task_priority = 5,
-                        .task_stack = 4096,
-                        .task_affinity = 0,
-                        .task_stack_in_ext = true,
-                        .flag_swap_color_bytes = false,
-                        .flag_double_buffer = false,
-                        .flag_buff_dma = false,
-                        .flag_buff_spiram = true,
-                    }))).str(),
-                    .type = FunctionValueType::Object
-                }
+    using DefaultValueKind = detail::static_schema::DefaultValueKind;
+    using DefaultValueSpec = detail::static_schema::DefaultValueSpec;
+    using EventItemSpec = detail::static_schema::EventItemSpec;
+    using EventSpec = detail::static_schema::EventSpec;
+    using FunctionParameterSpec = detail::static_schema::FunctionParameterSpec;
+    using FunctionSpec = detail::static_schema::FunctionSpec;
+
+    inline static constexpr std::span<const FunctionParameterSpec> EMPTY_PARAMETERS = {};
+
+    inline static constexpr DefaultValueSpec ZERO_NUMBER_DEFAULT = {
+        .kind = DefaultValueKind::Number,
+        .number = 0,
+    };
+
+    inline static constexpr DefaultValueSpec EMPTY_STRING_DEFAULT = {
+        .kind = DefaultValueKind::String,
+        .string = "",
+    };
+
+    inline static constexpr std::array<FunctionParameterSpec, 1> SET_CONFIG_PARAMETERS = {{
+            {
+                .name = "Config",
+                .description =
+                R"(Config. Example: {"h_res":320,"v_res":240,"buf_pixels":7680,"fps":30,)"
+                R"("task_priority":5,"task_stack":4096,"task_affinity":0,"task_stack_in_ext":true,)"
+                R"("flag_swap_color_bytes":false,"flag_double_buffer":false,"flag_buff_dma":false,)"
+                R"("flag_buff_spiram":true})",
+                .type = FunctionValueType::Object,
             },
-            .require_scheduler = false
-        };
-    }
+        }
+    };
 
-    static FunctionSchema function_schema_load_assets()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::LoadAssetsSource),
-            .description = "Load assets from the specified source.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionLoadAssetsParam::Source),
-                    .description = (boost::format("Asset source as a JSON object. Example: %1%")
-                    % BROOKESIA_DESCRIBE_JSON_SERIALIZE((AssetSource{
-                        .source = "anim_icon",
-                        .type = AssetSourceType::PartitionLabel,
-                        .flag_enable_mmap = false,
-                    }))).str(),
-                    .type = FunctionValueType::Object
-                }
+    inline static constexpr std::array<FunctionParameterSpec, 1> LOAD_ASSETS_SOURCE_PARAMETERS = {{
+            {
+                .name = "Source",
+                .description =
+                R"(Asset source as a JSON object. Example: {"source":"anim_icon","type":"PartitionLabel",)"
+                R"("flag_enable_mmap":false})",
+                .type = FunctionValueType::Object,
             },
-        };
-    }
+        }
+    };
 
-    static FunctionSchema function_schema_set_emoji()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetEmoji),
-            .description = "Set emoji and hide animation immediately.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionSetEmojiParam::Emoji),
-                    .description = "Emoji name.",
-                    .type = FunctionValueType::String
-                }
+    inline static constexpr std::array<FunctionParameterSpec, 1> SET_EMOJI_PARAMETERS = {{
+            {
+                .name = "Emoji",
+                .description = "Emoji name.",
+                .type = FunctionValueType::String,
             },
-        };
-    }
+        }
+    };
 
-    static FunctionSchema function_schema_hide_emoji()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::HideEmoji),
-            .description = "Hide current emoji.",
-        };
-    }
-
-    static FunctionSchema function_schema_set_animation()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetAnimation),
-            .description = "Set animation and hide emoji immediately.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionSetAnimationParam::Animation),
-                    .description = "Animation name.",
-                    .type = FunctionValueType::String
-                }
+    inline static constexpr std::array<FunctionParameterSpec, 1> SET_ANIMATION_PARAMETERS = {{
+            {
+                .name = "Animation",
+                .description = "Animation name.",
+                .type = FunctionValueType::String,
             },
-        };
-    }
+        }
+    };
 
-    static FunctionSchema function_schema_insert_animation()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::InsertAnimation),
-            .description = "Insert animation; it hides immediately and shows after the duration.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionInsertAnimationParam::Animation),
-                    .description = "Animation name.",
-                    .type = FunctionValueType::String
-                },
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionInsertAnimationParam::DurationMs),
-                    .description = "Animation duration in milliseconds. Stops automatically after this duration.",
-                    .type = FunctionValueType::Number
-                }
+    inline static constexpr std::array<FunctionParameterSpec, 2> INSERT_ANIMATION_PARAMETERS = {{
+            {
+                .name = "Animation",
+                .description = "Animation name.",
+                .type = FunctionValueType::String,
             },
-        };
-    }
-
-    static FunctionSchema function_schema_stop_animation()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::StopAnimation),
-            .description = "Stop current animation and hide it immediately.",
-        };
-    }
-
-    static FunctionSchema function_schema_wait_animation_frame_done()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::WaitAnimationFrameDone),
-            .description = "Wait for each animation frame to finish.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionWaitAnimationFrameDoneParam::TimeoutMs),
-                    .description = "Timeout in milliseconds. `0` means wait forever.",
-                    .type = FunctionValueType::Number,
-                    .default_value = 0.0,
-                }
+            {
+                .name = "DurationMs",
+                .description = "Animation duration in milliseconds. Stops automatically after this duration.",
+                .type = FunctionValueType::Number,
             },
-        };
-    }
+        }
+    };
 
-    static FunctionSchema function_schema_set_event_message()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetEventMessage),
-            .description = "Set message for a specified emote event.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionSetEventMessageParam::Event),
-                    .description = (boost::format("Event type. Allowed values: %1%")
-                    % BROOKESIA_DESCRIBE_TO_STR(std::vector<EventMessageType>({
-                        EventMessageType::Idle, EventMessageType::Speak, EventMessageType::Listen,
-                        EventMessageType::System, EventMessageType::User, EventMessageType::Battery
-                    }))).str(),
-                    .type = FunctionValueType::String
-                },
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionSetEventMessageParam::Message),
-                    .description =
-                    "Message text. For Battery event, the message format is \"<charging_status>,<percentage>\", where"
-                    " <charging_status> is `0` for not charging and `1` for charging, and <percentage> is the battery"
-                    " percentage in [0, 100].",
-                    .type = FunctionValueType::String,
-                    .default_value = "",
-                }
+    inline static constexpr std::array<FunctionParameterSpec, 1> WAIT_ANIMATION_FRAME_DONE_PARAMETERS = {{
+            {
+                .name = "TimeoutMs",
+                .description = "Timeout in milliseconds. `0` means wait forever.",
+                .type = FunctionValueType::Number,
+                .default_value = ZERO_NUMBER_DEFAULT,
             },
-        };
-    }
+        }
+    };
 
-    static FunctionSchema function_schema_hide_event_message()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::HideEventMessage),
-            .description = "Hide current event message.",
-        };
-    }
-
-    static FunctionSchema function_schema_set_qrcode()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetQrcode),
-            .description = "Set QR code and hide emoji and animation immediately.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionSetQrcodeParam::Qrcode),
-                    .description = "QR code content.",
-                    .type = FunctionValueType::String
-                }
+    inline static constexpr std::array<FunctionParameterSpec, 2> SET_EVENT_MESSAGE_PARAMETERS = {{
+            {
+                .name = "Event",
+                .description = "Event type. Allowed values: [Idle, Speak, Listen, System, User, Battery]",
+                .type = FunctionValueType::String,
             },
-        };
-    }
+            {
+                .name = "Message",
+                .description =
+                "Message text. For Battery event, the message format is \"<charging_status>,<percentage>\", "
+                "where <charging_status> is `0` for not charging and `1` for charging, and <percentage> is "
+                "the battery percentage in [0, 100].",
+                .type = FunctionValueType::String,
+                .default_value = EMPTY_STRING_DEFAULT,
+            },
+        }
+    };
 
-    static FunctionSchema function_schema_hide_qrcode()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::HideQrcode),
-            .description = "Hide current QR code and show emoji immediately.",
-        };
-    }
+    inline static constexpr std::array<FunctionParameterSpec, 1> SET_QRCODE_PARAMETERS = {{
+            {
+                .name = "Qrcode",
+                .description = "QR code content.",
+                .type = FunctionValueType::String,
+            },
+        }
+    };
 
-    static FunctionSchema function_schema_notify_flush_finished()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::NotifyFlushFinished),
-            .description = "Notify emote flush finished.",
-        };
-    }
-
-    static FunctionSchema function_schema_refresh_all()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::RefreshAll),
-            .description = "Refresh the screen.",
-        };
-    }
+    inline static constexpr std::array<FunctionSpec, static_cast<size_t>(FunctionId::Max)> FUNCTION_SPECS = {{
+            {
+                .name = "SetConfig",
+                .description = "Set emote config.",
+                .parameters = SET_CONFIG_PARAMETERS,
+                .require_scheduler = false,
+            },
+            {
+                .name = "LoadAssetsSource",
+                .description = "Load assets from the specified source.",
+                .parameters = LOAD_ASSETS_SOURCE_PARAMETERS,
+            },
+            {
+                .name = "SetEmoji",
+                .description = "Set emoji and hide animation immediately.",
+                .parameters = SET_EMOJI_PARAMETERS,
+            },
+            {
+                .name = "HideEmoji",
+                .description = "Hide current emoji.",
+                .parameters = EMPTY_PARAMETERS,
+            },
+            {
+                .name = "SetAnimation",
+                .description = "Set animation and hide emoji immediately.",
+                .parameters = SET_ANIMATION_PARAMETERS,
+            },
+            {
+                .name = "InsertAnimation",
+                .description = "Insert animation; it hides immediately and shows after the duration.",
+                .parameters = INSERT_ANIMATION_PARAMETERS,
+            },
+            {
+                .name = "StopAnimation",
+                .description = "Stop current animation and hide it immediately.",
+                .parameters = EMPTY_PARAMETERS,
+            },
+            {
+                .name = "WaitAnimationFrameDone",
+                .description = "Wait for each animation frame to finish.",
+                .parameters = WAIT_ANIMATION_FRAME_DONE_PARAMETERS,
+            },
+            {
+                .name = "SetEventMessage",
+                .description = "Set message for a specified emote event.",
+                .parameters = SET_EVENT_MESSAGE_PARAMETERS,
+            },
+            {
+                .name = "HideEventMessage",
+                .description = "Hide current event message.",
+                .parameters = EMPTY_PARAMETERS,
+            },
+            {
+                .name = "SetQrcode",
+                .description = "Set QR code and hide emoji and animation immediately.",
+                .parameters = SET_QRCODE_PARAMETERS,
+            },
+            {
+                .name = "HideQrcode",
+                .description = "Hide current QR code and show emoji immediately.",
+                .parameters = EMPTY_PARAMETERS,
+            },
+            {
+                .name = "NotifyFlushFinished",
+                .description = "Notify emote flush finished.",
+                .parameters = EMPTY_PARAMETERS,
+            },
+            {
+                .name = "RefreshAll",
+                .description = "Refresh the screen.",
+                .parameters = EMPTY_PARAMETERS,
+            },
+        }
+    };
+    static_assert(FUNCTION_SPECS.size() == static_cast<size_t>(FunctionId::Max));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the event schemas /////////////////////////////////////////////////////////
+/////////////////////////// The following are the event schema specifications //////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    static EventSchema event_schema_flush_ready()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EventId::FlushReady),
-            .description = "Emitted when emote flush is ready.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventFlushReadyParam::Param),
-                    .description = (boost::format("Flush-ready parameter as a JSON object. Example: %1%")
-                    % BROOKESIA_DESCRIBE_JSON_SERIALIZE((FlushReadyEventParam{
-                        .x_start = 0,
-                        .y_start = 0,
-                        .x_end = 100,
-                        .y_end = 100,
-                        .data = reinterpret_cast<const void *>(0x12345678)
-                    }))).str(),
-                    .type = EventItemType::Object
-                }
+    inline static constexpr std::array<EventItemSpec, 1> FLUSH_READY_ITEMS = {{
+            {
+                .name = "Param",
+                .description =
+                R"(Flush-ready parameter as a JSON object. Example: {"x_start":0,"y_start":0,"x_end":100,)"
+                R"("y_end":100,"data":"@0x12345678"})",
+                .type = EventItemType::Object,
             },
-            .require_scheduler = false
-        };
-    }
+        }
+    };
+
+    inline static constexpr std::array<EventSpec, static_cast<size_t>(EventId::Max)> EVENT_SPECS = {{
+            {
+                .name = "FlushReady",
+                .description = "Emitted when emote flush is ready.",
+                .items = FLUSH_READY_ITEMS,
+                .require_scheduler = false,
+            },
+        }
+    };
+    static_assert(EVENT_SPECS.size() == static_cast<size_t>(EventId::Max));
 
 public:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -396,33 +345,24 @@ public:
 
     static std::span<const FunctionSchema> get_function_schemas()
     {
-        static const std::array<FunctionSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(FunctionId::Max)> FUNCTION_SCHEMAS = {{
-                function_schema_set_configs(),
-                function_schema_load_assets(),
-                function_schema_set_emoji(),
-                function_schema_hide_emoji(),
-                function_schema_set_animation(),
-                function_schema_insert_animation(),
-                function_schema_stop_animation(),
-                function_schema_wait_animation_frame_done(),
-                function_schema_set_event_message(),
-                function_schema_hide_event_message(),
-                function_schema_set_qrcode(),
-                function_schema_hide_qrcode(),
-                function_schema_notify_flush_finished(),
-                function_schema_refresh_all(),
-            }
-        };
-        return std::span<const FunctionSchema>(FUNCTION_SCHEMAS);
+        static std::array<FunctionSchema, FUNCTION_SPECS.size()> schemas;
+        static const bool initialized = [] {
+            detail::static_schema::materialize_function_schemas(FUNCTION_SPECS, schemas);
+            return true;
+        }();
+        static_cast<void>(initialized);
+        return schemas;
     }
 
     static std::span<const EventSchema> get_event_schemas()
     {
-        static const std::array<EventSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(EventId::Max)> EVENT_SCHEMAS = {{
-                event_schema_flush_ready(),
-            }
-        };
-        return std::span<const EventSchema>(EVENT_SCHEMAS);
+        static std::array<EventSchema, EVENT_SPECS.size()> schemas;
+        static const bool initialized = [] {
+            detail::static_schema::materialize_event_schemas(EVENT_SPECS, schemas);
+            return true;
+        }();
+        static_cast<void>(initialized);
+        return schemas;
     }
 };
 
@@ -445,14 +385,5 @@ BROOKESIA_DESCRIBE_ENUM(
     NotifyFlushFinished, RefreshAll, Max
 );
 BROOKESIA_DESCRIBE_ENUM(ExpressionEmote::EventId, FlushReady, Max);
-BROOKESIA_DESCRIBE_ENUM(ExpressionEmote::FunctionSetConfigParam, Config);
-BROOKESIA_DESCRIBE_ENUM(ExpressionEmote::FunctionLoadAssetsParam, Source);
-BROOKESIA_DESCRIBE_ENUM(ExpressionEmote::FunctionSetEmojiParam, Emoji);
-BROOKESIA_DESCRIBE_ENUM(ExpressionEmote::FunctionSetAnimationParam, Animation);
-BROOKESIA_DESCRIBE_ENUM(ExpressionEmote::FunctionInsertAnimationParam, Animation, DurationMs);
-BROOKESIA_DESCRIBE_ENUM(ExpressionEmote::FunctionWaitAnimationFrameDoneParam, TimeoutMs);
-BROOKESIA_DESCRIBE_ENUM(ExpressionEmote::FunctionSetEventMessageParam, Event, Message);
-BROOKESIA_DESCRIBE_ENUM(ExpressionEmote::FunctionSetQrcodeParam, Qrcode);
-BROOKESIA_DESCRIBE_ENUM(ExpressionEmote::EventFlushReadyParam, Param);
 
 } // namespace esp_brookesia::service::helper

@@ -10,7 +10,7 @@
 #include <string_view>
 #include <vector>
 
-#include "brookesia/service_manager.hpp"
+#include "brookesia/service_manager/service/base.hpp"
 #include "brookesia/system_core/app/types.hpp"
 
 namespace esp_brookesia::system::core {

@@ -373,6 +373,39 @@ BROOKESIA_TEST_CASE(
     TEST_ASSERT_TRUE(BROOKESIA_DESCRIBE_FROM_JSON(std::get<boost::json::array>(*names_result.data), names));
     TEST_ASSERT_GREATER_OR_EQUAL(2, names.size());
 
+    auto dataflow_info_result = manager_service->call_function_sync(
+                                    BROOKESIA_DESCRIBE_TO_STR(ManagerService::FunctionId::GetServiceInfo),
+    FunctionParameterMap{{
+            BROOKESIA_DESCRIBE_TO_STR(ManagerService::FunctionGetServiceInfoParam::Name),
+            std::string(DataFlowService::get_name()),
+        }}
+                                );
+    TEST_ASSERT_TRUE(dataflow_info_result.success);
+    TEST_ASSERT_TRUE(dataflow_info_result.has_data());
+    ManagerService::ServiceInfo dataflow_info;
+    TEST_ASSERT_TRUE(BROOKESIA_DESCRIBE_FROM_JSON(
+                         std::get<boost::json::object>(*dataflow_info_result.data), dataflow_info
+                     ));
+    TEST_ASSERT_EQUAL_STRING("DataFlow", dataflow_info.name.c_str());
+    TEST_ASSERT_FALSE(dataflow_info.version.empty());
+
+    auto dataflow_schema_result = manager_service->call_function_sync(
+                                      BROOKESIA_DESCRIBE_TO_STR(ManagerService::FunctionId::GetServiceSchema),
+    FunctionParameterMap{{
+            BROOKESIA_DESCRIBE_TO_STR(ManagerService::FunctionGetServiceSchemaParam::Name),
+            std::string(DataFlowService::get_name()),
+        }}
+                                  );
+    TEST_ASSERT_TRUE(dataflow_schema_result.success);
+    TEST_ASSERT_TRUE(dataflow_schema_result.has_data());
+    ManagerService::ServiceSchemaOverview dataflow_schema;
+    TEST_ASSERT_TRUE(BROOKESIA_DESCRIBE_FROM_JSON(
+                         std::get<boost::json::object>(*dataflow_schema_result.data), dataflow_schema
+                     ));
+    TEST_ASSERT_EQUAL_STRING("DataFlow", dataflow_schema.name.c_str());
+    TEST_ASSERT_EQUAL_size_t(11, dataflow_schema.function_names.size());
+    TEST_ASSERT_EQUAL_size_t(4, dataflow_schema.event_names.size());
+
     binding.release();
     service_manager.stop();
     service_manager.deinit();

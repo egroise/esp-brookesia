@@ -39,9 +39,6 @@ public:
         Max,
     };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the function parameter types ////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////// The following are the event schemas /////////////////////////////////////////////////////////
@@ -68,12 +65,7 @@ public:
      */
     static std::span<const service::FunctionSchema> get_function_schemas()
     {
-        static const std::array < service::FunctionSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(FunctionId::Max) >
-        FUNCTION_SCHEMAS = {
-            {
-            }
-        };
-        return std::span<const service::FunctionSchema>(FUNCTION_SCHEMAS);
+        return {};
     }
 
     /**
@@ -83,11 +75,7 @@ public:
      */
     static std::span<const service::EventSchema> get_event_schemas()
     {
-        static const std::array < service::EventSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(EventId::Max) > EVENT_SCHEMAS = {
-            {
-            }
-        };
-        return std::span<const service::EventSchema>(EVENT_SCHEMAS);
+        return {};
     }
 };
 

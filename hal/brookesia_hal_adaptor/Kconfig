@@ -150,6 +150,20 @@ menu "ESP-Brookesia: Hal Adaptor Configurations"
                     Enable debug or lower level logs for the Wi-Fi ESP-IDF backend.
         endmenu
 
+        menu "BLE"
+            config BROOKESIA_HAL_ADAPTOR_BLE_DEVICE_ENABLE_DEBUG_LOG
+                bool "Device"
+                default n
+                help
+                    Enable debug or lower level logs for the BLE device.
+
+            config BROOKESIA_HAL_ADAPTOR_BLE_BACKEND_ENABLE_DEBUG_LOG
+                bool "NimBLE backend"
+                default n
+                help
+                    Enable debug or lower level logs for the BLE NimBLE backend.
+        endmenu
+
         menu "Power"
             config BROOKESIA_HAL_ADAPTOR_POWER_DEVICE_ENABLE_DEBUG_LOG
                 bool "Device"
@@ -191,6 +205,12 @@ menu "ESP-Brookesia: Hal Adaptor Configurations"
             help
                 Enable the OTA updater implementation.
 
+        menuconfig BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_RESTART_IMPL
+            bool "Restart"
+            default y
+            help
+                Enable the platform restart implementation.
+
         if BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_OTA_UPDATER_IMPL
             config BROOKESIA_HAL_ADAPTOR_SYSTEM_OTA_UPDATER_THREAD_STACK_SIZE
                 int "OTA updater internal-stack thread stack size"
@@ -225,6 +245,14 @@ menu "ESP-Brookesia: Hal Adaptor Configurations"
                 default y
                 help
                     Verify HTTPS server certificates when a request uses the default TLS policy.
+
+            config BROOKESIA_HAL_ADAPTOR_NETWORK_HTTP_CLIENT_TX_BUFFER_SIZE
+                int "HTTP client transmit buffer size"
+                default 1024
+                range 512 8192
+                help
+                    Size in bytes of the ESP-IDF HTTP client's transmit buffer.
+                    It must fit the request line and HTTP headers.
         endif
     endif
 
@@ -718,4 +746,28 @@ menu "ESP-Brookesia: Hal Adaptor Configurations"
         endmenu
     endif
 
+    menuconfig BROOKESIA_HAL_ADAPTOR_ENABLE_BLE_DEVICE
+        bool "BLE Peripheral Device"
+        default n
+        select BT_ENABLED
+        select BT_NIMBLE_ENABLED
+        select BT_NIMBLE_ROLE_PERIPHERAL
+        select BT_NIMBLE_GATT_SERVER
+        help
+            Enable the single-connection BLE Peripheral/GATT Server HAL interface.
+            Targets without an integrated BLE controller require the project sdkconfig
+            to select controller-disabled NimBLE with UART transport disabled and
+            ESP-Hosted NimBLE VHCI enabled. The component cannot select these upstream
+            options itself. The ESP32-P4 integration uses the pinned esp_hosted 2.12.3
+            dependency and leaves the shared Hosted transport available to Remote Wi-Fi.
+
+    menuconfig BROOKESIA_HAL_ADAPTOR_ENABLE_BT_DEVICE
+        bool "Bluetooth A2DP Device"
+        select BT_ENABLED
+        default n
+        help
+            Enable the generic Bluetooth HAL device. Classic-capable Bluedroid targets use
+            the esp_bt_audio/GMF A2DP Sink backend. BLE-only and ESP-Hosted targets report
+            the A2DP profile as unavailable instead of pretending that a wireless speaker is
+            present.
 endmenu

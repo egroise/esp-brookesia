@@ -37,7 +37,7 @@ if(NOT CMAKE_SCRIPT_MODE_FILE)
         endif()
     endforeach()
     foreach(source_file IN LISTS COMPONENT_SRCS_CPP)
-        if(source_file MATCHES "emulation_nes\\.cpp$")
+        if(source_file MATCHES "/(emulation_nes|nes_[^/]+)\\.cpp$")
             set_source_files_properties(${source_file}
                 PROPERTIES
                     COMPILE_OPTIONS "-Wno-variadic-macros"

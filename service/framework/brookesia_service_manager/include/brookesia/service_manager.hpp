@@ -11,6 +11,7 @@
 
 #include "service_manager/macro_configs.h"
 #include "service_manager/common.hpp"
+#include "service_manager/dataflow.hpp"
 /* Event */
 #include "service_manager/event/definition.hpp"
 #include "service_manager/event/registry.hpp"
@@ -19,8 +20,10 @@
 #include "service_manager/function/registry.hpp"
 /* Service */
 #include "service_manager/service/base.hpp"
+#include "service_manager/service/base_describe.hpp"
 #include "service_manager/service/manager.hpp"
 #include "service_manager/service/manager_service.hpp"
+#include "service_manager/service/dataflow_service.hpp"
 #include "service_manager/service/utils_service.hpp"
 #include "service_manager/service/local_runner.hpp"
 /* Helper */

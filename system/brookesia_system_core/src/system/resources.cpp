@@ -13,7 +13,7 @@
 #include "private/system/impl.hpp"
 
 #include "brookesia/gui_interface/parser.hpp"
-#include "brookesia/service_helper.hpp"
+#include "brookesia/service_helper/system/storage.hpp"
 
 namespace esp_brookesia::system::core {
 namespace {

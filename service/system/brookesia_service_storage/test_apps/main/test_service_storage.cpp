@@ -112,9 +112,9 @@ BROOKESIA_TEST_CASE(basic_set_and_get, "Test ServiceStorage - basic set and get"
             "Set key-value pairs",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVSet),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVSetParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVSetParam::KeyValuePairs),
+                "KeyValuePairs",
                 BROOKESIA_DESCRIBE_TO_JSON(storage_helper::KeyValueMap({
                     {"string_key", std::string("test_value")},
                     {"int_key", 42},
@@ -128,9 +128,9 @@ BROOKESIA_TEST_CASE(basic_set_and_get, "Test ServiceStorage - basic set and get"
             "Get key-value pairs",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVGet),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVGetParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVGetParam::Keys),
+                "Keys",
                 BROOKESIA_DESCRIBE_TO_JSON(std::vector<std::string>({"string_key", "int_key", "bool_key"}))
             }
         }
@@ -140,9 +140,9 @@ BROOKESIA_TEST_CASE(basic_set_and_get, "Test ServiceStorage - basic set and get"
             "Erase key-value pairs",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVErase),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVEraseParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVEraseParam::Keys),
+                "Keys",
                 BROOKESIA_DESCRIBE_TO_JSON(std::vector<std::string>({"string_key", "int_key", "bool_key"}))
             }
         }
@@ -396,7 +396,7 @@ BROOKESIA_TEST_CASE(
     auto storage_service = service_manager.get_service(storage_helper::get_name().data());
     TEST_ASSERT_NOT_NULL_MESSAGE(storage_service.get(), "Storage service should be registered");
     const auto read_text_name = BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::FSReadText);
-    const auto path_param_name = BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionFSPathParam::Path);
+    const auto path_param_name = "Path";
     auto batch_result = storage_service->call_functions_sync({
         {
             .name = read_text_name,
@@ -484,9 +484,9 @@ BROOKESIA_TEST_CASE(list_functionality, "Test ServiceStorage - list functionalit
             "Set key-value pairs for list test",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVSet),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVSetParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVSetParam::KeyValuePairs),
+                "KeyValuePairs",
                 BROOKESIA_DESCRIBE_TO_JSON(storage_helper::KeyValueMap({
                     {"key1", std::string("value1")},
                     {"key2", 123},
@@ -500,7 +500,7 @@ BROOKESIA_TEST_CASE(list_functionality, "Test ServiceStorage - list functionalit
             "List entries in namespace",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVList),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVListParam::Nspace), test_namespace}
+            {"Nspace", test_namespace}
         }
         , [](const service::FunctionValue & value)
         {
@@ -512,9 +512,9 @@ BROOKESIA_TEST_CASE(list_functionality, "Test ServiceStorage - list functionalit
             "Erase all entries",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVErase),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVEraseParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVEraseParam::Keys),
+                "Keys",
                 BROOKESIA_DESCRIBE_TO_JSON(std::vector<std::string>({}))
             }
         }
@@ -548,9 +548,9 @@ BROOKESIA_TEST_CASE(complete_workflow, "Test ServiceStorage - complete workflow"
             "Step 1: Set multiple key-value pairs",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVSet),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVSetParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVSetParam::KeyValuePairs),
+                "KeyValuePairs",
                 BROOKESIA_DESCRIBE_TO_JSON(storage_helper::KeyValueMap({
                     {"name", std::string("test_user")},
                     {"age", 30},
@@ -565,9 +565,9 @@ BROOKESIA_TEST_CASE(complete_workflow, "Test ServiceStorage - complete workflow"
             "Step 2: Get all keys",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVGet),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVGetParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVGetParam::Keys),
+                "Keys",
                 BROOKESIA_DESCRIBE_TO_JSON(std::vector<std::string>({"name", "age", "active", "score"}))
             }
         }
@@ -577,7 +577,7 @@ BROOKESIA_TEST_CASE(complete_workflow, "Test ServiceStorage - complete workflow"
             "Step 3: List entries",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVList),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVListParam::Nspace), test_namespace}
+            {"Nspace", test_namespace}
         }
         , [](const service::FunctionValue & value)
         {
@@ -589,9 +589,9 @@ BROOKESIA_TEST_CASE(complete_workflow, "Test ServiceStorage - complete workflow"
             "Step 4: Update some values",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVSet),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVSetParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVSetParam::KeyValuePairs),
+                "KeyValuePairs",
                 BROOKESIA_DESCRIBE_TO_JSON(storage_helper::KeyValueMap({
                     {"age", 31},
                     {"score", 98}
@@ -604,9 +604,9 @@ BROOKESIA_TEST_CASE(complete_workflow, "Test ServiceStorage - complete workflow"
             "Step 5: Get updated values",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVGet),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVGetParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVGetParam::Keys),
+                "Keys",
                 BROOKESIA_DESCRIBE_TO_JSON(std::vector<std::string>({"age", "score"}))
             }
         }
@@ -620,9 +620,9 @@ BROOKESIA_TEST_CASE(complete_workflow, "Test ServiceStorage - complete workflow"
             "Step 6: Erase specific keys",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVErase),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVEraseParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVEraseParam::Keys),
+                "Keys",
                 BROOKESIA_DESCRIBE_TO_JSON(std::vector<std::string>({"score"}))
             }
         }
@@ -632,9 +632,9 @@ BROOKESIA_TEST_CASE(complete_workflow, "Test ServiceStorage - complete workflow"
             "Step 7: Verify remaining keys",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVGet),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVGetParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVGetParam::Keys),
+                "Keys",
                 BROOKESIA_DESCRIBE_TO_JSON(std::vector<std::string>({"name", "age", "active"}))
             }
         }
@@ -648,9 +648,9 @@ BROOKESIA_TEST_CASE(complete_workflow, "Test ServiceStorage - complete workflow"
             "Step 8: Erase all remaining keys",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVErase),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVEraseParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVEraseParam::Keys),
+                "Keys",
                 BROOKESIA_DESCRIBE_TO_JSON(std::vector<std::string>({}))
             }
         }
@@ -689,7 +689,7 @@ BROOKESIA_TEST_CASE(default_namespace, "Test ServiceStorage - default namespace"
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVSet),
         boost::json::object{
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVSetParam::KeyValuePairs),
+                "KeyValuePairs",
                 BROOKESIA_DESCRIBE_TO_JSON(storage_helper::KeyValueMap({
                     {"default_key", std::string("default_value")}
                 }))
@@ -702,7 +702,7 @@ BROOKESIA_TEST_CASE(default_namespace, "Test ServiceStorage - default namespace"
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVGet),
         boost::json::object{
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVGetParam::Keys),
+                "Keys",
                 BROOKESIA_DESCRIBE_TO_JSON(std::vector<std::string>({"default_key"}))
             }
         }
@@ -717,7 +717,7 @@ BROOKESIA_TEST_CASE(default_namespace, "Test ServiceStorage - default namespace"
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVErase),
         boost::json::object{
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVEraseParam::Keys),
+                "Keys",
                 BROOKESIA_DESCRIBE_TO_JSON(std::vector<std::string>({"default_key"}))
             }
         }
@@ -755,9 +755,9 @@ BROOKESIA_TEST_CASE(
             "Set multiple key-value pairs",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVSet),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVSetParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVSetParam::KeyValuePairs),
+                "KeyValuePairs",
                 BROOKESIA_DESCRIBE_TO_JSON(storage_helper::KeyValueMap({
                     {"key1", std::string("value1")},
                     {"key2", 42},
@@ -772,9 +772,9 @@ BROOKESIA_TEST_CASE(
             "Get all keys with empty keys array",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVGet),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVGetParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVGetParam::Keys),
+                "Keys",
                 BROOKESIA_DESCRIBE_TO_JSON(std::vector<std::string>({}))
             }
         }
@@ -788,7 +788,7 @@ BROOKESIA_TEST_CASE(
             "Get all keys without keys parameter",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVGet),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVGetParam::Nspace), test_namespace}
+            {"Nspace", test_namespace}
         }
         , [](const service::FunctionValue & value)
         {
@@ -800,9 +800,9 @@ BROOKESIA_TEST_CASE(
             "Erase all entries",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVErase),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVEraseParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVEraseParam::Keys),
+                "Keys",
                 BROOKESIA_DESCRIBE_TO_JSON(std::vector<std::string>({}))
             }
         }
@@ -840,9 +840,9 @@ BROOKESIA_TEST_CASE(
             "Set one key-value pair",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVSet),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVSetParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVSetParam::KeyValuePairs),
+                "KeyValuePairs",
                 BROOKESIA_DESCRIBE_TO_JSON(storage_helper::KeyValueMap({
                     {"existing_key", std::string("existing_value")}
                 }))
@@ -854,9 +854,9 @@ BROOKESIA_TEST_CASE(
             "Get mix of existing and non-existent keys",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVGet),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVGetParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVGetParam::Keys),
+                "Keys",
                 BROOKESIA_DESCRIBE_TO_JSON(std::vector<std::string>({"existing_key", "non_existent_key1", "non_existent_key2"}))
             }
         }
@@ -903,9 +903,9 @@ BROOKESIA_TEST_CASE(
             "Erase mix of existing and non-existent keys",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVErase),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVEraseParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVEraseParam::Keys),
+                "Keys",
                 BROOKESIA_DESCRIBE_TO_JSON(std::vector<std::string>({"existing_key", "non_existent_key"}))
             }
         }
@@ -915,9 +915,9 @@ BROOKESIA_TEST_CASE(
             "Verify key is erased",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVGet),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVGetParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVGetParam::Keys),
+                "Keys",
                 BROOKESIA_DESCRIBE_TO_JSON(std::vector<std::string>({"existing_key"}))
             }
         }
@@ -942,9 +942,9 @@ BROOKESIA_TEST_CASE(
             "Erase all entries",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVErase),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVEraseParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVEraseParam::Keys),
+                "Keys",
                 BROOKESIA_DESCRIBE_TO_JSON(std::vector<std::string>({}))
             }
         }
@@ -982,9 +982,9 @@ BROOKESIA_TEST_CASE(
             "Set multiple key-value pairs with different types",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVSet),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVSetParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVSetParam::KeyValuePairs),
+                "KeyValuePairs",
                 BROOKESIA_DESCRIBE_TO_JSON(storage_helper::KeyValueMap({
                     {"string_key", std::string("string_value")},
                     {"int_key", 123},
@@ -998,7 +998,7 @@ BROOKESIA_TEST_CASE(
             "List entries and verify structure",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVList),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVListParam::Nspace), test_namespace}
+            {"Nspace", test_namespace}
         }
         , [test_namespace](const service::FunctionValue & value)
         {
@@ -1044,9 +1044,9 @@ BROOKESIA_TEST_CASE(
             "Erase all entries",
             BROOKESIA_DESCRIBE_ENUM_TO_STR(storage_helper::FunctionId::KVErase),
         boost::json::object{
-            {BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVEraseParam::Nspace), test_namespace},
+            {"Nspace", test_namespace},
             {
-                BROOKESIA_DESCRIBE_TO_STR(storage_helper::FunctionKVEraseParam::Keys),
+                "Keys",
                 BROOKESIA_DESCRIBE_TO_JSON(std::vector<std::string>({}))
             }
         }

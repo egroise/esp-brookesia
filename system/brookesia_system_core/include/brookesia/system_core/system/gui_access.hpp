@@ -137,6 +137,14 @@ public:
         bool reapply_loaded_documents = true
     ) const;
     std::string get_language() const;
+    /** @brief Persist a theme for the next system startup without changing the active theme. */
+    std::expected<void, std::string> save_theme_preference(std::string_view theme_id) const;
+    /** @brief Persist a language for the next system startup without changing the active language. */
+    std::expected<void, std::string> save_language_preference(std::string_view language) const;
+    /** @brief Get the persisted theme preference, if one exists. */
+    std::optional<std::string> get_stored_theme_preference() const;
+    /** @brief Get the persisted language preference, if one exists. */
+    std::optional<std::string> get_stored_language_preference() const;
 
 private:
     friend class System;

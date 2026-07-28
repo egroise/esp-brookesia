@@ -40,7 +40,7 @@ class LocalTestRunner {
 public:
     struct RunTestsConfig {
         std::string service_name;
-        lib_utils::TaskScheduler::StartConfig scheduler_config;
+        lib_utils::TaskSchedulerStartConfig scheduler_config;
         uint32_t extra_timeout_ms;
 
         RunTestsConfig(std::string service_name)

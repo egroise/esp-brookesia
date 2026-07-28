@@ -6,6 +6,10 @@
 
 `brookesia_hal_interface` 是 ESP-Brookesia 的硬件抽象基础组件，在板级实现与上层业务逻辑或其它子系统之间提供统一抽象。
 
+BLE 接口提供运行时配置、单连接的 `ble::PeripheralIface`，支持 128-bit GATT 服务与
+特征、拥有二进制数据所有权的写入事件、通知订阅状态、协商 MTU 以及广播/连接生命周期
+回调。v1 明确不包含 Central、经典蓝牙、配对、Bonding 或持久化密钥。
+
 更多信息请参考 [ESP-Brookesia 编程指南](https://docs.espressif.com/projects/esp-brookesia/zh_CN/latest/hal/interface/index.html)。
 
 ## 如何使用

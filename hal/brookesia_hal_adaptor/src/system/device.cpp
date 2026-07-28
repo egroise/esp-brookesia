@@ -10,11 +10,18 @@
 #include "private/utils.hpp"
 #include "brookesia/lib_utils/function_guard.hpp"
 #include "brookesia/hal_adaptor/system/device.hpp"
+#include "brookesia/hal_interface/interfaces/system/general.hpp"
 #if BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_BOARD_INFO_IMPL
 #   include "board_info_impl.hpp"
 #endif
 #if BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_OTA_UPDATER_IMPL
 #   include "ota_updater_impl.hpp"
+#endif
+
+#if BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_RESTART_IMPL
+namespace esp_brookesia::hal {
+std::shared_ptr<system::GeneralIface> make_restart_adaptor_iface();
+}
 #endif
 
 namespace esp_brookesia::hal {
@@ -35,6 +42,9 @@ std::vector<InterfaceSpec> SystemDevice::get_interface_specs() const
 #if BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_OTA_UPDATER_IMPL
     specs.push_back({system::OtaUpdaterIface::NAME, OTA_UPDATER_IFACE_NAME});
 #endif
+#if BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_RESTART_IMPL
+    specs.push_back({system::GeneralIface::NAME, RESTART_IFACE_NAME});
+#endif
     return specs;
 }
 
@@ -47,6 +57,9 @@ bool SystemDevice::on_init()
 #endif
 #if BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_OTA_UPDATER_IMPL
     BROOKESIA_CHECK_FALSE_RETURN(init_ota_updater(), false, "Failed to init OTA updater");
+#endif
+#if BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_RESTART_IMPL
+    BROOKESIA_CHECK_FALSE_RETURN(init_restart(), false, "Failed to init restart");
 #endif
     BROOKESIA_CHECK_FALSE_RETURN(!interfaces_.empty(), false, "No valid system interfaces initialized");
 
@@ -62,6 +75,9 @@ void SystemDevice::on_deinit()
 #endif
 #if BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_OTA_UPDATER_IMPL
     deinit_ota_updater();
+#endif
+#if BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_RESTART_IMPL
+    deinit_restart();
 #endif
 }
 
@@ -103,6 +119,26 @@ void SystemDevice::deinit_board_info()
     }
 
     interfaces_.erase(BOARD_INFO_IFACE_NAME);
+}
+#endif
+
+#if BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_RESTART_IMPL
+bool SystemDevice::init_restart()
+{
+    BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
+    if (is_iface_initialized(RESTART_IFACE_NAME)) {
+        return true;
+    }
+    auto iface = make_restart_adaptor_iface();
+    BROOKESIA_CHECK_FALSE_RETURN(iface != nullptr, false, "Failed to create restart interface");
+    interfaces_.emplace(RESTART_IFACE_NAME, std::move(iface));
+    return true;
+}
+
+void SystemDevice::deinit_restart()
+{
+    BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
+    interfaces_.erase(RESTART_IFACE_NAME);
 }
 #endif
 

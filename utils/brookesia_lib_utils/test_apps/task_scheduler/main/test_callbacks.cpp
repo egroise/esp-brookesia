@@ -7,6 +7,8 @@
 #include <chrono>
 #include <future>
 #include <map>
+#include "boost/thread/lock_guard.hpp"
+#include "boost/thread/mutex.hpp"
 #include <vector>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"

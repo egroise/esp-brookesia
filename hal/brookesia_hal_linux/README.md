@@ -15,9 +15,9 @@ Run the helper script from this directory:
 Use `--dry-run` to preview the package command. `--minimal` installs only the
 build, Boost, and OpenSSL dependencies. `--full` also installs the `proot`
 launcher helper used by the PC test apps for transparent absolute mount paths.
-`--media`, `--video`, `--display`, and `--network` install the optional
+`--media`, `--video`, `--display`, `--network`, and `--ble` install the optional
 dependency groups for FFmpeg/PortAudio/V4L2, FFmpeg/V4L2-only video, SDL2, and
-NetworkManager/UPower.
+NetworkManager/UPower, and GLib/GIO plus BlueZ.
 
 The script supports `apt`, `dnf`, and `pacman`. Other distributions print the
 dependency groups so they can be installed manually.
@@ -39,6 +39,7 @@ cmake -S host_test -B host_test/build-real \
   -DBROOKESIA_HAL_LINUX_DISPLAY_BACKEND=sdl2 \
   -DBROOKESIA_HAL_LINUX_POWER_BACKEND=upower \
   -DBROOKESIA_HAL_LINUX_WIFI_BACKEND=networkmanager \
+  -DBROOKESIA_HAL_LINUX_BLE_BACKEND=bluez \
   -DBROOKESIA_HAL_LINUX_VIDEO_BACKEND=ffmpeg_v4l2
 cmake --build host_test/build-real
 ctest --test-dir host_test/build-real --output-on-failure
@@ -50,6 +51,7 @@ backend variable. This keeps CI deterministic. The backend options accept:
 - `BROOKESIA_HAL_LINUX_MEDIA_BACKEND=auto|stub|ffmpeg_portaudio`
 - `BROOKESIA_HAL_LINUX_VIDEO_BACKEND=auto|stub|ffmpeg_v4l2`
 - `BROOKESIA_HAL_LINUX_WIFI_BACKEND=auto|stub|networkmanager`
+- `BROOKESIA_HAL_LINUX_BLE_BACKEND=auto|stub|bluez`
 - `BROOKESIA_HAL_LINUX_DISPLAY_BACKEND=auto|stub|sdl2`
 - `BROOKESIA_HAL_LINUX_POWER_BACKEND=auto|stub|upower`
 
@@ -57,6 +59,13 @@ Outside `host_test`, `auto` prefers the real backend when the optional
 development package is present. Runtime failures such as no display session, no
 camera, missing `nmcli`, no battery, or insufficient NetworkManager permissions
 fall back to the deterministic stub path with a warning log.
+
+For BLE, `bluez` is intentionally strict: missing GIO, system D-Bus access,
+`GattManager1`, or `LEAdvertisingManager1` is an error and never selects the
+stub. `auto` attempts the same BlueZ local GATT/advertising backend and falls
+back only when initialization is unavailable. The stub has no radio behavior;
+its `ble::linux_test` hooks explicitly inject connections, MTU changes,
+subscriptions, and writes for deterministic tests.
 
 ## Runtime Data
 
@@ -100,3 +109,8 @@ absolute-path access behave like the ESP target layout.
 - Wi-Fi uses NetworkManager via `nmcli` for scan/connect/disconnect/status.
   SoftAP is best-effort and may fail when the Wi-Fi device or permissions do not
   support AP mode.
+- BLE exports a single-connection Peripheral/GATT Server through BlueZ's system
+  D-Bus GATT and LE advertising managers. It supports write and
+  write-without-response characteristics, CCCD notification state, binary
+  notifications, MTU-aware payload checks, disconnect, and disconnect-driven
+  advertising restart.

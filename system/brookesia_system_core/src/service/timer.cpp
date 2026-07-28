@@ -97,25 +97,18 @@ std::vector<service::EventSchema> TimerService::get_event_schemas()
 
 service::ServiceBase::FunctionHandlerMap TimerService::get_function_handlers()
 {
-    using FunctionId = SystemTimerHelper::FunctionId;
     return {
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::StartPeriodic), [this](FunctionParameterMap &&params)
-            {
-                return start_periodic(std::move(params));
-            }
+            return start_periodic(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::StartDelayed), [this](FunctionParameterMap &&params)
-            {
-                return start_delayed(std::move(params));
-            }
+            return start_delayed(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::Stop), [this](FunctionParameterMap &&params)
-            {
-                return stop(std::move(params));
-            }
+            return stop(std::move(params));
         },
     };
 }

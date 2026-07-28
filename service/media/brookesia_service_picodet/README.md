@@ -6,6 +6,8 @@
 
 `brookesia_service_picodet` is the media service for on-device object detection, image inference, and frame-stream processing.
 
+Optional annotated-frame presentation uses the ServiceManager visual DataFlow interface, so this component does not link `brookesia_service_display` directly.
+
 For more information, see the [ESP-Brookesia Programming Guide](https://docs.espressif.com/projects/esp-brookesia/en/latest/service/picodet.html).
 
 ## How to Use

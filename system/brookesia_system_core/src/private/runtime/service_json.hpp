@@ -9,7 +9,8 @@
 #include <string>
 
 #include "boost/json.hpp"
-#include "brookesia/service_manager.hpp"
+#include "brookesia/service_manager/event/definition.hpp"
+#include "brookesia/service_manager/function/definition.hpp"
 
 namespace esp_brookesia::system::core {
 

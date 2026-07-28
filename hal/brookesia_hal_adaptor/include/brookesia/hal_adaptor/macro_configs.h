@@ -164,6 +164,44 @@
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////// BLE Device ////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#if !defined(BROOKESIA_HAL_ADAPTOR_BLE_DEVICE_ENABLE_DEBUG_LOG)
+#   if defined(CONFIG_BROOKESIA_HAL_ADAPTOR_BLE_DEVICE_ENABLE_DEBUG_LOG)
+#       define BROOKESIA_HAL_ADAPTOR_BLE_DEVICE_ENABLE_DEBUG_LOG  \
+            CONFIG_BROOKESIA_HAL_ADAPTOR_BLE_DEVICE_ENABLE_DEBUG_LOG
+#   else
+#       define BROOKESIA_HAL_ADAPTOR_BLE_DEVICE_ENABLE_DEBUG_LOG  (0)
+#   endif
+#endif
+#if !defined(BROOKESIA_HAL_ADAPTOR_BLE_BACKEND_ENABLE_DEBUG_LOG)
+#   if defined(CONFIG_BROOKESIA_HAL_ADAPTOR_BLE_BACKEND_ENABLE_DEBUG_LOG)
+#       define BROOKESIA_HAL_ADAPTOR_BLE_BACKEND_ENABLE_DEBUG_LOG  \
+            CONFIG_BROOKESIA_HAL_ADAPTOR_BLE_BACKEND_ENABLE_DEBUG_LOG
+#   else
+#       define BROOKESIA_HAL_ADAPTOR_BLE_BACKEND_ENABLE_DEBUG_LOG  (0)
+#   endif
+#endif
+#if !defined(BROOKESIA_HAL_ADAPTOR_ENABLE_BLE_DEVICE)
+#   if defined(CONFIG_BROOKESIA_HAL_ADAPTOR_ENABLE_BLE_DEVICE)
+#       define BROOKESIA_HAL_ADAPTOR_ENABLE_BLE_DEVICE  CONFIG_BROOKESIA_HAL_ADAPTOR_ENABLE_BLE_DEVICE
+#   else
+#       define BROOKESIA_HAL_ADAPTOR_ENABLE_BLE_DEVICE  (0)
+#   endif
+#endif
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////// Bluetooth Device //////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#if !defined(BROOKESIA_HAL_ADAPTOR_ENABLE_BT_DEVICE)
+#   if defined(CONFIG_BROOKESIA_HAL_ADAPTOR_ENABLE_BT_DEVICE)
+#       define BROOKESIA_HAL_ADAPTOR_ENABLE_BT_DEVICE  CONFIG_BROOKESIA_HAL_ADAPTOR_ENABLE_BT_DEVICE
+#   else
+#       define BROOKESIA_HAL_ADAPTOR_ENABLE_BT_DEVICE  (0)
+#   endif
+#endif
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////// Wi-Fi Device ///////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #if !defined(BROOKESIA_HAL_ADAPTOR_WIFI_DEVICE_ENABLE_DEBUG_LOG)
@@ -308,6 +346,14 @@
 #           define BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_OTA_UPDATER_IMPL  (0)
 #       endif
 #   endif
+#   if !defined(BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_RESTART_IMPL)
+#       if defined(CONFIG_BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_RESTART_IMPL)
+#           define BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_RESTART_IMPL \
+                CONFIG_BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_RESTART_IMPL
+#       else
+#           define BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_RESTART_IMPL  (1)
+#       endif
+#   endif
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -342,11 +388,20 @@
 #           define BROOKESIA_HAL_ADAPTOR_NETWORK_HTTP_CLIENT_REQUIRE_TLS_VERIFY  (1)
 #       endif
 #   endif
+#   if !defined(BROOKESIA_HAL_ADAPTOR_NETWORK_HTTP_CLIENT_TX_BUFFER_SIZE)
+#       if defined(CONFIG_BROOKESIA_HAL_ADAPTOR_NETWORK_HTTP_CLIENT_TX_BUFFER_SIZE)
+#           define BROOKESIA_HAL_ADAPTOR_NETWORK_HTTP_CLIENT_TX_BUFFER_SIZE  \
+                CONFIG_BROOKESIA_HAL_ADAPTOR_NETWORK_HTTP_CLIENT_TX_BUFFER_SIZE
+#       else
+#           define BROOKESIA_HAL_ADAPTOR_NETWORK_HTTP_CLIENT_TX_BUFFER_SIZE  (1024)
+#       endif
+#   endif
 #endif
 #if !BROOKESIA_HAL_ADAPTOR_ENABLE_NETWORK_DEVICE
 #   define BROOKESIA_HAL_ADAPTOR_NETWORK_ENABLE_SNTP_CLIENT_IMPL  (0)
 #   define BROOKESIA_HAL_ADAPTOR_NETWORK_ENABLE_HTTP_CLIENT_IMPL  (0)
 #   define BROOKESIA_HAL_ADAPTOR_NETWORK_HTTP_CLIENT_REQUIRE_TLS_VERIFY  (1)
+#   define BROOKESIA_HAL_ADAPTOR_NETWORK_HTTP_CLIENT_TX_BUFFER_SIZE  (1024)
 #endif
 #if BROOKESIA_HAL_ADAPTOR_ENABLE_SYSTEM_DEVICE
 #   if !defined(BROOKESIA_HAL_ADAPTOR_SYSTEM_OTA_UPDATER_THREAD_STACK_SIZE)

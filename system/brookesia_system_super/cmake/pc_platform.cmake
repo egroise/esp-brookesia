@@ -94,10 +94,10 @@ if(NOT DEFINED BROOKESIA_SYSTEM_CORE_PC_STAGE_SYSTEM_ROOT)
     set(BROOKESIA_SYSTEM_CORE_PC_STAGE_SYSTEM_ROOT "${CMAKE_BINARY_DIR}/brookesia/system")
 endif()
 
-if(NOT TARGET brookesia::service_display)
+if(NOT TARGET brookesia::service_manager)
     add_subdirectory(
-        ${COMPONENT_DIR}/../../service/media/brookesia_service_display
-        ${CMAKE_BINARY_DIR}/brookesia_service_display
+        ${COMPONENT_DIR}/../../service/framework/brookesia_service_manager
+        ${CMAKE_BINARY_DIR}/brookesia_service_manager
     )
 endif()
 if(NOT TARGET brookesia::service_wifi)
@@ -110,6 +110,12 @@ if(NOT TARGET brookesia::service_storage)
     add_subdirectory(
         ${COMPONENT_DIR}/../../service/system/brookesia_service_storage
         ${CMAKE_BINARY_DIR}/brookesia_service_storage
+    )
+endif()
+if(NOT TARGET brookesia::service_display)
+    add_subdirectory(
+        ${COMPONENT_DIR}/../../service/media/brookesia_service_display
+        ${CMAKE_BINARY_DIR}/brookesia_service_display
     )
 endif()
 
@@ -137,8 +143,9 @@ target_link_libraries(${COMPONENT_LIB}
         brookesia::system_core
     PRIVATE
         brookesia::lib_utils
-        brookesia::service_display
+        brookesia::service_manager
         brookesia::service_storage
+        brookesia::service_display
         brookesia::service_wifi
 )
 target_compile_definitions(${COMPONENT_LIB}

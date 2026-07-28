@@ -2,7 +2,7 @@
 
 [English Version](./README.md)
 
-本示例演示如何在 ESP-Brookesia 中启动一个完整的 System Super 产品壳。示例集成 HAL、Display/Audio/Wi-Fi/HTTP/Storage/SNTP/Video/Device 等服务、GUI LVGL 后端、JavaScript 运行时，以及内置 Settings、App Store 和 Files 应用，用于验证应用生命周期、资源打包、系统 overlay 和 launcher 流程。
+本示例演示如何在 ESP-Brookesia 中启动完整的 System Super 产品壳。默认构建集成 HAL、Display/Audio/Wi-Fi/HTTP/Storage/SNTP/Video/Device 等服务、NES 模拟器、Coze 和 Xiaozhi agent、GUI LVGL 后端、JavaScript 运行时，以及内置 Settings、App Store 和 Files 应用。
 
 ## 📑 目录
 
@@ -13,6 +13,8 @@
     - [硬件要求](#硬件要求)
     - [开发环境](#开发环境)
   - [🔨 如何使用](#-如何使用)
+  - [⚡ 构建性能](#-构建性能)
+  - [📊 构建分析](#-构建分析)
   - [🚀 快速体验](#-快速体验)
   - [🔍 故障排除](#-故障排除)
   - [💬 技术支持与反馈](#-技术支持与反馈)
@@ -53,6 +55,35 @@
 </a>
 
 请参考 [ESP-Brookesia 编程指南 - 如何使用示例工程](https://docs.espressif.com/projects/esp-brookesia/zh_CN/latest/getting_started.html#getting-started-example-projects)。
+
+## ⚡ 构建性能
+
+示例默认构建完整依赖集，同时启用 ccache，并限制第一方 Brookesia C++ target 和 `esp-boost` 的并发编译 edge 数量；这些模板密集型编译单元通常具有最高的编译器峰值内存。相同的调优机制也用于所有第一方 example 和 test app。
+
+| CMake 选项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `CCACHE_ENABLE` | `ON` | 在重复构建中复用编译结果 |
+| `BROOKESIA_CXX_JOBS` | `6` | 包含 C++ 的 Brookesia 和 `esp-boost` target 的 Ninja job pool 大小；设置为 `0` 可关闭限制 |
+| `BROOKESIA_FAST_COMPILE` | `OFF` | 为 Brookesia C++ 源文件使用 `-g1`，减少本地开发时的调试信息生成量 |
+| `BROOKESIA_COMPILE_TUNING_INCLUDE_ESP_BOOST` | `ON` | target 存在时将 `esp-boost` 加入共享 C++ job pool |
+
+PC 内存较小时可以进一步降低 `BROOKESIA_CXX_JOBS`：
+
+```bash
+idf.py -B build -D BROOKESIA_CXX_JOBS=3 build
+```
+
+现有的 GCC IPA clone 编译选项保持不变，并与 job pool 开关独立生效。旧的 `BROOKESIA_SUPER_CXX_JOBS` 和 `BROOKESIA_SUPER_FAST_COMPILE` 名称仍作为弃用别名接受。
+
+## 📊 构建分析
+
+完成配置或编译后，可基于构建元数据生成报告：
+
+```bash
+python3 tools/analyze_build.py build
+```
+
+工具读取 `project_description.json`、`compile_commands.json`、`.ninja_log` 和 Ninja 依赖信息，只会在指定构建目录中写入 `brookesia_build_analysis.json` 和 `brookesia_build_analysis.md`。仅需编译单元及 Ninja 耗时统计时可添加 `--skip-deps`。
 
 ## 🚀 快速体验
 

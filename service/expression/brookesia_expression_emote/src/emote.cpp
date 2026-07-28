@@ -3,9 +3,12 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <algorithm>
 #include <cstdint>
 #include <expected>
+#include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -19,19 +22,21 @@
 #include "../priv_include/emote_defs.h"
 #include "brookesia/lib_utils/function_guard.hpp"
 #include "brookesia/lib_utils/plugin.hpp"
-#include "brookesia/hal_interface.hpp"
-#include "brookesia/service_display.hpp"
 #include "brookesia/expression_emote/emote.hpp"
+#include "brookesia/service_manager/dataflow/registry.hpp"
+#include "brookesia/service_manager/service/manager.hpp"
 
 namespace esp_brookesia::expression {
 
 using EmoteHelper = service::helper::ExpressionEmote;
-using DisplayService = service::Display;
+
+constexpr std::string_view VISUAL_DATAFLOW_PROVIDER_ID_DEFAULT{};
+constexpr uint32_t VISUAL_DRAW_TIMEOUT_MS_DEFAULT = 5000;
 
 static bool get_native_source_data(const Emote::AssetSource &source, emote_data_t &native_data);
 static bool get_native_message_event(const std::string &event, std::string &native_event);
 static std::vector<gfx_obj_t *> get_native_objs(void *handle, Emote::GFX_ObjectType type);
-static size_t get_pixel_format_bytes(DisplayService::PixelFormat pixel_format);
+static size_t get_pixel_format_bytes(service::dataflow::VisualPixelFormat pixel_format);
 
 inline static emote_handle_t get_native_handle(void *handle)
 {
@@ -75,8 +80,14 @@ bool Emote::on_start()
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
-    if (DisplayService::Helper::is_available()) {
-        BROOKESIA_CHECK_FALSE_RETURN(setup_display_source(), false, "Failed to setup Emote Display source");
+    const auto providers = service::ServiceManager::get_instance().get_dataflow_registry().list_providers();
+    const auto visual_provider = std::find_if(providers.begin(), providers.end(), [](const auto & provider) {
+        return provider.available &&
+               (std::find(provider.models.begin(), provider.models.end(), service::dataflow::Model::Visual) !=
+                provider.models.end());
+    });
+    if (visual_provider != providers.end()) {
+        BROOKESIA_CHECK_FALSE_RETURN(setup_display_source(), false, "Failed to setup Emote visual source");
     }
     BROOKESIA_CHECK_FALSE_RETURN(is_configured(), false, "Emote is not configured");
 
@@ -88,7 +99,7 @@ bool Emote::on_start()
         auto *self = static_cast<Emote *>(emote_get_user_data(handle));
         BROOKESIA_CHECK_NULL_EXIT(self, "Invalid user data");
 
-        const bool auto_notify_flush_finished = self->display_source_id_ != 0;
+        const bool auto_notify_flush_finished = self->display_operation_ && self->display_operation_->is_available();
         lib_utils::FunctionGuard notify_guard([handle, auto_notify_flush_finished]() {
             if (auto_notify_flush_finished) {
                 emote_notify_flush_finished(handle);
@@ -104,7 +115,7 @@ bool Emote::on_start()
         };
         self->publish_event(BROOKESIA_DESCRIBE_TO_STR(EmoteHelper::EventId::FlushReady), service::EventItemMap{
             {
-                BROOKESIA_DESCRIBE_TO_STR(EmoteHelper::EventFlushReadyParam::Param),
+                "Param",
                 BROOKESIA_DESCRIBE_TO_JSON(param).as_object(),
             },
         });
@@ -146,8 +157,8 @@ bool Emote::on_start()
     native_handle_ = emote_init(&native_config);
     BROOKESIA_CHECK_NULL_RETURN(native_handle_, false, "Failed to initialize native emote");
 
-    if ((display_source_id_ != 0) && !display_output_name_.empty()) {
-        auto active_source_result = DisplayService::get_instance().get_active_source(display_output_name_);
+    if (display_operation_ && !display_output_name_.empty()) {
+        auto active_source_result = display_operation_->get_active_source(display_output_name_);
         if (active_source_result.has_value() && (active_source_result.value() == DISPLAY_SOURCE_NAME)) {
             (void)refresh_native();
         }
@@ -279,34 +290,43 @@ bool Emote::setup_display_source()
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
-    display_service_binding_ = service::ServiceManager::get_instance().bind(DisplayService::Helper::get_name().data());
-    BROOKESIA_CHECK_FALSE_RETURN(display_service_binding_.is_valid(), false, "Failed to bind Display service");
+    service::dataflow::VisualOperationConfig operation_config;
+    operation_config.owner = get_attributes().name;
+    operation_config.provider_id = std::string(VISUAL_DATAFLOW_PROVIDER_ID_DEFAULT);
+    operation_config.model = service::dataflow::Model::Visual;
+    operation_config.source = {
+        .name = std::string(DISPLAY_SOURCE_NAME),
+        .role = std::string(DISPLAY_SOURCE_ROLE),
+        .preferred_outputs = {},
+        .priority = 0,
+    };
+    auto operation_result = service::ServiceManager::get_instance().get_dataflow_registry().open_visual_operation(
+                                std::move(operation_config)
+                            );
+    BROOKESIA_CHECK_FALSE_RETURN(
+        operation_result.has_value(), false, "Failed to open Emote visual data-flow operation: %1%", operation_result.error()
+    );
+    auto display_operation = std::move(operation_result.value());
+    auto operation_cleanup_guard = lib_utils::FunctionGuard([&display_operation]() {
+        if (display_operation) {
+            display_operation->close();
+        }
+    });
 
-    auto outputs = DisplayService::get_instance().get_outputs();
-    BROOKESIA_CHECK_FALSE_RETURN(!outputs.empty(), false, "No Display output is available");
+    auto outputs = display_operation->get_outputs();
+    BROOKESIA_CHECK_FALSE_RETURN(!outputs.empty(), false, "No visual data-flow output is available");
 
     const auto &output = outputs.front();
-    display_output_name_ = output.name;
+    display_output_name_ = output.output.name;
     display_pixel_format_ = output.pixel_format;
 
-    bool swap_color_bytes = false;
-    auto panel_handles = hal::acquire_interfaces<hal::display::PanelIface>();
-    for (auto &panel_handle : panel_handles) {
-        if (panel_handle.instance_name() != output.panel_instance) {
-            continue;
-        }
-        hal::display::PanelIface::DriverSpecific panel_specific;
-        if (panel_handle->get_driver_specific(panel_specific)) {
-            swap_color_bytes = panel_specific.bus_type == hal::display::PanelIface::BusType::Generic;
-        }
-        break;
-    }
+    const bool swap_color_bytes = output.byte_order == service::dataflow::VisualByteOrder::Swap16;
 
     if (!is_configured_) {
         config_ = Config{
-            .h_res = output.width,
-            .v_res = output.height,
-            .buf_pixels = static_cast<size_t>(output.width * 16),
+            .h_res = output.output.width,
+            .v_res = output.output.height,
+            .buf_pixels = static_cast<size_t>(output.output.width * 16),
             .fps = 30,
             .task_priority = 5,
             .task_stack = 8 * 1024,
@@ -319,10 +339,10 @@ bool Emote::setup_display_source()
         is_configured_ = true;
     } else {
         if (config_.h_res == 0) {
-            config_.h_res = output.width;
+            config_.h_res = output.output.width;
         }
         if (config_.v_res == 0) {
-            config_.v_res = output.height;
+            config_.v_res = output.output.height;
         }
         if (config_.buf_pixels == 0) {
             config_.buf_pixels = static_cast<size_t>(config_.h_res * 16);
@@ -338,37 +358,28 @@ bool Emote::setup_display_source()
         }
     }
 
-    DisplayService::SourceInfo source = {
-        .name = std::string(DISPLAY_SOURCE_NAME),
-        .role = std::string(DISPLAY_SOURCE_ROLE),
-        .preferred_outputs = {display_output_name_},
-        .priority = 0,
-    };
-    auto register_result = DisplayService::get_instance().register_source(std::move(source));
+    auto request_result = display_operation->request_output(display_output_name_);
     BROOKESIA_CHECK_FALSE_RETURN(
-        register_result.has_value(), false, "Failed to register Emote Display source: %1%", register_result.error()
-    );
-    display_source_id_ = register_result.value();
-
-    auto request_result = DisplayService::get_instance().request_output(display_source_id_, display_output_name_);
-    BROOKESIA_CHECK_FALSE_RETURN(
-        request_result.has_value(), false, "Failed to request Emote Display output: %1%", request_result.error()
+        request_result.has_value(), false, "Failed to request Emote visual data-flow output: %1%", request_result.error()
     );
 
-    display_source_state_connection_ = DisplayService::get_instance().connect_source_state_changed(
-    [this](const std::string & source_name, const std::string & output_name, DisplayService::SourceState state) {
+    display_source_state_connection_ = display_operation->connect_source_state_changed(
+    [this](const std::string & source_name, const std::string & output_name, service::dataflow::SourceState state) {
         if ((source_name != DISPLAY_SOURCE_NAME) || (output_name != display_output_name_)) {
             return;
         }
-        if (state == DisplayService::SourceState::Granted) {
+        if (state == service::dataflow::SourceState::Granted) {
             (void)refresh_native();
         }
     }
                                        );
     BROOKESIA_CHECK_FALSE_RETURN(
         display_source_state_connection_.connected(), false,
-        "Failed to subscribe Display SourceStateChanged for Emote source"
+        "Failed to subscribe visual data-flow SourceStateChanged for Emote source"
     );
+
+    display_operation_ = std::move(display_operation);
+    operation_cleanup_guard.release();
 
     return true;
 }
@@ -379,32 +390,33 @@ void Emote::clear_display_source()
 
     display_source_state_connection_.disconnect();
 
-    if (display_source_id_ != 0) {
-        auto &display_service = DisplayService::get_instance();
-        if (!display_output_name_.empty()) {
-            (void)display_service.release_output(display_source_id_, display_output_name_);
-        }
-        (void)display_service.unregister_source(display_source_id_);
+    if (display_operation_) {
+        display_operation_->close();
+        display_operation_.reset();
     }
 
     display_output_name_.clear();
-    display_source_id_ = 0;
-    display_pixel_format_ = DisplayService::PixelFormat::Max;
+    display_pixel_format_ = service::dataflow::VisualPixelFormat::Unknown;
 }
 
 esp_err_t Emote::submit_display_frame(int x_start, int y_start, int x_end, int y_end, const void *data)
 {
     BROOKESIA_CHECK_NULL_RETURN(data, ESP_ERR_INVALID_ARG, "Emote frame data is null");
-    BROOKESIA_CHECK_FALSE_RETURN(display_source_id_ != 0, ESP_ERR_INVALID_STATE, "Emote Display source is not registered");
-    BROOKESIA_CHECK_FALSE_RETURN(!display_output_name_.empty(), ESP_ERR_INVALID_STATE, "Emote Display output is not selected");
+    BROOKESIA_CHECK_FALSE_RETURN(
+        display_operation_ && display_operation_->is_available(), ESP_ERR_INVALID_STATE,
+        "Emote visual data-flow operation is not available"
+    );
+    BROOKESIA_CHECK_FALSE_RETURN(
+        !display_output_name_.empty(), ESP_ERR_INVALID_STATE, "Emote visual data-flow output is not selected"
+    );
     BROOKESIA_CHECK_FALSE_RETURN((x_end > x_start) && (y_end > y_start), ESP_ERR_INVALID_ARG, "Invalid Emote frame area");
 
     const size_t bpp = get_pixel_format_bytes(display_pixel_format_);
-    BROOKESIA_CHECK_FALSE_RETURN(bpp > 0, ESP_ERR_NOT_SUPPORTED, "Unsupported Display pixel format");
+    BROOKESIA_CHECK_FALSE_RETURN(bpp > 0, ESP_ERR_NOT_SUPPORTED, "Unsupported visual output pixel format");
 
     const uint32_t width = static_cast<uint32_t>(x_end - x_start);
     const uint32_t height = static_cast<uint32_t>(y_end - y_start);
-    DisplayService::FrameInfo frame = {
+    service::dataflow::VisualFrameInfo frame = {
         .x = static_cast<uint32_t>(x_start),
         .y = static_cast<uint32_t>(y_start),
         .width = width,
@@ -412,20 +424,24 @@ esp_err_t Emote::submit_display_frame(int x_start, int y_start, int x_end, int y
         .pixel_format = display_pixel_format_,
     };
 
-    auto present_result = DisplayService::get_instance().present_frame_sync(
-                              display_source_id_, display_output_name_, frame,
-                              service::RawBuffer(data, static_cast<size_t>(width) * height * bpp)
+    auto present_result = display_operation_->present_frame_sync(
+                              display_output_name_, frame,
+                              std::span<const uint8_t>(
+                                  static_cast<const uint8_t *>(data), static_cast<size_t>(width) * height * bpp
+                              ),
+                              VISUAL_DRAW_TIMEOUT_MS_DEFAULT
                           );
 
     switch (present_result) {
-    case DisplayService::PresentResult::Presented:
+    case service::dataflow::VisualPresentResult::Presented:
         return ESP_OK;
-    case DisplayService::PresentResult::DroppedNotActive:
+    case service::dataflow::VisualPresentResult::DroppedNotActive:
         return ESP_ERR_NOT_ALLOWED;
-    case DisplayService::PresentResult::DroppedInvalidFrame:
-    case DisplayService::PresentResult::Error:
+    case service::dataflow::VisualPresentResult::DroppedInvalidFrame:
+    case service::dataflow::VisualPresentResult::DroppedQueueFull:
+    case service::dataflow::VisualPresentResult::Error:
     default:
-        BROOKESIA_LOGW("Emote Display frame was not presented: %1%", BROOKESIA_DESCRIBE_ENUM_TO_STR(present_result));
+        BROOKESIA_LOGW("Emote visual frame was not presented: %1%", BROOKESIA_DESCRIBE_ENUM_TO_STR(present_result));
         return ESP_ERR_INVALID_STATE;
     }
 }
@@ -748,13 +764,15 @@ static bool get_native_message_event(const std::string &event, std::string &nati
     return true;
 }
 
-static size_t get_pixel_format_bytes(DisplayService::PixelFormat pixel_format)
+static size_t get_pixel_format_bytes(service::dataflow::VisualPixelFormat pixel_format)
 {
     switch (pixel_format) {
-    case DisplayService::PixelFormat::RGB565:
+    case service::dataflow::VisualPixelFormat::RGB565:
         return 2;
-    case DisplayService::PixelFormat::RGB888:
+    case service::dataflow::VisualPixelFormat::RGB888:
         return 3;
+    case service::dataflow::VisualPixelFormat::ARGB8888:
+        return 4;
     default:
         return 0;
     }

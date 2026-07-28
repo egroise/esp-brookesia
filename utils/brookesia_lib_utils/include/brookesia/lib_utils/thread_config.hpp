@@ -5,8 +5,9 @@
  */
 #pragma once
 
-#include "brookesia/lib_utils/macro_configs.h"
-#include "brookesia/lib_utils/describe_helpers.hpp"
+#include <cstddef>
+#include <string>
+
 #include "brookesia/lib_utils/macro_configs.h"
 
 namespace esp_brookesia::lib_utils {
@@ -106,9 +107,7 @@ private:
     ThreadConfig original_config_;  ///< Original configuration to restore on destruction
 };
 
-BROOKESIA_DESCRIBE_STRUCT(ThreadConfig, (), (name, core_id, priority, stack_size, stack_in_ext))
-
-}; // namespace esp_brookesia::lib_utils
+} // namespace esp_brookesia::lib_utils
 
 #define _BROOKESIA_THREAD_CONFIG_CONCAT(a, b) a##b
 #define BROOKESIA_THREAD_CONFIG_CONCAT(a, b) _BROOKESIA_THREAD_CONFIG_CONCAT(a, b)

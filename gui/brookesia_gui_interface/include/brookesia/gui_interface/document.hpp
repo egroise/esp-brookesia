@@ -302,6 +302,8 @@ struct Style {
     std::optional<int32_t> arc_gradient_segments;
     std::optional<bool> arc_rounded;
     std::optional<bool> clip_corner;
+
+    bool operator==(const Style &) const = default;
 };
 
 using StateStyleMap = std::map<std::string, Style>;
@@ -309,6 +311,8 @@ using StateStyleMap = std::map<std::string, Style>;
 struct PartStyleSet {
     Style style;
     StateStyleMap state_styles;
+
+    bool operator==(const PartStyleSet &) const = default;
 };
 
 using PartStyleMap = std::map<std::string, PartStyleSet>;
@@ -334,11 +338,15 @@ inline bool is_supported_style_part_name(std::string_view part)
 struct ImageFontGlyph {
     uint32_t codepoint = 0;
     std::string src;
+
+    bool operator==(const ImageFontGlyph &) const = default;
 };
 
 struct ImageFontSize {
     int32_t height = 0;
     std::vector<ImageFontGlyph> glyphs;
+
+    bool operator==(const ImageFontSize &) const = default;
 };
 
 struct FontAsset {
@@ -373,18 +381,20 @@ struct StyleAsset {
 struct NativeFontVariant {
     uintptr_t native_src = 0;
     int32_t native_size = 0;
+
+    bool operator==(const NativeFontVariant &) const = default;
 };
 
 struct RuntimeFontResource {
-    std::string id;
+    std::string id = {};
     std::string kind = "file";
-    std::string primary_src;
-    std::vector<std::string> languages;
-    std::vector<std::string> fallback_ids;
-    std::vector<NativeFontVariant> native_fonts;
+    std::string primary_src = {};
+    std::vector<std::string> languages = {};
+    std::vector<std::string> fallback_ids = {};
+    std::vector<NativeFontVariant> native_fonts = {};
     int32_t image_font_height = 0;
-    std::vector<ImageFontGlyph> image_font_glyphs;
-    std::vector<ImageFontSize> image_font_sizes;
+    std::vector<ImageFontGlyph> image_font_glyphs = {};
+    std::vector<ImageFontSize> image_font_sizes = {};
 };
 
 struct RuntimeImageResource {
@@ -419,6 +429,8 @@ struct ResolvedFontSpec {
     int32_t image_font_height = 0;
     std::vector<ImageFontGlyph> image_font_glyphs;
     std::vector<ImageFontSize> image_font_sizes;
+
+    bool operator==(const ResolvedFontSpec &) const = default;
 };
 
 struct ResolvedStyle {
@@ -426,6 +438,8 @@ struct ResolvedStyle {
     ResolvedFontSpec resolved_font;
     StateStyleMap state_styles;
     PartStyleMap part_styles;
+
+    bool operator==(const ResolvedStyle &) const = default;
 };
 
 struct ResolvedImageSpec {

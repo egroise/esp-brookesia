@@ -1,5 +1,11 @@
 # ChangeLog
 
+## v0.8.2 - 2026-07-27
+
+### Enhancements:
+
+- chore(build): use lightweight utility headers and shared compile tuning for component tests.
+
 ## v0.8.1 - 2026-07-13
 
 ### Enhancements:

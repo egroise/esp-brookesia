@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include "boost/thread/lock_guard.hpp"
 #include "boost/thread/shared_mutex.hpp"
 #include "brookesia/lib_utils/macro_configs.h"
 #include "brookesia/lib_utils/state_base.hpp"

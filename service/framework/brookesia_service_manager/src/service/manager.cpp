@@ -4,14 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include <exception>
+#include <cassert>
 #include "brookesia/service_manager/macro_configs.h"
 #if !BROOKESIA_SERVICE_MANAGER_SERVICE_ENABLE_DEBUG_LOG
 #   define BROOKESIA_LOG_DISABLE_DEBUG_TRACE 1
 #endif
 #include "private/utils.hpp"
+#include "brookesia/service_manager/dataflow/registry.hpp"
+#include "brookesia/service_manager/event/registry.hpp"
+#include "brookesia/service_manager/function/registry.hpp"
+#include "brookesia/service_manager/service/dataflow_service.hpp"
 #include "brookesia/service_manager/service/manager.hpp"
 
 namespace esp_brookesia::service {
+
+ServiceManager::ServiceManager() = default;
 
 ServiceBinding::ServiceBinding(ServiceBinding &&other) noexcept
     : unbind_callback_(std::move(other.unbind_callback_))
@@ -106,7 +113,17 @@ bool ServiceManager::init_internal()
         utils_service_ = std::make_shared<UtilsService>(), false,
         "Failed to create the built-in Utils service"
     );
+    BROOKESIA_CHECK_EXCEPTION_RETURN(
+        dataflow_registry_ = std::make_unique<dataflow::DataFlowRegistry>(*this), false,
+        "Failed to create the DataFlow registry"
+    );
+    BROOKESIA_CHECK_EXCEPTION_RETURN(
+        dataflow_service_ = std::make_shared<DataFlowService>(*this), false,
+        "Failed to create the built-in DataFlow service"
+    );
     if (!add_service(manager_service_)) {
+        dataflow_service_.reset();
+        dataflow_registry_.reset();
         utils_service_.reset();
         manager_service_.reset();
         task_scheduler_.reset();
@@ -116,11 +133,25 @@ bool ServiceManager::init_internal()
     }
     if (!add_service(utils_service_)) {
         remove_service(ManagerService::get_name().data());
+        dataflow_service_.reset();
+        dataflow_registry_.reset();
         utils_service_.reset();
         manager_service_.reset();
         task_scheduler_.reset();
         secondary_task_scheduler_.reset();
         BROOKESIA_LOGE("Failed to add the built-in Utils service");
+        return false;
+    }
+    if (!add_service(dataflow_service_)) {
+        remove_service(UtilsService::get_name().data());
+        remove_service(ManagerService::get_name().data());
+        dataflow_service_.reset();
+        dataflow_registry_.reset();
+        utils_service_.reset();
+        manager_service_.reset();
+        task_scheduler_.reset();
+        secondary_task_scheduler_.reset();
+        BROOKESIA_LOGE("Failed to add the built-in DataFlow service");
         return false;
     }
 
@@ -149,6 +180,8 @@ void ServiceManager::deinit()
 
     // Deinitialize all services
     remove_all_registered_services();
+    dataflow_service_.reset();
+    dataflow_registry_.reset();
     utils_service_.reset();
     manager_service_.reset();
 
@@ -212,6 +245,14 @@ bool ServiceManager::start(const lib_utils::TaskScheduler::StartConfig &config)
         BROOKESIA_LOGE("Failed to start the built-in Utils service");
         return false;
     }
+    dataflow_binding_ = bind(DataFlowService::get_name().data());
+    if (!dataflow_binding_.is_valid()) {
+        utils_binding_.release();
+        manager_binding_.release();
+        is_running_.store(false);
+        BROOKESIA_LOGE("Failed to start the built-in DataFlow service");
+        return false;
+    }
 
     stop_guard.release();
 
@@ -237,7 +278,9 @@ void ServiceManager::stop_internal()
         return;
     }
 
-    // Stop Utils first so profiler callbacks finish while the shared service schedulers are still alive.
+    // Stop DataFlow first so provider callbacks cannot outlive the manager-owned
+    // control plane while the shared service schedulers are still alive.
+    dataflow_binding_.release();
     utils_binding_.release();
     manager_binding_.release();
 
@@ -263,6 +306,7 @@ void ServiceManager::stop_internal()
             service_it->second.transition_cv.notify_all();
         }
     };
+    stop_builtin(DataFlowService::get_name(), dataflow_service_);
     stop_builtin(UtilsService::get_name(), utils_service_);
     stop_builtin(ManagerService::get_name(), manager_service_);
 
@@ -614,7 +658,8 @@ std::optional<ServiceManager::ServiceInfo> ServiceManager::get_service_info(cons
     }
     const auto &runtime_info = service_it->second;
     const auto &attributes = runtime_info.service->get_attributes();
-    const bool is_builtin = (name == ManagerService::get_name()) || (name == UtilsService::get_name());
+    const bool is_builtin = (name == ManagerService::get_name()) || (name == UtilsService::get_name()) ||
+                            (name == DataFlowService::get_name());
     const auto reference_count = is_builtin && is_running() && (runtime_info.ref_count > 0)
                                  ? runtime_info.ref_count - 1 : runtime_info.ref_count;
     return ServiceInfo{
@@ -625,6 +670,18 @@ std::optional<ServiceManager::ServiceInfo> ServiceManager::get_service_info(cons
         .bindable = attributes.bindable,
         .dependencies = attributes.dependencies,
     };
+}
+
+dataflow::DataFlowRegistry &ServiceManager::get_dataflow_registry()
+{
+    assert(dataflow_registry_ != nullptr);
+    return *dataflow_registry_;
+}
+
+const dataflow::DataFlowRegistry &ServiceManager::get_dataflow_registry() const
+{
+    assert(dataflow_registry_ != nullptr);
+    return *dataflow_registry_;
 }
 
 std::optional<ManagerService::ServiceSchemaOverview> ServiceManager::get_service_schema(

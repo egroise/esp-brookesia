@@ -1,5 +1,12 @@
 # ChangeLog
 
+## v0.8.2 - 2026-07-27
+
+### Enhancements:
+
+- feat(dataflow): route agent audio capture and playback through provider-neutral Manager operations.
+- chore(deps): remove the direct audio-provider dependency from Agent Manager.
+
 ## v0.8.1 - 2026-07-13
 
 ### Breaking Changes:

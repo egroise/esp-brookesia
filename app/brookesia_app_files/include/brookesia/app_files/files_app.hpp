@@ -16,7 +16,7 @@
 
 #include "brookesia/lib_utils/signal.hpp"
 
-#include "brookesia/service_manager.hpp"
+#include "brookesia/service_manager/function/definition.hpp"
 #include "brookesia/system_core.hpp"
 
 namespace esp_brookesia::app::files {

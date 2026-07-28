@@ -269,11 +269,16 @@ void Wifi::on_deinit()
     connect_retries_ = 0;
     connecting_ap_info_ = {};
 
+    {
+        std::lock_guard<std::recursive_mutex> callback_lock(hal_callback_mutex_);
+        hal_callbacks_enabled_ = false;
+        clear_hal_interface_callbacks();
+    }
+
     state_machine_.reset();
     if (basic_iface_) {
         basic_iface_->deinit();
     }
-    clear_hal_interface_callbacks();
     softap_iface_.reset();
     station_iface_.reset();
     basic_iface_.reset();
@@ -342,11 +347,22 @@ void Wifi::on_stop()
         }
     }
 
+    /* Disable and clear callbacks before stopping objects used by those callbacks. This
+     * waits for an in-flight callback and makes queued callbacks return immediately. */
+    {
+        std::lock_guard<std::recursive_mutex> callback_lock(hal_callback_mutex_);
+        hal_callbacks_enabled_ = false;
+        clear_hal_interface_callbacks();
+    }
+
     /* Stop the state machine first */
-    state_machine_->stop();
+    if (state_machine_) {
+        state_machine_->stop();
+    }
     /* Reset the wifi context */
-    basic_iface_->stop();
-    clear_hal_interface_callbacks();
+    if (basic_iface_) {
+        basic_iface_->stop();
+    }
 }
 
 std::expected<void, std::string> Wifi::function_trigger_general_action(const std::string &action)
@@ -1101,7 +1117,18 @@ bool Wifi::configure_hal_interfaces()
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
 
+    {
+        std::lock_guard<std::recursive_mutex> callback_lock(hal_callback_mutex_);
+        hal_callbacks_enabled_ = false;
+        clear_hal_interface_callbacks();
+    }
+
     auto handle_general_event = [this](GeneralEvent general_event, bool is_unexpected) {
+        std::lock_guard<std::recursive_mutex> callback_lock(hal_callback_mutex_);
+        if (!hal_callbacks_enabled_) {
+            return;
+        }
+
         bool was_connecting = false;
         if (state_machine_) {
             was_connecting = (state_machine_->get_current_state() == GeneralState::Connecting);
@@ -1122,6 +1149,11 @@ bool Wifi::configure_hal_interfaces()
     auto basic_callbacks = hal::wifi::BasicIface::Callbacks{
         .on_action = [this](hal::wifi::BasicAction action)
         {
+            std::lock_guard<std::recursive_mutex> callback_lock(hal_callback_mutex_);
+            if (!hal_callbacks_enabled_) {
+                return;
+            }
+
             auto general_action = to_general_action(action);
             if (general_action != GeneralAction::Max) {
                 publish_general_action(general_action);
@@ -1137,6 +1169,11 @@ bool Wifi::configure_hal_interfaces()
         },
         .on_error = [this]()
         {
+            std::lock_guard<std::recursive_mutex> callback_lock(hal_callback_mutex_);
+            if (!hal_callbacks_enabled_) {
+                return;
+            }
+
             on_hal_error_state();
         },
     };
@@ -1151,6 +1188,11 @@ bool Wifi::configure_hal_interfaces()
     auto station_callbacks = hal::wifi::StationIface::Callbacks{
         .on_action = [this](hal::wifi::StationAction action)
         {
+            std::lock_guard<std::recursive_mutex> callback_lock(hal_callback_mutex_);
+            if (!hal_callbacks_enabled_) {
+                return;
+            }
+
             auto general_action = to_general_action(action);
             if (general_action != GeneralAction::Max) {
                 publish_general_action(general_action);
@@ -1166,19 +1208,39 @@ bool Wifi::configure_hal_interfaces()
         },
         .on_error = [this]()
         {
+            std::lock_guard<std::recursive_mutex> callback_lock(hal_callback_mutex_);
+            if (!hal_callbacks_enabled_) {
+                return;
+            }
+
             on_hal_error_state();
         },
         .on_action_requested = [this](hal::wifi::StationAction action)
         {
+            std::lock_guard<std::recursive_mutex> callback_lock(hal_callback_mutex_);
+            if (!hal_callbacks_enabled_) {
+                return false;
+            }
+
             auto general_action = to_general_action(action);
             return (general_action != GeneralAction::Max) && trigger_general_action(general_action);
         },
         .on_scan_state_changed = [this](bool is_running)
         {
+            std::lock_guard<std::recursive_mutex> callback_lock(hal_callback_mutex_);
+            if (!hal_callbacks_enabled_) {
+                return;
+            }
+
             publish_scan_state_changed(is_running);
         },
         .on_scan_ap_infos_updated = [this](std::span<const ScanApInfo> ap_infos)
         {
+            std::lock_guard<std::recursive_mutex> callback_lock(hal_callback_mutex_);
+            if (!hal_callbacks_enabled_) {
+                return;
+            }
+
             publish_scan_ap_infos(ap_infos);
             if (!handle_scan_ap_infos_policy(ap_infos)) {
                 BROOKESIA_LOGE("Failed to handle scan AP infos policy");
@@ -1186,16 +1248,31 @@ bool Wifi::configure_hal_interfaces()
         },
         .on_last_connected_ap_info_updated = [this](const ConnectApInfo &)
         {
+            std::lock_guard<std::recursive_mutex> callback_lock(hal_callback_mutex_);
+            if (!hal_callbacks_enabled_) {
+                return;
+            }
+
             try_save_data(DataType::LastAp);
         },
         .on_connected_ap_infos_updated = [this](const hal::wifi::ConnectApInfoList &)
         {
+            std::lock_guard<std::recursive_mutex> callback_lock(hal_callback_mutex_);
+            if (!hal_callbacks_enabled_) {
+                return;
+            }
+
             try_save_data(DataType::ConnectedAps);
         },
     };
     BROOKESIA_CHECK_FALSE_RETURN(
         station_iface_->configure(std::move(station_callbacks)), false, "Failed to configure Wi-Fi station interface"
     );
+
+    {
+        std::lock_guard<std::recursive_mutex> callback_lock(hal_callback_mutex_);
+        hal_callbacks_enabled_ = true;
+    }
 
     if (!softap_iface_) {
         return true;
@@ -1204,6 +1281,11 @@ bool Wifi::configure_hal_interfaces()
     auto softap_callbacks = hal::wifi::SoftApIface::Callbacks{
         .on_event = [this](hal::wifi::SoftApEvent event)
         {
+            std::lock_guard<std::recursive_mutex> callback_lock(hal_callback_mutex_);
+            if (!hal_callbacks_enabled_) {
+                return;
+            }
+
             if ((event == hal::wifi::SoftApEvent::Stopped) && softap_provision_running_) {
                 softap_provision_running_ = false;
                 auto_connect_disabled_ = false;
@@ -1213,10 +1295,20 @@ bool Wifi::configure_hal_interfaces()
         },
         .on_params_updated = [this](const SoftApParams &)
         {
+            std::lock_guard<std::recursive_mutex> callback_lock(hal_callback_mutex_);
+            if (!hal_callbacks_enabled_) {
+                return;
+            }
+
             try_save_data(DataType::SoftApParams);
         },
         .on_station_action_requested = [this](hal::wifi::StationAction action)
         {
+            std::lock_guard<std::recursive_mutex> callback_lock(hal_callback_mutex_);
+            if (!hal_callbacks_enabled_) {
+                return false;
+            }
+
             auto general_action = to_general_action(action);
             return (general_action != GeneralAction::Max) && trigger_general_action(general_action);
         },

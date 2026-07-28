@@ -164,7 +164,7 @@ public:
     connection connect(slot_type slot)
     {
         auto control = std::make_shared<signal_detail::SlotControl>();
-        auto entry = std::make_shared<Slot>(Slot{control, std::move(slot)});
+        auto entry = std::make_shared<Slot>(control, std::move(slot));
         std::lock_guard<std::mutex> lock(mutex_);
         slots_.push_back(std::move(entry));
         return connection{control};
@@ -233,6 +233,15 @@ public:
 
 private:
     struct Slot {
+        Slot(std::shared_ptr<signal_detail::SlotControl> control_in, slot_type fn_in)
+            : control(std::move(control_in)), fn(std::move(fn_in))
+        {
+        }
+
+        // GCC 16 may misdiagnose std::function destruction as array-bounds
+        // when this destructor is inlined through shared_ptr's control block.
+        [[gnu::noinline]] ~Slot() = default;
+
         std::shared_ptr<signal_detail::SlotControl> control;
         slot_type fn;
     };

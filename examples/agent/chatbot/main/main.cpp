@@ -74,6 +74,7 @@ extern "C" void app_main(void)
         BROOKESIA_CHECK_FALSE_EXIT(service_manager.start(), "Failed to start ServiceManager");
 
         GeneralServices::get_instance().start_device();
+        GeneralServices::get_instance().start_bt_speaker();
 
         /* Initialize AI agents */
         AI_Agents::get_instance().init({

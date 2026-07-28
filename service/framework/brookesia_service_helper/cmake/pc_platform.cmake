@@ -22,7 +22,6 @@ target_link_libraries(${COMPONENT_LIB}
         brookesia::service_manager
         brookesia::hal_interface
         brookesia::lib_utils
-        brookesia::hal_interface
 )
 
 if(DEFINED BROOKESIA_SERVICE_HELPER_PC_COMPILE_DEFINITIONS AND

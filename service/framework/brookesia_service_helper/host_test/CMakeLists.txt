@@ -49,3 +49,5 @@ add_test(
     NAME brookesia_service_helper_schema_dump
     COMMAND brookesia_service_helper_host_test
 )
+
+brookesia_compile_tuning_apply_current_project()

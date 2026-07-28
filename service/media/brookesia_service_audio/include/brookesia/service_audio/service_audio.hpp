@@ -24,6 +24,7 @@
 #include "brookesia/hal_interface/interfaces/audio/processor.hpp"
 #include "brookesia/service_helper/media/audio.hpp"
 #include "brookesia/service_helper/system/storage.hpp"
+#include "brookesia/service_manager/dataflow/registration.hpp"
 #include "brookesia/service_manager/macro_configs.h"
 #include "brookesia/service_manager/service/base.hpp"
 #include "brookesia/service_audio/macro_configs.h"
@@ -77,7 +78,7 @@ private:
             StorageHelper::get_name().data(),
         },
 #if BROOKESIA_SERVICE_AUDIO_ENABLE_WORKER
-        .task_scheduler_config = lib_utils::TaskScheduler::StartConfig{
+        .task_scheduler_config = lib_utils::TaskSchedulerStartConfig{
             .worker_configs = {
                 lib_utils::ThreadConfig{
                     .name = BROOKESIA_SERVICE_AUDIO_WORKER_NAME,
@@ -207,7 +208,7 @@ private:
         int64_t start_time_ms = 0;
         int64_t pause_start_ms = 0;
         int64_t paused_duration_ms = 0;
-        lib_utils::TaskScheduler::TaskId scheduled_task_id = 0;
+        lib_utils::TaskSchedulerTaskId scheduled_task_id = 0;
     };
     PlaylistState playlist_state_;
     std::mutex playlist_state_mutex_;
@@ -222,7 +223,7 @@ public:
         .description = "Capture and encode audio for one configured input instance.",
         .version = get_component_version(),
 #if BROOKESIA_SERVICE_AUDIO_ENABLE_WORKER
-        .task_scheduler_config = lib_utils::TaskScheduler::StartConfig{
+        .task_scheduler_config = lib_utils::TaskSchedulerStartConfig{
             .worker_configs = {
                 lib_utils::ThreadConfig{
                     .name = BROOKESIA_SERVICE_AUDIO_WORKER_NAME,
@@ -255,12 +256,15 @@ public:
     }
 
 private:
+    friend class AudioCaptureDataFlowOperation;
+
     static std::string get_component_version();
 
     using BaseHelper = helper::Audio;
     using Helper = helper::AudioEncoder<0>;
 
     bool on_init() override;
+    void on_deinit() override;
     bool on_start() override;
     void on_stop() override;
 
@@ -325,18 +329,21 @@ private:
 
     int id_ = 0;
     hal::InterfaceHandle<hal::audio::EncoderIface> encoder_iface_;
-    lib_utils::TaskScheduler::TaskId encoder_fetch_task_id_ = 0;
+    lib_utils::TaskSchedulerTaskId encoder_fetch_task_id_ = 0;
     AudioEncoderDynamicConfig encoder_config_{};
     std::mutex encoder_state_mutex_;
     std::vector<uint8_t> encoder_fetch_buffer_;
     DataSignal encoded_data_signal_;
     DataSignal recorder_data_signal_;
-    lib_utils::TaskScheduler::TaskId wake_end_task_id_ = 0;
+    using AfeEventSignal = esp_brookesia::lib_utils::signal<void(AudioAFE_Event event)>;
+    AfeEventSignal afe_event_signal_;
+    lib_utils::TaskSchedulerTaskId wake_end_task_id_ = 0;
     int64_t wake_end_deadline_ms_ = 0;
     int64_t wake_end_remaining_ms_ = 0;
     uint32_t wake_end_session_id_ = 0;
     bool wake_end_paused_ = false;
     bool wake_end_pending_ = false;
+    std::optional<dataflow::ProviderRegistration> dataflow_provider_registration_;
 };
 
 class AudioDecoder : public ServiceBase {
@@ -413,6 +420,7 @@ private:
     using Helper = helper::AudioDecoder<0>;
 
     bool on_init() override;
+    void on_deinit() override;
     bool on_start() override;
     void on_stop() override;
 
@@ -570,10 +578,11 @@ private:
     uint32_t active_hal_source_id_ = 0;
     std::string active_hal_output_name_;
     AudioStreamConfig active_hal_config_{};
-    lib_utils::TaskScheduler::TaskId decoder_stream_task_id_ = 0;
+    lib_utils::TaskSchedulerTaskId decoder_stream_task_id_ = 0;
     SourceStateChangedSignal source_state_changed_signal_;
     ActiveSourceChangedSignal active_source_changed_signal_;
     StreamDrainedSignal stream_drained_signal_;
+    std::optional<dataflow::ProviderRegistration> dataflow_provider_registration_;
 };
 
 } // namespace esp_brookesia::service

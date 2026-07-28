@@ -8,6 +8,10 @@
 
 For more information, see the [ESP-Brookesia Programming Guide](https://docs.espressif.com/projects/esp-brookesia/en/latest/service/display.html).
 
+## DataFlow Integration
+
+The service registers a visual DataFlow provider for output and source discovery, active-source routing, and frame presentation. Video consumers can use the provider-neutral visual operation without depending on this component's implementation details.
+
 ## How to Use
 
 ### Environment Requirements

@@ -106,6 +106,26 @@ std::optional<std::string> load_string_preference(std::string_view key)
     return *result;
 }
 
+std::expected<void, std::string> save_string_preference_sync(std::string_view key, std::string value)
+{
+    auto kv_name = make_gui_preference_kv_name(key);
+    if (!kv_name) {
+        return std::unexpected(kv_name.error());
+    }
+
+    auto result = StorageHelper::save_key_value(
+                      kv_name->nspace,
+                      kv_name->key,
+                      value,
+                      GUI_PREFERENCE_STORAGE_TIMEOUT_MS
+                  );
+    if (!result) {
+        return std::unexpected(result.error());
+    }
+    BROOKESIA_LOGI("System GUI preference '%1%: %2%' is saved synchronously", key, value);
+    return {};
+}
+
 void save_string_preference(std::string_view key, std::string value)
 {
     auto kv_name = make_gui_preference_kv_name(key);
@@ -143,11 +163,13 @@ void System::Impl::load_gui_preferences()
 
 std::optional<std::string> System::get_stored_gui_theme_id() const
 {
+    std::lock_guard lock(impl_->mutex_);
     return impl_->stored_theme_id_;
 }
 
 std::optional<std::string> System::get_stored_gui_language() const
 {
+    std::lock_guard lock(impl_->mutex_);
     return impl_->stored_language_;
 }
 
@@ -176,6 +198,36 @@ void System::Impl::persist_gui_language_preference(std::string_view language)
         return;
     }
     save_string_preference(GUI_PREFERENCE_LANGUAGE_KEY, std::string(language));
+}
+
+std::expected<void, std::string> System::Impl::save_gui_theme_preference(std::string_view theme_id)
+{
+    if (theme_id.empty()) {
+        return std::unexpected("GUI theme preference is empty");
+    }
+    if (auto result = save_string_preference_sync(GUI_PREFERENCE_THEME_KEY, std::string(theme_id)); !result) {
+        return std::unexpected("Failed to save GUI theme preference: " + result.error());
+    }
+    {
+        std::lock_guard lock(mutex_);
+        stored_theme_id_ = std::string(theme_id);
+    }
+    return {};
+}
+
+std::expected<void, std::string> System::Impl::save_gui_language_preference(std::string_view language)
+{
+    if (language.empty()) {
+        return std::unexpected("GUI language preference is empty");
+    }
+    if (auto result = save_string_preference_sync(GUI_PREFERENCE_LANGUAGE_KEY, std::string(language)); !result) {
+        return std::unexpected("Failed to save GUI language preference: " + result.error());
+    }
+    {
+        std::lock_guard lock(mutex_);
+        stored_language_ = std::string(language);
+    }
+    return {};
 }
 
 } // namespace esp_brookesia::system::core

@@ -20,7 +20,7 @@ using brookesia_host::append_helper_schema_dump;
 int main()
 {
     boost::json::array helpers;
-    helpers.reserve(20);
+    helpers.reserve(24);
     std::size_t total_function_count = 0;
     std::size_t total_event_count = 0;
     std::size_t helper_error_count = 0;
@@ -53,6 +53,9 @@ int main()
     append_dump_with_guard(Device::get_name(), Device::get_function_schemas, Device::get_event_schemas);
     append_dump_with_guard(Display::get_name(), Display::get_function_schemas, Display::get_event_schemas);
     append_dump_with_guard(PicoDet::get_name(), PicoDet::get_function_schemas, PicoDet::get_event_schemas);
+    append_dump_with_guard(Ble::get_name(), Ble::get_function_schemas, Ble::get_event_schemas);
+    append_dump_with_guard(Bt::get_name(), Bt::get_function_schemas, Bt::get_event_schemas);
+    append_dump_with_guard(BtSpeaker::get_name(), BtSpeaker::get_function_schemas, BtSpeaker::get_event_schemas);
     append_dump_with_guard(Http::get_name(), Http::get_function_schemas, Http::get_event_schemas);
     append_dump_with_guard(Nes::get_name(), Nes::get_function_schemas, Nes::get_event_schemas);
     append_dump_with_guard(SNTP::get_name(), SNTP::get_function_schemas, SNTP::get_event_schemas);
@@ -68,6 +71,7 @@ int main()
         VideoDecoder<0>::get_name(), VideoDecoder<0>::get_function_schemas, VideoDecoder<0>::get_event_schemas
     );
     append_dump_with_guard(Manager::get_name(), Manager::get_function_schemas, Manager::get_event_schemas);
+    append_dump_with_guard(DataFlow::get_name(), DataFlow::get_function_schemas, DataFlow::get_event_schemas);
     append_dump_with_guard(Utils::get_name(), Utils::get_function_schemas, Utils::get_event_schemas);
     append_dump_with_guard(
         AgentManager::get_name(), AgentManager::get_function_schemas, AgentManager::get_event_schemas

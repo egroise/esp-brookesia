@@ -25,7 +25,7 @@ public:
 
     bool init();
     void deinit();
-    bool start(std::shared_ptr<lib_utils::TaskScheduler> scheduler, const lib_utils::TaskScheduler::Group &group);
+    bool start(std::shared_ptr<lib_utils::TaskScheduler> scheduler, const lib_utils::TaskSchedulerGroup &group);
     void stop();
 
     bool is_inited() const

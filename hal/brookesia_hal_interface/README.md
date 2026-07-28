@@ -6,6 +6,13 @@
 
 `brookesia_hal_interface` is the foundational hardware abstraction component for ESP-Brookesia. It provides a unified abstraction between board-level implementations and upper-layer business logic or other subsystems.
 
+The BLE surface provides a runtime-configured, single-connection
+`ble::PeripheralIface` with 128-bit GATT services and characteristics, write
+events with owned binary data, notification subscription tracking, negotiated
+MTU reporting, and advertising/connection lifecycle callbacks. It intentionally
+does not include Central, Classic Bluetooth, pairing, bonding, or persistent
+keys in v1.
+
 For more information, see the [ESP-Brookesia Programming Guide](https://docs.espressif.com/projects/esp-brookesia/en/latest/hal/interface/index.html).
 
 ## How to Use

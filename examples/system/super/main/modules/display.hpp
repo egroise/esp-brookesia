@@ -10,7 +10,7 @@
 #include <string>
 #include "sdkconfig.h"
 #include "brookesia/service_helper/media/display.hpp"
-#include "brookesia/service_manager.hpp"
+#include "brookesia/service_manager/service/manager.hpp"
 
 class Display {
 public:

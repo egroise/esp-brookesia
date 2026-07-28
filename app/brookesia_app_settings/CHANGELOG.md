@@ -1,5 +1,12 @@
 # ChangeLog
 
+## v0.8.2 - 2026-07-27
+
+### Enhancements:
+
+- feat(settings): persist language and theme preferences and offer explicit restart confirmation.
+- chore(build): use the lightweight Service Manager base API in the settings app.
+
 ## v0.8.1 - 2026-07-13
 
 ### Enhancements:

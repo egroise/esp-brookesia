@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.20)
 
 project(brookesia_hal_linux_host_test LANGUAGES CXX)
 
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 if(NOT DEFINED BROOKESIA_HAL_LINUX_MEDIA_BACKEND)
     set(BROOKESIA_HAL_LINUX_MEDIA_BACKEND "stub" CACHE STRING "HAL Linux media backend")
 endif()
@@ -10,6 +13,9 @@ if(NOT DEFINED BROOKESIA_HAL_LINUX_VIDEO_BACKEND)
 endif()
 if(NOT DEFINED BROOKESIA_HAL_LINUX_WIFI_BACKEND)
     set(BROOKESIA_HAL_LINUX_WIFI_BACKEND "stub" CACHE STRING "HAL Linux Wi-Fi backend")
+endif()
+if(NOT DEFINED BROOKESIA_HAL_LINUX_BLE_BACKEND)
+    set(BROOKESIA_HAL_LINUX_BLE_BACKEND "stub" CACHE STRING "HAL Linux BLE backend")
 endif()
 if(NOT DEFINED BROOKESIA_HAL_LINUX_DISPLAY_BACKEND)
     set(BROOKESIA_HAL_LINUX_DISPLAY_BACKEND "stub" CACHE STRING "HAL Linux display backend")
@@ -30,7 +36,7 @@ target_link_libraries(brookesia_hal_linux_host_test
 )
 
 set_target_properties(brookesia_hal_linux_host_test PROPERTIES
-    CXX_STANDARD 20
+    CXX_STANDARD 23
     CXX_STANDARD_REQUIRED ON
 )
 
@@ -50,7 +56,7 @@ else()
             brookesia::hal_linux
     )
     set_target_properties(brookesia_hal_linux_real_smoke PROPERTIES
-        CXX_STANDARD 20
+        CXX_STANDARD 23
         CXX_STANDARD_REQUIRED ON
     )
     add_test(
@@ -58,3 +64,23 @@ else()
         COMMAND brookesia_hal_linux_real_smoke
     )
 endif()
+
+if(BROOKESIA_HAL_LINUX_BLE_BACKEND STREQUAL "stub")
+    add_executable(brookesia_hal_linux_ble_test
+        ble_test.cpp
+    )
+    target_link_libraries(brookesia_hal_linux_ble_test
+        PRIVATE
+            brookesia::hal_linux
+    )
+    set_target_properties(brookesia_hal_linux_ble_test PROPERTIES
+        CXX_STANDARD 23
+        CXX_STANDARD_REQUIRED ON
+    )
+    add_test(
+        NAME brookesia_hal_linux_ble
+        COMMAND brookesia_hal_linux_ble_test
+    )
+endif()
+
+brookesia_compile_tuning_apply_current_project()

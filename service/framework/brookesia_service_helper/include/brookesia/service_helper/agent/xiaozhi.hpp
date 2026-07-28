@@ -5,7 +5,11 @@
  */
 #pragma once
 
+#include <array>
+#include <span>
+
 #include "brookesia/lib_utils/describe_helpers.hpp"
+#include "brookesia/service_manager/detail/static_schema.hpp"
 #include "brookesia/service_manager/helper/base.hpp"
 #include "brookesia/service_manager/function/definition.hpp"
 #include "manager.hpp"
@@ -37,163 +41,147 @@ public:
         Max,
     };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the function parameter types ////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    enum class FunctionAddMCP_ToolsWithServiceFunctionParam : uint8_t {
-        ServiceName,
-        FunctionNames,
-    };
-    enum class FunctionAddMCP_ToolsWithCustomFunctionParam : uint8_t {
-        Tools,
-    };
-    enum class FunctionRemoveMCP_ToolsParam : uint8_t {
-        Tools,
-    };
-    enum class FunctionExplainImageParam : uint8_t {
-        Image,
-        Question,
-    };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the event parameter types ///////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    enum class EventActivationCodeReceivedParam : uint8_t {
-        Code,
-    };
 
 private:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////// The following are the function schemas /////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    static service::FunctionSchema function_schema_add_mcp_tool_with_service_function()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::AddMCP_ToolsWithServiceFunction),
-            .description = "Add MCP tools from service functions.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionAddMCP_ToolsWithServiceFunctionParam::ServiceName),
-                    .description = "Service name.",
-                    .type = service::FunctionValueType::String,
-                },
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionAddMCP_ToolsWithServiceFunctionParam::FunctionNames),
-                    .description = (boost::format("Function names as JSON array<string>. "
-                                                  "Empty means all functions in the service. Example: %1%")
-                    % BROOKESIA_DESCRIBE_JSON_SERIALIZE(std::vector<std::string>({
-                        "SetAudioPlayerVolume",
-                        "GetAudioPlayerVolume"
-                    }))).str(),
-                    .type = service::FunctionValueType::Array,
-                    .default_value = boost::json::array(),
-                }
-            },
-            .require_scheduler = false,
-            .return_value = service::FunctionReturnSchema{
-                .type = service::FunctionValueType::Array,
-                .description = (boost::format("Added tool names. Example: %1%")
-                % BROOKESIA_DESCRIBE_JSON_SERIALIZE(std::vector<std::string>({
-                    "Service.Device.SetAudioPlayerVolume",
-                    "Service.Device.GetAudioPlayerVolume",
-                }))).str(),
-            },
-        };
-    }
-    static service::FunctionSchema function_schema_add_mcp_tool_with_custom_function()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::AddMCP_ToolsWithCustomFunction),
-            .description = "Add custom MCP tools.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionAddMCP_ToolsWithCustomFunctionParam::Tools),
-                    .description = (boost::format("Tools to add as JSON array<object>. Example: %1%")
-                    % BROOKESIA_DESCRIBE_JSON_SERIALIZE((std::vector<std::map<std::string, std::string>>({
-                        {
-                            {"name", "Display.GetBrightness"},
-                            {"description", "custom tool description 1"}
-                        },
-                        {
-                            {"name", "Display.SetBrightness"},
-                            {"description", "custom tool description 2"}
-                        }
-                    })))).str(),
-                    .type = service::FunctionValueType::Array,
-                }
-            },
-            .require_scheduler = false,
-            .return_value = service::FunctionReturnSchema{
-                .type = service::FunctionValueType::Array,
-                .description = (boost::format("Added tool names. Example: %1%")
-                % BROOKESIA_DESCRIBE_JSON_SERIALIZE(std::vector<std::string>({
-                    "Custom.Display.GetBrightness",
-                    "Custom.Display.SetBrightness",
-                }))).str(),
-            },
-        };
-    }
-    static service::FunctionSchema function_schema_remove_mcp_tools()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::RemoveMCP_Tools),
-            .description = "Remove MCP tools.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionRemoveMCP_ToolsParam::Tools),
-                    .description = (boost::format("Tool names to remove. Example: %1%")
-                    % BROOKESIA_DESCRIBE_JSON_SERIALIZE(std::vector<std::string>({
-                        "Service.Device.SetAudioPlayerVolume",
-                        "Custom.Display.GetBrightness",
-                    }))).str(),
-                    .type = service::FunctionValueType::Array,
-                }
-            },
-            .require_scheduler = false,
-        };
-    }
-    static service::FunctionSchema function_schema_explain_image()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::ExplainImage),
-            .description = "Explain an image.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionExplainImageParam::Image),
-                    .description = "Image data.",
-                    .type = service::FunctionValueType::RawBuffer,
-                },
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionExplainImageParam::Question),
-                    .description = "Question text.",
-                    .type = service::FunctionValueType::String,
-                    .default_value = "What is in the image?",
-                }
-            },
-            .return_value = service::FunctionReturnSchema{
+    using DefaultValueKind = service::detail::static_schema::DefaultValueKind;
+    using DefaultValueSpec = service::detail::static_schema::DefaultValueSpec;
+    using FunctionParameterSpec = service::detail::static_schema::FunctionParameterSpec;
+    using FunctionReturnSpec = service::detail::static_schema::FunctionReturnSpec;
+    using FunctionSpec = service::detail::static_schema::FunctionSpec;
+
+    inline static constexpr DefaultValueSpec EMPTY_ARRAY_DEFAULT = {
+        .kind = DefaultValueKind::JsonArray,
+        .string = "[]",
+    };
+
+    inline static constexpr DefaultValueSpec DEFAULT_IMAGE_QUESTION = {
+        .kind = DefaultValueKind::String,
+        .string = "What is in the image?",
+    };
+
+    inline static constexpr std::array<FunctionParameterSpec, 2> ADD_MCP_TOOLS_WITH_SERVICE_FUNCTION_PARAMETERS = {{
+            {
+                .name = "ServiceName",
+                .description = "Service name.",
                 .type = service::FunctionValueType::String,
-                .description = "Example: \"This image contains a cup on a desk.\"",
             },
-        };
-    }
+            {
+                .name = "FunctionNames",
+                .description =
+                "Function names as JSON array<string>. Empty means all functions in the service. Example: "
+                "[\"SetAudioPlayerVolume\",\"GetAudioPlayerVolume\"]",
+                .type = service::FunctionValueType::Array,
+                .default_value = EMPTY_ARRAY_DEFAULT,
+            },
+        }
+    };
+
+    inline static constexpr std::array<FunctionParameterSpec, 1> ADD_MCP_TOOLS_WITH_CUSTOM_FUNCTION_PARAMETERS = {{
+            {
+                .name = "Tools",
+                .description =
+                "Tools to add as JSON array<object>. Example: [{\"description\":\"custom tool description 1\","
+                "\"name\":\"Display.GetBrightness\"},{\"description\":\"custom tool description 2\","
+                "\"name\":\"Display.SetBrightness\"}]",
+                .type = service::FunctionValueType::Array,
+            },
+        }
+    };
+
+    inline static constexpr std::array<FunctionParameterSpec, 1> REMOVE_MCP_TOOLS_PARAMETERS = {{
+            {
+                .name = "Tools",
+                .description =
+                "Tool names to remove. Example: [\"Service.Device.SetAudioPlayerVolume\","
+                "\"Custom.Display.GetBrightness\"]",
+                .type = service::FunctionValueType::Array,
+            },
+        }
+    };
+
+    inline static constexpr std::array<FunctionParameterSpec, 2> EXPLAIN_IMAGE_PARAMETERS = {{
+            {
+                .name = "Image",
+                .description = "Image data.",
+                .type = service::FunctionValueType::RawBuffer,
+            },
+            {
+                .name = "Question",
+                .description = "Question text.",
+                .type = service::FunctionValueType::String,
+                .default_value = DEFAULT_IMAGE_QUESTION,
+            },
+        }
+    };
+
+    inline static constexpr std::array<FunctionSpec, static_cast<size_t>(FunctionId::Max)> FUNCTION_SPECS = {{
+            {
+                .name = "AddMCP_ToolsWithServiceFunction",
+                .description = "Add MCP tools from service functions.",
+                .parameters = ADD_MCP_TOOLS_WITH_SERVICE_FUNCTION_PARAMETERS,
+                .require_scheduler = false,
+                .return_value = FunctionReturnSpec{
+                    .type = service::FunctionValueType::Array,
+                    .description =
+                    "Added tool names. Example: [\"Service.Device.SetAudioPlayerVolume\","
+                    "\"Service.Device.GetAudioPlayerVolume\"]",
+                },
+            },
+            {
+                .name = "AddMCP_ToolsWithCustomFunction",
+                .description = "Add custom MCP tools.",
+                .parameters = ADD_MCP_TOOLS_WITH_CUSTOM_FUNCTION_PARAMETERS,
+                .require_scheduler = false,
+                .return_value = FunctionReturnSpec{
+                    .type = service::FunctionValueType::Array,
+                    .description =
+                    "Added tool names. Example: [\"Custom.Display.GetBrightness\","
+                    "\"Custom.Display.SetBrightness\"]",
+                },
+            },
+            {
+                .name = "RemoveMCP_Tools",
+                .description = "Remove MCP tools.",
+                .parameters = REMOVE_MCP_TOOLS_PARAMETERS,
+                .require_scheduler = false,
+            },
+            {
+                .name = "ExplainImage",
+                .description = "Explain an image.",
+                .parameters = EXPLAIN_IMAGE_PARAMETERS,
+                .return_value = FunctionReturnSpec{
+                    .type = service::FunctionValueType::String,
+                    .description = "Example: \"This image contains a cup on a desk.\"",
+                },
+            },
+        }
+    };
+    static_assert(FUNCTION_SPECS.size() == static_cast<size_t>(FunctionId::Max));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////// The following are the event schemas /////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    static service::EventSchema event_schema_activation_code_received()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EventId::ActivationCodeReceived),
-            .description = "Emitted when an activation code is received.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventActivationCodeReceivedParam::Code),
-                    .description = "Activation code.",
-                    .type = service::EventItemType::String
-                }
+    using EventItemSpec = service::detail::static_schema::EventItemSpec;
+    using EventSpec = service::detail::static_schema::EventSpec;
+
+    inline static constexpr std::array<EventItemSpec, 1> ACTIVATION_CODE_RECEIVED_ITEMS = {{
+            {"Code", "Activation code.", service::EventItemType::String},
+        }
+    };
+
+    inline static constexpr std::array<EventSpec, static_cast<size_t>(EventId::Max)> EVENT_SPECS = {{
+            {
+                .name = "ActivationCodeReceived",
+                .description = "Emitted when an activation code is received.",
+                .items = ACTIVATION_CODE_RECEIVED_ITEMS,
             },
-        };
-    }
+        }
+    };
+    static_assert(EVENT_SPECS.size() == static_cast<size_t>(EventId::Max));
 
 public:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -216,16 +204,13 @@ public:
      */
     static std::span<const service::FunctionSchema> get_function_schemas()
     {
-        static const std::array < service::FunctionSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(FunctionId::Max) >
-        FUNCTION_SCHEMAS = {
-            {
-                function_schema_add_mcp_tool_with_service_function(),
-                function_schema_add_mcp_tool_with_custom_function(),
-                function_schema_remove_mcp_tools(),
-                function_schema_explain_image(),
-            }
-        };
-        return std::span<const service::FunctionSchema>(FUNCTION_SCHEMAS.begin(), FUNCTION_SCHEMAS.end());
+        static std::array<service::FunctionSchema, FUNCTION_SPECS.size()> schemas;
+        static const bool initialized = [] {
+            service::detail::static_schema::materialize_function_schemas(FUNCTION_SPECS, schemas);
+            return true;
+        }();
+        static_cast<void>(initialized);
+        return schemas;
     }
 
     /**
@@ -235,12 +220,13 @@ public:
      */
     static std::span<const service::EventSchema> get_event_schemas()
     {
-        static const std::array < service::EventSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(EventId::Max) > EVENT_SCHEMAS = {
-            {
-                event_schema_activation_code_received(),
-            }
-        };
-        return std::span<const service::EventSchema>(EVENT_SCHEMAS.begin(), EVENT_SCHEMAS.end());
+        static std::array<service::EventSchema, EVENT_SPECS.size()> schemas;
+        static const bool initialized = [] {
+            service::detail::static_schema::materialize_event_schemas(EVENT_SPECS, schemas);
+            return true;
+        }();
+        static_cast<void>(initialized);
+        return schemas;
     }
 };
 
@@ -254,15 +240,10 @@ BROOKESIA_DESCRIBE_ENUM(
     XiaoZhi::FunctionId, AddMCP_ToolsWithServiceFunction, AddMCP_ToolsWithCustomFunction, RemoveMCP_Tools,
     ExplainImage, Max
 );
-BROOKESIA_DESCRIBE_ENUM(XiaoZhi::FunctionAddMCP_ToolsWithServiceFunctionParam, ServiceName, FunctionNames);
-BROOKESIA_DESCRIBE_ENUM(XiaoZhi::FunctionAddMCP_ToolsWithCustomFunctionParam, Tools);
-BROOKESIA_DESCRIBE_ENUM(XiaoZhi::FunctionRemoveMCP_ToolsParam, Tools);
-BROOKESIA_DESCRIBE_ENUM(XiaoZhi::FunctionExplainImageParam, Image, Question);
 
 /**
  * @brief  Event related
  */
 BROOKESIA_DESCRIBE_ENUM(XiaoZhi::EventId, ActivationCodeReceived, Max);
-BROOKESIA_DESCRIBE_ENUM(XiaoZhi::EventActivationCodeReceivedParam, Code);
 
 } // namespace esp_brookesia::service::helper

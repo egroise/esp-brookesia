@@ -6,13 +6,14 @@
 #pragma once
 
 #include <atomic>
+#include <memory>
 #include <mutex>
 
 #include "brookesia/lib_utils/describe_helpers.hpp"
 #include "brookesia/hal_interface/interface.hpp"
 #include "brookesia/hal_interface/interfaces/video/processor.hpp"
-#include "brookesia/service_display.hpp"
 #include "brookesia/service_helper/media/video.hpp"
+#include "brookesia/service_manager/dataflow/visual/operation.hpp"
 #include "brookesia/service_manager/service/base.hpp"
 #include "brookesia/service_manager/macro_configs.h"
 #include "brookesia/service_video/macro_configs.h"
@@ -109,7 +110,7 @@ private:
     );
     hal::video::EncoderConfig to_hal_config(const BaseHelper::EncoderConfig &encoder_cfg) const;
     std::expected<BaseHelper::EncoderSinkFormat, std::string> to_encoder_sink_format(
-        Display::PixelFormat pixel_format
+        dataflow::VisualPixelFormat pixel_format
     ) const;
 
     bool is_opened()
@@ -127,10 +128,9 @@ private:
     std::atomic<bool> closing_requested_ = false;
     hal::InterfaceHandle<hal::video::EncoderIface> encoder_iface_;
     BaseHelper::EncoderConfig encoder_cfg_;
-    ServiceBinding display_binding_;
-    uint32_t display_source_id_ = 0;
+    std::shared_ptr<dataflow::VisualOperation> display_operation_;
     std::string display_output_name_;
-    Display::PixelFormat display_pixel_format_ = Display::PixelFormat::Max;
+    dataflow::VisualPixelFormat display_pixel_format_ = dataflow::VisualPixelFormat::Unknown;
     uint32_t display_x_ = 0;
     uint32_t display_y_ = 0;
     uint32_t display_draw_timeout_ms_ = 0;

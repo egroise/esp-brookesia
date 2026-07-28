@@ -8,20 +8,63 @@
 #include <cstdint>
 #include <expected>
 #include <functional>
-#include <future>
-#include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 #include <vector>
-#include "boost/thread/shared_mutex.hpp"
-#include "brookesia/lib_utils/task_scheduler.hpp"
+#include "brookesia/lib_utils/task_scheduler_types.hpp"
 #include "brookesia/service_manager/macro_configs.h"
-#include "brookesia/service_manager/function/registry.hpp"
-#include "brookesia/service_manager/event/registry.hpp"
+#include "brookesia/service_manager/function/definition.hpp"
+#include "brookesia/service_manager/event/definition.hpp"
 
 namespace esp_brookesia::service {
+
+class EventRegistry;
+class FunctionRegistry;
+
+} // namespace esp_brookesia::service
+
+namespace esp_brookesia::lib_utils {
+
+class TaskScheduler;
+
+} // namespace esp_brookesia::lib_utils
+
+namespace esp_brookesia::service {
+
+/**
+ * @brief Get one typed function parameter or construct the existing validation error.
+ *
+ * The supported types are the alternatives stored in `FunctionValue`. Explicit
+ * instantiations keep the repeated parameter-validation path out of every
+ * service handler lambda.
+ */
+template <typename ParameterType>
+std::expected<ParameterType *, FunctionResult> get_function_parameter(
+    FunctionParameterMap &arguments, const std::string *parameter_name
+);
+
+extern template std::expected<bool *, FunctionResult> get_function_parameter<bool>(
+    FunctionParameterMap &, const std::string *
+);
+extern template std::expected<double *, FunctionResult> get_function_parameter<double>(
+    FunctionParameterMap &, const std::string *
+);
+extern template std::expected<std::string *, FunctionResult> get_function_parameter<std::string>(
+    FunctionParameterMap &, const std::string *
+);
+extern template std::expected<boost::json::object *, FunctionResult> get_function_parameter<boost::json::object>(
+    FunctionParameterMap &, const std::string *
+);
+extern template std::expected<boost::json::array *, FunctionResult> get_function_parameter<boost::json::array>(
+    FunctionParameterMap &, const std::string *
+);
+extern template std::expected<RawBuffer *, FunctionResult> get_function_parameter<RawBuffer>(
+    FunctionParameterMap &, const std::string *
+);
 
 /**
  * @brief Base class for bindable services managed by `ServiceManager`.
@@ -42,9 +85,42 @@ public:
     };
 
     /**
-     * @brief Map from function names to service-side handlers.
+     * @brief Function handler entry used during service registration.
      */
-    using FunctionHandlerMap = std::map<std::string, FunctionHandler>;
+    struct FunctionHandlerEntry {
+        template <typename Handler>
+        FunctionHandlerEntry(Handler &&value)
+            : handler(std::forward<Handler>(value))
+        {
+        }
+
+        template <typename Handler>
+        FunctionHandlerEntry(std::string_view, Handler &&value)
+            : handler(std::forward<Handler>(value))
+        {
+        }
+
+        template <typename Name, typename Handler>
+        FunctionHandlerEntry(std::pair<Name, Handler> value)
+            : handler(std::move(value.second))
+        {
+        }
+
+        FunctionHandler handler;
+    };
+    /**
+     * @brief Contiguous function handlers used during service registration.
+     *
+     * The list is short-lived and ordered exactly like `get_function_schemas()`.
+     * A contiguous handler-only container avoids a temporary tree, duplicate
+     * function-name strings, and schema-name lookups for every service.
+     */
+    using FunctionHandlerList = std::vector<FunctionHandlerEntry>;
+    // Compatibility name for existing service overrides. The type is intentionally
+    // a contiguous list rather than an associative container. The two-argument
+    // entry constructor accepts legacy name/handler initializers and discards the
+    // duplicate name.
+    using FunctionHandlerMap = FunctionHandlerList;
     /**
      * @brief Callback invoked with the result of an asynchronous function call.
      */
@@ -63,22 +139,16 @@ public:
          *
          * @return true if the service should create its own scheduler.
          */
-        bool has_scheduler() const
-        {
-            return task_scheduler_config.has_value();
-        }
+        bool has_scheduler() const;
 
         /**
          * @brief Get the dedicated task scheduler configuration.
          *
-         * @return const lib_utils::TaskScheduler::StartConfig& Config stored in `task_scheduler_config`.
+         * @return const lib_utils::TaskSchedulerStartConfig& Config stored in `task_scheduler_config`.
          *
          * @note Call this only when `has_scheduler()` returns `true`.
          */
-        const lib_utils::TaskScheduler::StartConfig &get_scheduler_config() const
-        {
-            return task_scheduler_config.value();
-        }
+        const lib_utils::TaskSchedulerStartConfig &get_scheduler_config() const;
 
         std::string name;  ///< Service name
         std::string description;  ///< Human-readable service description
@@ -94,7 +164,7 @@ public:
          * If configured, service request tasks will be scheduled to this scheduler;
          * otherwise, ServiceManager's scheduler will be used.
          */
-        std::optional<lib_utils::TaskScheduler::StartConfig> task_scheduler_config = std::nullopt;
+        std::optional<lib_utils::TaskSchedulerStartConfig> task_scheduler_config = std::nullopt;
 
         /**
          * @brief Shared scheduler selected when `task_scheduler_config` is not configured.
@@ -109,9 +179,7 @@ public:
      *
      * @param[in] attributes Public metadata and scheduler preferences for the service.
      */
-    ServiceBase(const Attributes &attributes)
-        : attributes_(attributes)
-    {}
+    ServiceBase(const Attributes &attributes);
 
     /**
      * @brief Virtual destructor.
@@ -289,11 +357,11 @@ public:
      *
      * @param[in] event_name Event name to subscribe
      * @param[in] slot Callback slot to be invoked when event is published
-     * @return EventRegistry::SignalConnection RAII scoped connection object for managing the subscription,
+     * @return EventSignalConnection RAII scoped connection object for managing the subscription,
      *         automatically disconnects the subscription when the connection object is destroyed.
      */
-    EventRegistry::SignalConnection subscribe_event(
-        const std::string &event_name, const EventRegistry::SignalSlot &slot
+    EventSignalConnection subscribe_event(
+        const std::string &event_name, const EventSignalSlot &slot
     );
 
     /**
@@ -301,60 +369,42 @@ public:
      *
      * @return true if initialized, false otherwise
      */
-    bool is_initialized() const
-    {
-        return is_initialized_.load();
-    }
+    bool is_initialized() const;
 
     /**
      * @brief Check if the service is running
      *
      * @return true if running, false otherwise
      */
-    bool is_running() const
-    {
-        return is_running_.load();
-    }
+    bool is_running() const;
 
     /**
      * @brief Get the service attributes
      *
      * @return const Attributes& Reference to service attributes
      */
-    const Attributes &get_attributes() const
-    {
-        return attributes_;
-    }
+    const Attributes &get_attributes() const;
 
     /**
      * @brief Get the call task group name
      *
      * @return std::string Call task group name
      */
-    virtual std::string get_call_task_group() const
-    {
-        return get_attributes().name + "_call";
-    }
+    virtual std::string get_call_task_group() const;
 
     /**
      * @brief Get the event task group name
      *
      * @return std::string Event task group name
      */
-    virtual std::string get_event_task_group() const
-    {
-        return get_attributes().name + "_event";
-    }
+    virtual std::string get_event_task_group() const;
 
     /**
      * @brief Get the request task group name
      *
      * @return std::string Request task group name
      */
-    virtual std::string get_request_task_group() const
-    {
-        return get_attributes().name + "_request";
-    }
+    virtual std::string get_request_task_group() const;
 
     /**
      * @brief Helper function to convert std::expected to FunctionResult
@@ -462,32 +512,28 @@ protected:
     }
 
     /**
-     * @brief Get function handlers map
+     * @brief Get function handlers.
      *
-     * Subclasses should override this method to return a map from function names to handlers
+     * Subclasses should return handlers in the same order as their function
+     * schemas. Function names are carried by the schemas, so handlers do not
+     * retain a second copy.
      *
-     * @return FunctionHandlerMap Function handlers map
+     * @return FunctionHandlerList Ordered function handlers.
      *
      * @code{.cpp}
-     * FunctionHandlerMap get_function_handlers() override {
+     * FunctionHandlerList get_function_handlers() override {
      *     return {
-     *         {
-     *             "add",
-     *             [this](const FunctionParameterMap &args) -> FunctionResult {
-     *                 return handle_add(args);
-     *             }
+     *         [this](FunctionParameterMap &&args) -> FunctionResult {
+     *             return handle_add(std::move(args));
      *         },
-     *         {
-     *             "sub",
-     *             [this](const FunctionParameterMap &args) -> FunctionResult {
-     *                 return handle_sub(args);
-     *             }
-     *         }
+     *         [this](FunctionParameterMap &&args) -> FunctionResult {
+     *             return handle_sub(std::move(args));
+     *         },
      *     };
      * }
      * @endcode
      */
-    virtual FunctionHandlerMap get_function_handlers()
+    virtual FunctionHandlerList get_function_handlers()
     {
         return {};
     }
@@ -496,10 +542,10 @@ protected:
      * @brief Register function list (internal use)
      *
      * @param[in] schemas Function schemas list
-     * @param[in] handlers Function handler map
+     * @param[in] handlers Function handlers in schema order.
      * @return true if registered successfully, false otherwise
      */
-    bool register_functions(std::vector<FunctionSchema> schemas, FunctionHandlerMap handlers);
+    bool register_functions(std::vector<FunctionSchema> schemas, FunctionHandlerList handlers);
 
     /**
      * @brief Unregister function list (internal use)
@@ -575,33 +621,21 @@ protected:
      *
      * @return std::shared_ptr<lib_utils::TaskScheduler> Shared pointer to the task scheduler
      */
-    std::shared_ptr<lib_utils::TaskScheduler> get_task_scheduler() const
-    {
-        boost::shared_lock lock(resources_mutex_);
-        return task_scheduler_;
-    }
+    std::shared_ptr<lib_utils::TaskScheduler> get_task_scheduler() const;
 
     /**
     * @brief Get the function registry
     *
     * @return std::shared_ptr<FunctionRegistry> Shared pointer to the function registry
     */
-    std::shared_ptr<const FunctionRegistry> get_function_registry() const
-    {
-        boost::shared_lock lock(resources_mutex_);
-        return function_registry_;
-    }
+    std::shared_ptr<const FunctionRegistry> get_function_registry() const;
 
     /**
     * @brief Get the event registry
     *
     * @return std::shared_ptr<EventRegistry> Shared pointer to the event registry
     */
-    std::shared_ptr<const EventRegistry> get_event_registry() const
-    {
-        boost::shared_lock lock(resources_mutex_);
-        return event_registry_;
-    }
+    std::shared_ptr<const EventRegistry> get_event_registry() const;
 
     /**
      * @brief Start the service.
@@ -623,36 +657,9 @@ private:
     void deinit_internal();  // Internal deinit without lock
     bool start_internal();  // Internal start without lock
     void stop_internal();  // Internal stop without lock
-    // Variant of stop_internal() that may temporarily release a caller-provided
-    // unique lock on `state_mutex_` while draining the task scheduler. This is
-    // required when the service has its own scheduler whose workers may be
-    // blocked acquiring `shared_lock(state_mutex_)` (e.g. inside
-    // publish_event's emit_signal_task). Holding the unique lock across
-    // task_scheduler->stop() would deadlock against threads_.join_all().
-    // Pass nullptr if the caller does not own a unique lock.
-    void stop_internal(boost::unique_lock<boost::shared_mutex> *state_lock);
-    // Variant of deinit_internal() that forwards a caller-provided unique lock
-    // on `state_mutex_` to stop_internal() so the deinit-while-running path
-    // does not deadlock against task_scheduler->stop().
-    void deinit_internal_locked(boost::unique_lock<boost::shared_mutex> *state_lock);
-
-    Attributes attributes_;
-
-    boost::shared_mutex state_mutex_;  // Protect state transitions (init/deinit/start/stop)
-    std::atomic<bool> is_initialized_{false};
-    std::atomic<bool> is_running_{false};
-
-    // Use shared_ptr instead of unique_ptr to support thread-safe access
-    mutable boost::shared_mutex resources_mutex_;  // Protect resources access
-    std::shared_ptr<lib_utils::TaskScheduler> task_scheduler_;
-    std::shared_ptr<FunctionRegistry> function_registry_;
-    std::shared_ptr<EventRegistry> event_registry_;
+    class Impl;
+    std::unique_ptr<Impl> impl_;
 };
-
-BROOKESIA_DESCRIBE_ENUM(ServiceBase::SchedulerType, Main, Secondary);
-BROOKESIA_DESCRIBE_STRUCT(
-    ServiceBase::Attributes, (), (name, description, version, dependencies, task_scheduler_config, scheduler_type)
-)
 
 // ============================================================================
 // Helper macros: Simplify FunctionHandlerMap writing
@@ -668,11 +675,8 @@ BROOKESIA_DESCRIBE_STRUCT(
  * BROOKESIA_SERVICE_FUNC_HANDLER_0("get_volume", function_get_volume())
  */
 #define BROOKESIA_SERVICE_FUNC_HANDLER_0(func_name, func_call) \
-    { \
-        func_name, \
-        [this](esp_brookesia::service::FunctionParameterMap &&) -> esp_brookesia::service::FunctionResult { \
-            return esp_brookesia::service::ServiceBase::to_function_result(func_call); \
-        } \
+    [this](esp_brookesia::service::FunctionParameterMap &&) -> esp_brookesia::service::FunctionResult { \
+        return esp_brookesia::service::ServiceBase::to_function_result(func_call); \
     }
 
 /**
@@ -689,12 +693,9 @@ BROOKESIA_DESCRIBE_STRUCT(
  *                     function_set_volume(static_cast<uint8_t>(PARAM)))
  */
 #define BROOKESIA_SERVICE_FUNC_HANDLER_1(func_name, param_name, param_type, func_call) \
-    { \
-        func_name, \
-        [this](esp_brookesia::service::FunctionParameterMap &&args) -> esp_brookesia::service::FunctionResult { \
-            auto &PARAM = std::get<param_type>(args.at(param_name)); \
-            return esp_brookesia::service::ServiceBase::to_function_result(func_call); \
-        } \
+    [this](esp_brookesia::service::FunctionParameterMap &&args) -> esp_brookesia::service::FunctionResult { \
+        auto &PARAM = std::get<param_type>(args.at(param_name)); \
+        return esp_brookesia::service::ServiceBase::to_function_result(func_call); \
     }
 
 /**
@@ -712,13 +713,10 @@ BROOKESIA_DESCRIBE_STRUCT(
  *                     function_add(PARAM1, PARAM2))
  */
 #define BROOKESIA_SERVICE_FUNC_HANDLER_2(func_name, param1_name, param1_type, param2_name, param2_type, func_call) \
-    { \
-        func_name, \
-        [this](esp_brookesia::service::FunctionParameterMap &&args) -> esp_brookesia::service::FunctionResult { \
-            auto &PARAM1 = std::get<param1_type>(args.at(param1_name)); \
-            auto &PARAM2 = std::get<param2_type>(args.at(param2_name)); \
-            return esp_brookesia::service::ServiceBase::to_function_result(func_call); \
-        } \
+    [this](esp_brookesia::service::FunctionParameterMap &&args) -> esp_brookesia::service::FunctionResult { \
+        auto &PARAM1 = std::get<param1_type>(args.at(param1_name)); \
+        auto &PARAM2 = std::get<param2_type>(args.at(param2_name)); \
+        return esp_brookesia::service::ServiceBase::to_function_result(func_call); \
     }
 
 /**
@@ -727,14 +725,11 @@ BROOKESIA_DESCRIBE_STRUCT(
  * Usage is similar to BROOKESIA_SERVICE_FUNC_HANDLER_2, supports PARAM1, PARAM2, PARAM3
  */
 #define BROOKESIA_SERVICE_FUNC_HANDLER_3(func_name, p1_name, p1_type, p2_name, p2_type, p3_name, p3_type, func_call) \
-    { \
-        func_name, \
-        [this](esp_brookesia::service::FunctionParameterMap &&args) -> esp_brookesia::service::FunctionResult { \
-            auto &PARAM1 = std::get<p1_type>(args.at(p1_name)); \
-            auto &PARAM2 = std::get<p2_type>(args.at(p2_name)); \
-            auto &PARAM3 = std::get<p3_type>(args.at(p3_name)); \
-            return esp_brookesia::service::ServiceBase::to_function_result(func_call); \
-        } \
+    [this](esp_brookesia::service::FunctionParameterMap &&args) -> esp_brookesia::service::FunctionResult { \
+        auto &PARAM1 = std::get<p1_type>(args.at(p1_name)); \
+        auto &PARAM2 = std::get<p2_type>(args.at(p2_name)); \
+        auto &PARAM3 = std::get<p3_type>(args.at(p3_name)); \
+        return esp_brookesia::service::ServiceBase::to_function_result(func_call); \
     }
 
 } // namespace esp_brookesia::service

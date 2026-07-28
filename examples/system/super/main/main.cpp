@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include "private/utils.hpp"
-#include "brookesia/lib_utils.hpp"
+#include "boost/chrono.hpp"
+#include "boost/thread.hpp"
+#include "brookesia/lib_utils/thread_config.hpp"
 #include "brookesia/gui_lvgl.hpp"
 #include "brookesia/system_super.hpp"
 #include "modules/general_services.hpp"

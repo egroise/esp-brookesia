@@ -8,8 +8,10 @@
 #   define BROOKESIA_LOG_DISABLE_DEBUG_TRACE 1
 #endif
 #include "private/utils.hpp"
+#include "private/service/static_schema.hpp"
 #include "private/service/utils.hpp"
-#include "brookesia/service_helper.hpp"
+#include "brookesia/service_helper/system/device.hpp"
+#include "brookesia/service_helper/system/storage.hpp"
 
 #include <algorithm>
 #include <array>
@@ -265,198 +267,6 @@ std::expected<MessageDialogOptions, std::string> message_dialog_options_from_jso
     };
 }
 
-FunctionSchema make_keyboard_options_schema()
-{
-    return {
-        .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::FunctionId::ShowKeyboard),
-        .description = "Show caller app keyboard input overlay",
-        .parameters = {
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::KeyboardOptionsParam::Options),
-                .description = "Keyboard request options",
-                .type = FunctionValueType::Object,
-            },
-        },
-        .require_scheduler = true,
-    };
-}
-
-FunctionSchema make_keyboard_request_schema()
-{
-    return {
-        .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::FunctionId::HideKeyboard),
-        .description = "Hide caller app keyboard input overlay",
-        .parameters = {
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::KeyboardRequestParam::RequestId),
-                .description = "Keyboard request id",
-                .type = FunctionValueType::Number,
-            },
-        },
-        .require_scheduler = true,
-    };
-}
-
-FunctionSchema make_storage_location_schema(SystemCoreHelper::FunctionId id, std::string description)
-{
-    return {
-        .name = BROOKESIA_DESCRIBE_TO_STR(id),
-        .description = std::move(description),
-        .parameters = {
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::StorageLocationParam::Location),
-                .description = "Storage location object: {kind, volume_id?, relative_path?}",
-                .type = FunctionValueType::Object,
-            },
-        },
-        .require_scheduler = true,
-    };
-}
-
-FunctionSchema make_storage_location_schema(
-    SystemCoreHelper::FunctionId id, std::string description, FunctionValueType return_type, std::string return_description
-)
-{
-    auto schema = make_storage_location_schema(id, std::move(description));
-    schema.return_value = service::FunctionReturnSchema{
-        .type = return_type,
-        .description = std::move(return_description),
-    };
-    return schema;
-}
-
-FunctionSchema with_return(
-    FunctionSchema schema, FunctionValueType return_type, std::string return_description
-)
-{
-    schema.return_value = service::FunctionReturnSchema{
-        .type = return_type,
-        .description = std::move(return_description),
-    };
-    return schema;
-}
-
-FunctionSchema make_storage_write_schema()
-{
-    return {
-        .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::FunctionId::StorageWrite),
-        .description = "Write data to a caller-owned storage file",
-        .parameters = {
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::StorageWriteParam::Location),
-                .description = "Storage location object: {kind, volume_id?, relative_path?}",
-                .type = FunctionValueType::Object,
-            },
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::StorageWriteParam::Data),
-                .description = "File data",
-                .type = FunctionValueType::String,
-            },
-        },
-        .require_scheduler = true,
-    };
-}
-
-FunctionSchema make_storage_rename_schema()
-{
-    return {
-        .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::FunctionId::StorageRename),
-        .description = "Rename a caller-owned storage file or directory",
-        .parameters = {
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::StorageRenameParam::From),
-                .description = "Source storage location object",
-                .type = FunctionValueType::Object,
-            },
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::StorageRenameParam::To),
-                .description = "Destination storage location object",
-                .type = FunctionValueType::Object,
-            },
-        },
-        .require_scheduler = true,
-    };
-}
-
-FunctionSchema make_message_dialog_options_schema()
-{
-    return {
-        .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::FunctionId::ShowMessageDialog),
-        .description = "Show caller app message dialog",
-        .parameters = {
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::MessageDialogOptionsParam::Options),
-                .description = "Message dialog options",
-                .type = FunctionValueType::Object,
-            },
-        },
-        .require_scheduler = true,
-        .return_value = service::FunctionReturnSchema{
-            .type = FunctionValueType::Object,
-            .description = "Message dialog request object. Example: {\"RequestId\":1}",
-        },
-    };
-}
-
-FunctionSchema make_message_dialog_request_schema()
-{
-    return {
-        .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::FunctionId::HideMessageDialog),
-        .description = "Hide caller app message dialog",
-        .parameters = {
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::MessageDialogRequestParam::RequestId),
-                .description = "Message dialog request id",
-                .type = FunctionValueType::Number,
-            },
-        },
-        .require_scheduler = true,
-    };
-}
-
-FunctionSchema make_message_dialog_update_schema()
-{
-    return {
-        .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::FunctionId::UpdateMessageDialog),
-        .description = "Update caller app message dialog",
-        .parameters = {
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::MessageDialogUpdateParam::RequestId),
-                .description = "Message dialog request id",
-                .type = FunctionValueType::Number,
-            },
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::MessageDialogUpdateParam::Options),
-                .description = "Message dialog options",
-                .type = FunctionValueType::Object,
-            },
-        },
-        .require_scheduler = true,
-    };
-}
-
-FunctionSchema make_storage_install_schema()
-{
-    return {
-        .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::FunctionId::SetDefaultInstallStorage),
-        .description = "Set default runtime app install storage. Native system app only.",
-        .parameters = {
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::StorageInstallParam::Target),
-                .description = "Install target: Auto, Internal, or External",
-                .type = FunctionValueType::String,
-            },
-            {
-                .name = BROOKESIA_DESCRIBE_TO_STR(SystemCoreHelper::StorageInstallParam::PreferredExternalId),
-                .description = "Preferred external volume id",
-                .type = FunctionValueType::String,
-                .default_value = FunctionValue(std::string()),
-            },
-        },
-        .require_scheduler = true,
-    };
-}
-
 boost::json::object to_json_object(const auto &value)
 {
     auto json_value = BROOKESIA_DESCRIBE_TO_JSON(value);
@@ -501,90 +311,303 @@ std::expected<StorageFileLocation, std::string> storage_location_from_json(const
     };
 }
 
+using static_schema::DefaultValueKind;
+using static_schema::FunctionParameterSpec;
+using static_schema::FunctionReturnSpec;
+using static_schema::FunctionSpec;
+
+constexpr std::array<FunctionParameterSpec, 1> APP_ID_PARAMETERS = {{
+        {"AppId", "System app id", FunctionValueType::Number},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 1> KEYBOARD_OPTIONS_PARAMETERS = {{
+        {"Options", "Keyboard request options", FunctionValueType::Object},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 1> KEYBOARD_REQUEST_PARAMETERS = {{
+        {"RequestId", "Keyboard request id", FunctionValueType::Number},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 1> MESSAGE_DIALOG_OPTIONS_PARAMETERS = {{
+        {"Options", "Message dialog options", FunctionValueType::Object},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 1> MESSAGE_DIALOG_REQUEST_PARAMETERS = {{
+        {"RequestId", "Message dialog request id", FunctionValueType::Number},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 2> MESSAGE_DIALOG_UPDATE_PARAMETERS = {{
+        {"RequestId", "Message dialog request id", FunctionValueType::Number},
+        {"Options", "Message dialog options", FunctionValueType::Object},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 2> STORAGE_INSTALL_PARAMETERS = {{
+        {"Target", "Install target: Auto, Internal, or External", FunctionValueType::String},
+        {
+            "PreferredExternalId",
+            "Preferred external volume id",
+            FunctionValueType::String,
+            {.kind = DefaultValueKind::String, .string_value = ""},
+        },
+    }
+};
+constexpr std::array<FunctionParameterSpec, 1> STORAGE_LOCATION_PARAMETERS = {{
+        {
+            "Location",
+            "Storage location object: {kind, volume_id?, relative_path?}",
+            FunctionValueType::Object,
+        },
+    }
+};
+constexpr std::array<FunctionParameterSpec, 2> STORAGE_WRITE_PARAMETERS = {{
+        {
+            "Location",
+            "Storage location object: {kind, volume_id?, relative_path?}",
+            FunctionValueType::Object,
+        },
+        {"Data", "File data", FunctionValueType::String},
+    }
+};
+constexpr std::array<FunctionParameterSpec, 2> STORAGE_RENAME_PARAMETERS = {{
+        {"From", "Source storage location object", FunctionValueType::Object},
+        {"To", "Destination storage location object", FunctionValueType::Object},
+    }
+};
+
+constexpr FunctionReturnSpec SYSTEM_TYPE_RETURN = {
+    FunctionValueType::String,
+    "System type string",
+};
+constexpr FunctionReturnSpec SYSTEM_INFO_RETURN = {
+    FunctionValueType::Object,
+    "System information object. Example: {\"name\":\"SuperOS\",\"version\":\"0.8.0\"}",
+};
+constexpr FunctionReturnSpec ENVIRONMENT_RETURN = {
+    FunctionValueType::Object,
+    "GUI environment object. Example: {\"widthDp\":800,\"heightDp\":480,\"language\":\"en\"}",
+};
+constexpr FunctionReturnSpec ACTIVE_APP_RETURN = {
+    FunctionValueType::Object,
+    "Active app object, or empty object when no app is active. Example: {\"app_id\":1,\"manifest\":{},\"state\":\"Running\"}",
+};
+constexpr FunctionReturnSpec LIST_APPS_RETURN = {
+    FunctionValueType::Array,
+    "Installed app array. Example: [{\"app_id\":1,\"manifest\":{},\"state\":\"Stopped\"}]",
+};
+constexpr FunctionReturnSpec KEYBOARD_RETURN = {
+    FunctionValueType::Object,
+    "Keyboard request object. Example: {\"RequestId\":1}",
+};
+constexpr FunctionReturnSpec MESSAGE_DIALOG_RETURN = {
+    FunctionValueType::Object,
+    "Message dialog request object. Example: {\"RequestId\":1}",
+};
+constexpr FunctionReturnSpec STORAGE_LAYOUT_RETURN = {
+    FunctionValueType::Object,
+    "Storage layout object. Example: {\"internal\":{},\"external\":[]}",
+};
+constexpr FunctionReturnSpec APP_STORAGE_PATHS_RETURN = {
+    FunctionValueType::Object,
+    "Caller app storage paths object. Example: {\"internal\":{\"files\":\"/path\"},\"external\":[{\"volume_id\":\"sdcard\",\"files\":\"/sdcard/apps/app/files\"}]}",
+};
+constexpr FunctionReturnSpec PUBLIC_STORAGE_PATHS_RETURN = {
+    FunctionValueType::Object,
+    "Public storage paths object. Example: {\"internal\":{},\"external\":[]}",
+};
+constexpr FunctionReturnSpec STORAGE_LIST_RETURN = {
+    FunctionValueType::Array,
+    "Storage entry array. Example: [{\"name\":\"game.nes\",\"info\":{\"type\":\"File\",\"size\":1024}}]",
+};
+constexpr FunctionReturnSpec STORAGE_STAT_RETURN = {
+    FunctionValueType::Object,
+    "Storage file info object. Example: {\"type\":\"Directory\",\"size\":0}",
+};
+constexpr FunctionReturnSpec STORAGE_READ_RETURN = {
+    FunctionValueType::String,
+    "File data",
+};
+
+constexpr std::array<FunctionSpec, static_cast<size_t>(SystemCoreHelper::FunctionId::Max)> SYSTEM_FUNCTION_SPECS = {{
+        {
+            "GetSystemType",
+            "Get current system type",
+            {},
+            false,
+            &SYSTEM_TYPE_RETURN,
+        },
+        {
+            "GetSystemInfo",
+            "Get current system information",
+            {},
+            false,
+            &SYSTEM_INFO_RETURN,
+        },
+        {
+            "GetEnvironment",
+            "Get current GUI environment",
+            {},
+            false,
+            &ENVIRONMENT_RETURN,
+        },
+        {
+            "GetActiveApp",
+            "Get active app snapshot",
+            {},
+            false,
+            &ACTIVE_APP_RETURN,
+        },
+        {
+            "ListApps",
+            "List installed apps",
+            {},
+            false,
+            &LIST_APPS_RETURN,
+        },
+        {
+            "RequestCloseApp",
+            "Request closing an app",
+            APP_ID_PARAMETERS,
+            false,
+        },
+        {
+            "StartApp",
+            "Start an app",
+            APP_ID_PARAMETERS,
+            false,
+        },
+        {
+            "StopApp",
+            "Stop an app",
+            APP_ID_PARAMETERS,
+            false,
+        },
+        {
+            "ShowLoading",
+            "Show caller app loading overlay",
+            {},
+            false,
+        },
+        {
+            "HideLoading",
+            "Hide caller app loading overlay",
+            {},
+            false,
+        },
+        {
+            "ShowKeyboard",
+            "Show caller app keyboard input overlay",
+            KEYBOARD_OPTIONS_PARAMETERS,
+            true,
+            &KEYBOARD_RETURN,
+        },
+        {
+            "HideKeyboard",
+            "Hide caller app keyboard input overlay",
+            KEYBOARD_REQUEST_PARAMETERS,
+            true,
+        },
+        {
+            "ShowMessageDialog",
+            "Show caller app message dialog",
+            MESSAGE_DIALOG_OPTIONS_PARAMETERS,
+            true,
+            &MESSAGE_DIALOG_RETURN,
+        },
+        {
+            "HideMessageDialog",
+            "Hide caller app message dialog",
+            MESSAGE_DIALOG_REQUEST_PARAMETERS,
+            true,
+        },
+        {
+            "UpdateMessageDialog",
+            "Update caller app message dialog",
+            MESSAGE_DIALOG_UPDATE_PARAMETERS,
+            true,
+        },
+        {
+            "GetStorageLayout",
+            "Get system storage layout",
+            {},
+            false,
+            &STORAGE_LAYOUT_RETURN,
+        },
+        {
+            "GetAppStoragePaths",
+            "Get caller app storage paths",
+            {},
+            false,
+            &APP_STORAGE_PATHS_RETURN,
+        },
+        {
+            "GetPublicStoragePaths",
+            "Get public storage paths",
+            {},
+            false,
+            &PUBLIC_STORAGE_PATHS_RETURN,
+        },
+        {
+            "SetDefaultInstallStorage",
+            "Set default runtime app install storage. Native system app only.",
+            STORAGE_INSTALL_PARAMETERS,
+            true,
+        },
+        {
+            "StorageList",
+            "List caller-owned storage directory",
+            STORAGE_LOCATION_PARAMETERS,
+            true,
+            &STORAGE_LIST_RETURN,
+        },
+        {
+            "StorageStat",
+            "Stat caller-owned storage path",
+            STORAGE_LOCATION_PARAMETERS,
+            true,
+            &STORAGE_STAT_RETURN,
+        },
+        {
+            "StorageMkdir",
+            "Create caller-owned storage directory",
+            STORAGE_LOCATION_PARAMETERS,
+            true,
+        },
+        {
+            "StorageRead",
+            "Read caller-owned storage file",
+            STORAGE_LOCATION_PARAMETERS,
+            true,
+            &STORAGE_READ_RETURN,
+        },
+        {
+            "StorageWrite",
+            "Write data to a caller-owned storage file",
+            STORAGE_WRITE_PARAMETERS,
+            true,
+        },
+        {
+            "StorageRemove",
+            "Remove caller-owned storage file or directory",
+            STORAGE_LOCATION_PARAMETERS,
+            true,
+        },
+        {
+            "StorageRename",
+            "Rename a caller-owned storage file or directory",
+            STORAGE_RENAME_PARAMETERS,
+            true,
+        },
+    }
+};
+
+static_assert(SYSTEM_FUNCTION_SPECS.size() == static_cast<size_t>(SystemCoreHelper::FunctionId::Max));
+
 } // namespace
 
 std::span<const service::FunctionSchema> SystemCoreHelper::get_function_schemas()
 {
-    static const std::array<service::FunctionSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(FunctionId::Max)> SCHEMAS = {{
-            with_return(
-                make_no_param_schema(FunctionId::GetSystemType, "Get current system type"),
-                FunctionValueType::String,
-                "System type string"
-            ),
-            with_return(
-                make_no_param_schema(FunctionId::GetSystemInfo, "Get current system information"),
-                FunctionValueType::Object,
-                "System information object. Example: {\"name\":\"SuperOS\",\"version\":\"0.8.0\"}"
-            ),
-            with_return(
-                make_no_param_schema(FunctionId::GetEnvironment, "Get current GUI environment"),
-                FunctionValueType::Object,
-                "GUI environment object. Example: {\"widthDp\":800,\"heightDp\":480,\"language\":\"en\"}"
-            ),
-            with_return(
-                make_no_param_schema(FunctionId::GetActiveApp, "Get active app snapshot"),
-                FunctionValueType::Object,
-                "Active app object, or empty object when no app is active. Example: {\"app_id\":1,\"manifest\":{},\"state\":\"Running\"}"
-            ),
-            with_return(
-                make_no_param_schema(FunctionId::ListApps, "List installed apps"),
-                FunctionValueType::Array,
-                "Installed app array. Example: [{\"app_id\":1,\"manifest\":{},\"state\":\"Stopped\"}]"
-            ),
-            make_app_id_schema(FunctionId::RequestCloseApp, "Request closing an app"),
-            make_app_id_schema(FunctionId::StartApp, "Start an app"),
-            make_app_id_schema(FunctionId::StopApp, "Stop an app"),
-            make_no_param_schema(FunctionId::ShowLoading, "Show caller app loading overlay"),
-            make_no_param_schema(FunctionId::HideLoading, "Hide caller app loading overlay"),
-            with_return(
-                make_keyboard_options_schema(),
-                FunctionValueType::Object,
-                "Keyboard request object. Example: {\"RequestId\":1}"
-            ),
-            make_keyboard_request_schema(),
-            make_message_dialog_options_schema(),
-            make_message_dialog_request_schema(),
-            make_message_dialog_update_schema(),
-            with_return(
-                make_no_param_schema(FunctionId::GetStorageLayout, "Get system storage layout"),
-                FunctionValueType::Object,
-                "Storage layout object. Example: {\"internal\":{},\"external\":[]}"
-            ),
-            with_return(
-                make_no_param_schema(FunctionId::GetAppStoragePaths, "Get caller app storage paths"),
-                FunctionValueType::Object,
-                "Caller app storage paths object. Example: {\"internal\":{\"files\":\"/path\"},\"external\":[{\"volume_id\":\"sdcard\",\"files\":\"/sdcard/apps/app/files\"}]}"
-            ),
-            with_return(
-                make_no_param_schema(FunctionId::GetPublicStoragePaths, "Get public storage paths"),
-                FunctionValueType::Object,
-                "Public storage paths object. Example: {\"internal\":{},\"external\":[]}"
-            ),
-            make_storage_install_schema(),
-            make_storage_location_schema(
-                FunctionId::StorageList,
-                "List caller-owned storage directory",
-                FunctionValueType::Array,
-                "Storage entry array. Example: [{\"name\":\"game.nes\",\"info\":{\"type\":\"File\",\"size\":1024}}]"
-            ),
-            make_storage_location_schema(
-                FunctionId::StorageStat,
-                "Stat caller-owned storage path",
-                FunctionValueType::Object,
-                "Storage file info object. Example: {\"type\":\"Directory\",\"size\":0}"
-            ),
-            make_storage_location_schema(FunctionId::StorageMkdir, "Create caller-owned storage directory"),
-            make_storage_location_schema(
-                FunctionId::StorageRead,
-                "Read caller-owned storage file",
-                FunctionValueType::String,
-                "File data"
-            ),
-            make_storage_write_schema(),
-            make_storage_location_schema(FunctionId::StorageRemove, "Remove caller-owned storage file or directory"),
-            make_storage_rename_schema(),
-        }
-    };
+    static const std::vector<service::FunctionSchema> SCHEMAS =
+        static_schema::materialize_function_schemas(SYSTEM_FUNCTION_SPECS);
     return std::span<const service::FunctionSchema>(SCHEMAS);
 }
 
@@ -698,8 +721,7 @@ bool SystemService::publish_message_dialog_closed(const MessageDialogResult &res
 
 std::vector<service::FunctionSchema> SystemService::get_function_schemas()
 {
-    auto schemas = SystemCoreHelper::get_function_schemas();
-    return std::vector<service::FunctionSchema>(schemas.begin(), schemas.end());
+    return static_schema::materialize_function_schemas(SYSTEM_FUNCTION_SPECS);
 }
 
 std::vector<service::EventSchema> SystemService::get_event_schemas()
@@ -710,163 +732,110 @@ std::vector<service::EventSchema> SystemService::get_event_schemas()
 
 service::ServiceBase::FunctionHandlerMap SystemService::get_function_handlers()
 {
-    using FunctionId = SystemCoreHelper::FunctionId;
     return {
+        [this](FunctionParameterMap &&)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetSystemType), [this](FunctionParameterMap &&)
-            {
-                return get_system_type();
-            }
+            return get_system_type();
         },
+        [this](FunctionParameterMap &&)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetSystemInfo), [this](FunctionParameterMap &&)
-            {
-                return get_system_info();
-            }
+            return get_system_info();
         },
+        [this](FunctionParameterMap &&)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetEnvironment), [this](FunctionParameterMap &&)
-            {
-                return get_environment();
-            }
+            return get_environment();
         },
+        [this](FunctionParameterMap &&)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetActiveApp), [this](FunctionParameterMap &&)
-            {
-                return get_active_app();
-            }
+            return get_active_app();
         },
+        [this](FunctionParameterMap &&)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::ListApps), [this](FunctionParameterMap &&)
-            {
-                return list_apps();
-            }
+            return list_apps();
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::RequestCloseApp), [this](FunctionParameterMap &&params)
-            {
-                return request_close_app(std::move(params));
-            }
+            return request_close_app(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::StartApp), [this](FunctionParameterMap &&params)
-            {
-                return start_app(std::move(params));
-            }
+            return start_app(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::StopApp), [this](FunctionParameterMap &&params)
-            {
-                return stop_app(std::move(params));
-            }
+            return stop_app(std::move(params));
         },
+        [this](FunctionParameterMap &&)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::ShowLoading), [this](FunctionParameterMap &&)
-            {
-                return show_loading();
-            }
+            return show_loading();
         },
+        [this](FunctionParameterMap &&)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::HideLoading), [this](FunctionParameterMap &&)
-            {
-                return hide_loading();
-            }
+            return hide_loading();
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::ShowKeyboard), [this](FunctionParameterMap &&params)
-            {
-                return show_keyboard(std::move(params));
-            }
+            return show_keyboard(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::HideKeyboard), [this](FunctionParameterMap &&params)
-            {
-                return hide_keyboard(std::move(params));
-            }
+            return hide_keyboard(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::ShowMessageDialog), [this](FunctionParameterMap &&params)
-            {
-                return show_message_dialog(std::move(params));
-            }
+            return show_message_dialog(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::HideMessageDialog), [this](FunctionParameterMap &&params)
-            {
-                return hide_message_dialog(std::move(params));
-            }
+            return hide_message_dialog(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::UpdateMessageDialog), [this](FunctionParameterMap &&params)
-            {
-                return update_message_dialog(std::move(params));
-            }
+            return update_message_dialog(std::move(params));
         },
+        [this](FunctionParameterMap &&)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetStorageLayout), [this](FunctionParameterMap &&)
-            {
-                return get_storage_layout();
-            }
+            return get_storage_layout();
         },
+        [this](FunctionParameterMap &&)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetAppStoragePaths), [this](FunctionParameterMap &&)
-            {
-                return get_app_storage_paths();
-            }
+            return get_app_storage_paths();
         },
+        [this](FunctionParameterMap &&)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetPublicStoragePaths), [this](FunctionParameterMap &&)
-            {
-                return get_public_storage_paths();
-            }
+            return get_public_storage_paths();
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetDefaultInstallStorage), [this](FunctionParameterMap &&params)
-            {
-                return set_default_install_storage(std::move(params));
-            }
+            return set_default_install_storage(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::StorageList), [this](FunctionParameterMap &&params)
-            {
-                return storage_list(std::move(params));
-            }
+            return storage_list(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::StorageStat), [this](FunctionParameterMap &&params)
-            {
-                return storage_stat(std::move(params));
-            }
+            return storage_stat(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::StorageMkdir), [this](FunctionParameterMap &&params)
-            {
-                return storage_mkdir(std::move(params));
-            }
+            return storage_mkdir(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::StorageRead), [this](FunctionParameterMap &&params)
-            {
-                return storage_read(std::move(params));
-            }
+            return storage_read(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::StorageWrite), [this](FunctionParameterMap &&params)
-            {
-                return storage_write(std::move(params));
-            }
+            return storage_write(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::StorageRemove), [this](FunctionParameterMap &&params)
-            {
-                return storage_remove(std::move(params));
-            }
+            return storage_remove(std::move(params));
         },
+        [this](FunctionParameterMap &&params)
         {
-            BROOKESIA_DESCRIBE_TO_STR(FunctionId::StorageRename), [this](FunctionParameterMap &&params)
-            {
-                return storage_rename(std::move(params));
-            }
+            return storage_rename(std::move(params));
         },
     };
 }

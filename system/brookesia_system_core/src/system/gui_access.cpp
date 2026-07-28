@@ -909,4 +909,30 @@ std::string SystemGuiAccess::get_language() const
     return system_->impl_->get_gui_theme_language_snapshot().language;
 }
 
+std::expected<void, std::string> SystemGuiAccess::save_theme_preference(std::string_view theme_id) const
+{
+    if (system_ == nullptr) {
+        return make_unavailable_error();
+    }
+    return system_->impl_->save_gui_theme_preference(theme_id);
+}
+
+std::expected<void, std::string> SystemGuiAccess::save_language_preference(std::string_view language) const
+{
+    if (system_ == nullptr) {
+        return make_unavailable_error();
+    }
+    return system_->impl_->save_gui_language_preference(language);
+}
+
+std::optional<std::string> SystemGuiAccess::get_stored_theme_preference() const
+{
+    return system_ != nullptr ? system_->get_stored_gui_theme_id() : std::nullopt;
+}
+
+std::optional<std::string> SystemGuiAccess::get_stored_language_preference() const
+{
+    return system_ != nullptr ? system_->get_stored_gui_language() : std::nullopt;
+}
+
 } // namespace esp_brookesia::system::core

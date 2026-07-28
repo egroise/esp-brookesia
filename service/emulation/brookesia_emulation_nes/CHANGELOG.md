@@ -1,5 +1,12 @@
 # ChangeLog
 
+## v0.8.2 - 2026-07-27
+
+### Enhancements:
+
+- feat(dataflow): route NES video and audio output through provider-neutral operations.
+- chore(build): split emulator lifecycle, frame, audio, and ROM implementation units.
+
 ## v0.8.1 - 2026-07-13
 
 ### Enhancements:

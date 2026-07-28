@@ -125,8 +125,8 @@ private:
     wifi::SoftApParams softap_params_{};
     wifi::SoftApEvent softap_target_event_ = wifi::SoftApEvent::Max;
     SoftApStateFlags softap_state_flags_;
-    lib_utils::TaskScheduler::TaskId softap_setup_task_ = 0;
-    lib_utils::TaskScheduler::TaskId softap_event_task_ = 0;
+    lib_utils::TaskSchedulerTaskId softap_setup_task_ = 0;
+    lib_utils::TaskSchedulerTaskId softap_event_task_ = 0;
 
     // Provision related
     bool is_softap_provision_running_ = false;
@@ -140,7 +140,7 @@ private:
     bool provision_scan_completed_ = false;
     boost::mutex provision_scan_mutex_;
     boost::condition_variable provision_scan_cv_;
-    lib_utils::TaskScheduler::TaskId provision_scan_periodic_task_ = 0;
+    lib_utils::TaskSchedulerTaskId provision_scan_periodic_task_ = 0;
 };
 
 BROOKESIA_DESCRIBE_ENUM(SoftAp::ProvisionConnectStatus, Idle, Connecting, Success, Failed);

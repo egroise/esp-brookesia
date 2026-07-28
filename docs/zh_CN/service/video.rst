@@ -97,4 +97,11 @@
    * - **O_UYY_E_VYY**
      - 特定打包 YUV 布局（视硬件与管线而定）
 
+.. _service-video-sec-07:
+
+显示 DataFlow 集成
+^^^^^^^^^^^^^^^^^^^
+
+配置显示 sink 后，编码器和解码器会通过与 provider 无关的显示 DataFlow 操作发现输出、选择源并提交帧，使视频服务不依赖具体的显示 provider 实现。
+
 .. include-build-file:: contract_guides/service/video.inc

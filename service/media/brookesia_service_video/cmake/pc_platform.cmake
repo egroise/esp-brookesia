@@ -32,10 +32,24 @@ set(
     "Default value of CONFIG_BROOKESIA_SERVICE_VIDEO_DECODER_DEFAULT_NUM on PC"
 )
 
-if(NOT TARGET brookesia::service_display)
+if(NOT TARGET brookesia::lib_utils)
     add_subdirectory(
-        ${COMPONENT_DIR}/../brookesia_service_display
-        ${CMAKE_BINARY_DIR}/brookesia_service_display
+        ${COMPONENT_DIR}/../../../utils/brookesia_lib_utils
+        ${CMAKE_BINARY_DIR}/brookesia_lib_utils
+    )
+endif()
+
+if(NOT TARGET brookesia::service_manager)
+    add_subdirectory(
+        ${COMPONENT_DIR}/../../framework/brookesia_service_manager
+        ${CMAKE_BINARY_DIR}/brookesia_service_manager
+    )
+endif()
+
+if(NOT TARGET brookesia::service_helper)
+    add_subdirectory(
+        ${COMPONENT_DIR}/../../framework/brookesia_service_helper
+        ${CMAKE_BINARY_DIR}/brookesia_service_helper
     )
 endif()
 
@@ -85,7 +99,9 @@ target_compile_definitions(${COMPONENT_LIB}
 )
 target_link_libraries(${COMPONENT_LIB}
     PUBLIC
-        brookesia::service_display
+        brookesia::service_manager
+        brookesia::service_helper
+        brookesia::hal_interface
 )
 
 if(BROOKESIA_SERVICE_VIDEO_PC_CONFIG_ENABLE_ENCODER AND

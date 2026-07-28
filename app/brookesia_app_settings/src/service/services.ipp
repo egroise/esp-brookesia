@@ -59,8 +59,13 @@ void SettingsApp::subscribe_sntp_events()
         return;
     }
 
-    const auto state_callback = [this](const std::string &, const std::string & state) {
-        time_zone_ui_state_.state = state;
+    const service::EventRegistry::SignalSlot state_callback =
+        [this](const std::string &, const service::EventItemMap &items) {
+        const auto *state = std::get_if<std::string>(find_event_item(items, "State"));
+        if (!state) {
+            return;
+        }
+        time_zone_ui_state_.state = *state;
         if (context_ == nullptr) {
             return;
         }
@@ -306,8 +311,14 @@ void SettingsApp::subscribe_wifi_events()
         return;
     }
 
-    const auto general_callback = [this](const std::string &, const std::string & event, bool unexpected) {
-        handle_wifi_general_event(event, unexpected);
+    const service::EventRegistry::SignalSlot general_callback =
+        [this](const std::string &, const service::EventItemMap &items) {
+        const auto *event = std::get_if<std::string>(find_event_item(items, "Event"));
+        const auto *unexpected = std::get_if<bool>(find_event_item(items, "IsUnexpected"));
+        if (!event || !unexpected) {
+            return;
+        }
+        handle_wifi_general_event(*event, *unexpected);
     };
     auto general_connection = WifiHelper::subscribe_event(
                                   WifiHelper::EventId::GeneralEventHappened,
@@ -319,8 +330,13 @@ void SettingsApp::subscribe_wifi_events()
         BROOKESIA_LOGW("Failed to subscribe Wi-Fi general event");
     }
 
-    const auto scan_state_callback = [this](const std::string &, bool running) {
-        handle_wifi_scan_state_changed(running);
+    const service::EventRegistry::SignalSlot scan_state_callback =
+        [this](const std::string &, const service::EventItemMap &items) {
+        const auto *running = std::get_if<bool>(find_event_item(items, "IsRunning"));
+        if (!running) {
+            return;
+        }
+        handle_wifi_scan_state_changed(*running);
     };
     auto scan_state_connection = WifiHelper::subscribe_event(
                                      WifiHelper::EventId::ScanStateChanged,
@@ -332,8 +348,13 @@ void SettingsApp::subscribe_wifi_events()
         BROOKESIA_LOGW("Failed to subscribe Wi-Fi scan state event");
     }
 
-    const auto scan_infos_callback = [this](const std::string &, const boost::json::array & ap_infos_json) {
-        handle_wifi_scan_ap_infos_updated(ap_infos_json);
+    const service::EventRegistry::SignalSlot scan_infos_callback =
+        [this](const std::string &, const service::EventItemMap &items) {
+        const auto *ap_infos_json = std::get_if<boost::json::array>(find_event_item(items, "ApInfos"));
+        if (!ap_infos_json) {
+            return;
+        }
+        handle_wifi_scan_ap_infos_updated(*ap_infos_json);
     };
     auto scan_infos_connection = WifiHelper::subscribe_event(
                                      WifiHelper::EventId::ScanApInfosUpdated,

@@ -650,16 +650,26 @@ bool verify_manager_service(ServiceManager &manager)
             !BROOKESIA_DESCRIBE_FROM_JSON(std::get<boost::json::array>(*names_result.data), names) ||
             !std::is_sorted(names.begin(), names.end()) ||
             !std::binary_search(names.begin(), names.end(), ManagerService::get_name().data()) ||
-            !std::binary_search(names.begin(), names.end(), UtilsService::get_name().data())) {
+            !std::binary_search(names.begin(), names.end(), UtilsService::get_name().data()) ||
+            !std::binary_search(names.begin(), names.end(), DataFlowService::get_name().data())) {
         std::cerr << "Manager service names are invalid" << '\n';
         return false;
     }
 
     auto manager_info = manager.get_service_info(ManagerService::get_name().data());
     auto utils_info = manager.get_service_info(UtilsService::get_name().data());
-    if (!manager_info || !utils_info || (manager_info->reference_count != 1) ||
-            (utils_info->reference_count != 0)) {
+    auto dataflow_info = manager.get_service_info(DataFlowService::get_name().data());
+    if (!manager_info || !utils_info || !dataflow_info || (manager_info->reference_count != 1) ||
+            (utils_info->reference_count != 0) || (dataflow_info->reference_count != 0)) {
         std::cerr << "Built-in service reference counts are invalid" << '\n';
+        return false;
+    }
+
+    auto dataflow_overview = manager.get_service_schema(DataFlowService::get_name().data());
+    if (!dataflow_overview ||
+            (dataflow_overview->function_names.size() != DataFlowService::get_static_function_schemas().size()) ||
+            (dataflow_overview->event_names.size() != DataFlowService::get_static_event_schemas().size())) {
+        std::cerr << "DataFlow service schema overview is invalid" << '\n';
         return false;
     }
 
@@ -921,13 +931,14 @@ int main()
 
     auto external_manager_binding = manager.bind(std::string(ManagerService::get_name()));
     auto external_utils_binding = manager.bind(std::string(UtilsService::get_name()));
-    if (!external_manager_binding.is_valid() || !external_utils_binding.is_valid()) {
+    auto external_dataflow_binding = manager.bind(std::string(DataFlowService::get_name()));
+    if (!external_manager_binding.is_valid() || !external_utils_binding.is_valid() || !external_dataflow_binding.is_valid()) {
         std::cerr << "Failed to retain external built-in service bindings" << std::endl;
         return EXIT_FAILURE;
     }
 
     manager.stop();
-    if (external_manager_binding.is_valid() || external_utils_binding.is_valid()) {
+    if (external_manager_binding.is_valid() || external_utils_binding.is_valid() || external_dataflow_binding.is_valid()) {
         std::cerr << "A built-in service remained running after ServiceManager stopped" << std::endl;
         return EXIT_FAILURE;
     }

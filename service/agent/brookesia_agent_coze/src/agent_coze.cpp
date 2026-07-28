@@ -622,7 +622,7 @@ bool Coze::on_audio_event(uint8_t event_id, void *event_data)
             auto result = publish_event(BROOKESIA_DESCRIBE_TO_STR(CozeHelper::EventId::CozeEventHappened),
             service::EventItemMap{
                 {
-                    BROOKESIA_DESCRIBE_ENUM_TO_STR(CozeHelper::EventCozeEventHappenedParam::CozeEvent),
+                    "CozeEvent",
                     BROOKESIA_DESCRIBE_ENUM_TO_STR(event_type)
                 }
             });

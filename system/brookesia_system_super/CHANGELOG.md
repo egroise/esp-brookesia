@@ -1,5 +1,12 @@
 # ChangeLog
 
+## v0.8.2 - 2026-07-27
+
+### Enhancements:
+
+- feat(build): split shell lifecycle, display, input, resource, and launch modules.
+- chore(deps): rely on System Core contracts instead of direct utility linkage.
+
 ## v0.8.1 - 2026-07-13
 
 ### Enhancements:

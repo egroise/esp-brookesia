@@ -20,6 +20,7 @@
 #include "brookesia/hal_interface/interfaces/power/battery.hpp"
 #include "brookesia/hal_interface/interfaces/video/camera.hpp"
 #include "brookesia/lib_utils/describe_helpers.hpp"
+#include "brookesia/service_manager/detail/static_schema.hpp"
 #include "brookesia/service_manager/helper/base.hpp"
 
 namespace esp_brookesia::service::helper {
@@ -96,251 +97,175 @@ public:
         Max,
     };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the function parameter types ////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    enum class FunctionSetPowerBatteryChargeConfigParam {
-        Config,
-    };
 
-    enum class FunctionSetPowerBatteryChargingEnabledParam {
-        Enabled,
-    };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////// The following are the event parameter types ///////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    enum class EventPowerBatteryStateChangedParam {
-        State,
-    };
 
-    enum class EventPowerBatteryChargeConfigChangedParam {
-        Config,
-    };
 
 private:
-    static FunctionSchema function_schema_get_capabilities()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetCapabilities),
-            .description = "Get available HAL devices and interfaces.",
-            .return_value = FunctionReturnSchema{
-                .type = FunctionValueType::Array,
-                .description = (boost::format("Example: %1%")
-                % BROOKESIA_DESCRIBE_JSON_SERIALIZE(Capabilities({
-                    hal::DeviceInfo{
-                        .name = "General",
-                        .interfaces = {
-                            hal::InterfaceInfo{hal::system::BoardInfoIface::NAME, "System:BoardInfo"},
-                        },
-                    },
-                    hal::DeviceInfo{
-                        .name = "Display",
-                        .interfaces = {
-                            hal::InterfaceInfo{hal::display::PanelIface::NAME, "Display:PanelA"},
-                            hal::InterfaceInfo{hal::display::PanelIface::NAME, "Display:PanelB"},
-                        },
-                    },
-                }))).str(),
-            },
-        };
-    }
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////// The following are the static schema specifications ////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    using EventItemSpec = detail::static_schema::EventItemSpec;
+    using EventSpec = detail::static_schema::EventSpec;
+    using FunctionParameterSpec = detail::static_schema::FunctionParameterSpec;
+    using FunctionReturnSpec = detail::static_schema::FunctionReturnSpec;
+    using FunctionSpec = detail::static_schema::FunctionSpec;
 
-    static FunctionSchema function_schema_get_board_info()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetBoardInfo),
-            .description = "Get static board information.",
-            .return_value = FunctionReturnSchema{
+    inline static constexpr std::span<const FunctionParameterSpec> EMPTY_PARAMETERS = {};
+
+    inline static constexpr std::array<FunctionParameterSpec, 1> SET_POWER_BATTERY_CHARGE_CONFIG_PARAMETERS = {{
+            {
+                .name = "Config",
+                .description = "Battery charge configuration object.",
                 .type = FunctionValueType::Object,
-                .description = (boost::format("Example: %1%")
-                % BROOKESIA_DESCRIBE_JSON_SERIALIZE((BoardInfo{
-                    .name = "esp32_s3_touch_amoled_1_8",
-                    .chip = "ESP32-S3",
-                    .version = "v1.0",
-                    .description = "Example board information",
-                    .manufacturer = "Espressif",
-                }))).str(),
             },
-        };
-    }
+        }
+    };
 
-    static FunctionSchema function_schema_get_camera_device_infos()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetCameraDeviceInfos),
-            .description = "Get available camera devices.",
-            .default_timeout_ms = 2000,
-            .return_value = FunctionReturnSchema{
-                .type = FunctionValueType::Array,
-                .description =
-                (boost::format("Example: %1%")
-                % BROOKESIA_DESCRIBE_JSON_SERIALIZE(CameraDeviceInfos({
-                    hal::video::CameraIface::DeviceInfo{
-                        .id = 0,
-                        .name = "camera",
-                        .device_path = "/dev/video0",
-                        .supported_formats = {
-                            hal::video::EncoderSinkFormat::YUV422,
-                        },
-                    },
-                }))).str(),
+    inline static constexpr std::array<FunctionParameterSpec, 1> SET_POWER_BATTERY_CHARGING_ENABLED_PARAMETERS = {{
+            {
+                .name = "Enabled",
+                .description = "True to enable charging, false to disable charging.",
+                .type = FunctionValueType::Boolean,
             },
-        };
-    }
+        }
+    };
 
-    static FunctionSchema function_schema_get_network_connectivity_info()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetNetworkConnectivityInfo),
-            .description = "Get current network connectivity status.",
-            .default_timeout_ms = 2000,
-            .return_value = FunctionReturnSchema{
-                .type = FunctionValueType::Array,
-                .description =
-                (boost::format("Example: %1%")
-                % BROOKESIA_DESCRIBE_JSON_SERIALIZE(NetworkConnectivityInfos({
-                    NetworkConnectivityInfo{
-                        .instance_name = "Network:Connectivity:0",
-                        .status = hal::network::NetworkStatus{
-                            .interface_type = hal::network::InterfaceType::WifiStation,
-                            .link_state = hal::network::LinkState::Up,
-                            .ip_state = hal::network::IpState::Ready,
-                            .reachability = hal::network::Reachability::LocalOnly,
-                        },
-                        .state = hal::network::ConnectivityState::LocalNetworkReady,
-                        .network_ready = true,
-                        .internet_ready = false,
-                    },
-                }))).str(),
+    inline static constexpr std::array<FunctionSpec, static_cast<size_t>(FunctionId::Max)> FUNCTION_SPECS = {{
+            {
+                .name = "GetCapabilities",
+                .description = "Get available HAL devices and interfaces.",
+                .parameters = EMPTY_PARAMETERS,
+                .return_value = FunctionReturnSpec{
+                    .type = FunctionValueType::Array,
+                    .description =
+                    R"(Example: [{"name":"General","interfaces":[{"type_name":"SystemBoardInfo",)"
+                    R"("instance_name":"System:BoardInfo"}]},{"name":"Display","interfaces":[)"
+                    R"({"type_name":"DisplayPanel","instance_name":"Display:PanelA"},{"type_name":)"
+                    R"("DisplayPanel","instance_name":"Display:PanelB"}]}])",
+                },
             },
-        };
-    }
-
-    static FunctionSchema function_schema_get_power_battery_info()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetPowerBatteryInfo),
-            .description = "Get static power battery information.",
-            .default_timeout_ms = 2000,
-            .return_value = FunctionReturnSchema{
-                .type = FunctionValueType::Object,
-                .description = (boost::format("Example: %1%")
-                % BROOKESIA_DESCRIBE_JSON_SERIALIZE((PowerBatteryInfo{
-                    .name = "MainBattery",
-                    .chemistry = "Li-ion",
-                    .abilities = {
-                        hal::power::BatteryIface::Ability::Voltage,
-                        hal::power::BatteryIface::Ability::Percentage,
-                        hal::power::BatteryIface::Ability::ChargeState,
-                    },
-                }))).str(),
-            },
-        };
-    }
-
-    static FunctionSchema function_schema_get_power_battery_state()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetPowerBatteryState),
-            .description = "Get current power battery state.",
-            .return_value = FunctionReturnSchema{
-                .type = FunctionValueType::Object,
-                .description = (boost::format("Example: %1%")
-                % BROOKESIA_DESCRIBE_JSON_SERIALIZE((PowerBatteryState{
-                    .is_present = true,
-                    .power_source = hal::power::BatteryIface::PowerSource::Battery,
-                    .charge_state = hal::power::BatteryIface::ChargeState::NotCharging,
-                    .level_source = hal::power::BatteryIface::LevelSource::VoltageCurve,
-                    .voltage_mv = 3920,
-                    .percentage = 67,
-                    .vbus_voltage_mv = std::nullopt,
-                    .system_voltage_mv = std::nullopt,
-                    .is_low = false,
-                    .is_critical = false,
-                }))).str(),
-            },
-        };
-    }
-
-    static FunctionSchema function_schema_get_power_battery_charge_config()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::GetPowerBatteryChargeConfig),
-            .description = "Get current power battery charge configuration.",
-            .return_value = FunctionReturnSchema{
-                .type = FunctionValueType::Object,
-                .description = (boost::format("Example: %1%")
-                % BROOKESIA_DESCRIBE_JSON_SERIALIZE((PowerBatteryChargeConfig{
-                    .enabled = true,
-                    .target_voltage_mv = 4200,
-                    .charge_current_ma = 500,
-                    .precharge_current_ma = 100,
-                    .termination_current_ma = 100,
-                }))).str(),
-            },
-        };
-    }
-
-    static FunctionSchema function_schema_set_power_battery_charge_config()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetPowerBatteryChargeConfig),
-            .description = "Set power battery charge configuration.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionSetPowerBatteryChargeConfigParam::Config),
-                    .description = "Battery charge configuration object.",
+            {
+                .name = "GetBoardInfo",
+                .description = "Get static board information.",
+                .parameters = EMPTY_PARAMETERS,
+                .return_value = FunctionReturnSpec{
                     .type = FunctionValueType::Object,
-                }
+                    .description =
+                    R"(Example: {"name":"esp32_s3_touch_amoled_1_8","chip":"ESP32-S3","version":"v1.0",)"
+                    R"("description":"Example board information","manufacturer":"Espressif"})",
+                },
             },
-        };
-    }
+            {
+                .name = "GetCameraDeviceInfos",
+                .description = "Get available camera devices.",
+                .parameters = EMPTY_PARAMETERS,
+                .default_timeout_ms = 2000,
+                .return_value = FunctionReturnSpec{
+                    .type = FunctionValueType::Array,
+                    .description = R"(Example: [{"id":0,"name":"camera","device_path":"/dev/video0",)"
+                    R"("supported_formats":["YUV422"]}])",
+                },
+            },
+            {
+                .name = "GetNetworkConnectivityInfo",
+                .description = "Get current network connectivity status.",
+                .parameters = EMPTY_PARAMETERS,
+                .default_timeout_ms = 2000,
+                .return_value = FunctionReturnSpec{
+                    .type = FunctionValueType::Array,
+                    .description =
+                    R"(Example: [{"instance_name":"Network:Connectivity:0","status":)"
+                    R"({"interface_type":"WifiStation",)"
+                    R"("link_state":"Up","ip_state":"Ready","reachability":"LocalOnly","ip_info":null,)"
+                    R"("signal_dbm":null,"connected_duration_ms":null},"state":"LocalNetworkReady",)"
+                    R"("network_ready":true,"internet_ready":false}])",
+                },
+            },
+            {
+                .name = "GetPowerBatteryInfo",
+                .description = "Get static power battery information.",
+                .parameters = EMPTY_PARAMETERS,
+                .default_timeout_ms = 2000,
+                .return_value = FunctionReturnSpec{
+                    .type = FunctionValueType::Object,
+                    .description =
+                    R"(Example: {"name":"MainBattery","chemistry":"Li-ion","abilities":["Voltage",)"
+                    R"("Percentage","ChargeState"]})",
+                },
+            },
+            {
+                .name = "GetPowerBatteryState",
+                .description = "Get current power battery state.",
+                .parameters = EMPTY_PARAMETERS,
+                .return_value = FunctionReturnSpec{
+                    .type = FunctionValueType::Object,
+                    .description =
+                    R"(Example: {"is_present":true,"power_source":"Battery","charge_state":"NotCharging",)"
+                    R"("level_source":"VoltageCurve","voltage_mv":3920,"percentage":67,"vbus_voltage_mv":null,)"
+                    R"("system_voltage_mv":null,"is_low":false,"is_critical":false})",
+                },
+            },
+            {
+                .name = "GetPowerBatteryChargeConfig",
+                .description = "Get current power battery charge configuration.",
+                .parameters = EMPTY_PARAMETERS,
+                .return_value = FunctionReturnSpec{
+                    .type = FunctionValueType::Object,
+                    .description =
+                    R"(Example: {"enabled":true,"target_voltage_mv":4200,"charge_current_ma":500,)"
+                    R"("precharge_current_ma":100,"termination_current_ma":100})",
+                },
+            },
+            {
+                .name = "SetPowerBatteryChargeConfig",
+                .description = "Set power battery charge configuration.",
+                .parameters = SET_POWER_BATTERY_CHARGE_CONFIG_PARAMETERS,
+            },
+            {
+                .name = "SetPowerBatteryChargingEnabled",
+                .description = "Enable or disable battery charging.",
+                .parameters = SET_POWER_BATTERY_CHARGING_ENABLED_PARAMETERS,
+            },
+        }
+    };
+    static_assert(FUNCTION_SPECS.size() == static_cast<size_t>(FunctionId::Max));
 
-    static FunctionSchema function_schema_set_power_battery_charging_enabled()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(FunctionId::SetPowerBatteryChargingEnabled),
-            .description = "Enable or disable battery charging.",
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionSetPowerBatteryChargingEnabledParam::Enabled),
-                    .description = "True to enable charging, false to disable charging.",
-                    .type = FunctionValueType::Boolean,
-                }
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////// The following are the event schema specifications //////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    inline static constexpr std::array<EventItemSpec, 1> POWER_BATTERY_STATE_CHANGED_ITEMS = {{
+            {
+                .name = "State",
+                .description = "Current power battery state snapshot.",
+                .type = EventItemType::Object,
             },
-        };
-    }
+        }
+    };
 
-    static EventSchema event_schema_power_battery_state_changed()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EventId::PowerBatteryStateChanged),
-            .description = "Emitted when the power battery state snapshot changes.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventPowerBatteryStateChangedParam::State),
-                    .description = "Current power battery state snapshot.",
-                    .type = EventItemType::Object,
-                }
+    inline static constexpr std::array<EventItemSpec, 1> POWER_BATTERY_CHARGE_CONFIG_CHANGED_ITEMS = {{
+            {
+                .name = "Config",
+                .description = "Current power battery charge configuration.",
+                .type = EventItemType::Object,
             },
-        };
-    }
+        }
+    };
 
-    static EventSchema event_schema_power_battery_charge_config_changed()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_TO_STR(EventId::PowerBatteryChargeConfigChanged),
-            .description = "Emitted when the power battery charge configuration changes.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventPowerBatteryChargeConfigChangedParam::Config),
-                    .description = "Current power battery charge configuration.",
-                    .type = EventItemType::Object,
-                }
+    inline static constexpr std::array<EventSpec, static_cast<size_t>(EventId::Max)> EVENT_SPECS = {{
+            {
+                .name = "PowerBatteryStateChanged",
+                .description = "Emitted when the power battery state snapshot changes.",
+                .items = POWER_BATTERY_STATE_CHANGED_ITEMS,
             },
-        };
-    }
+            {
+                .name = "PowerBatteryChargeConfigChanged",
+                .description = "Emitted when the power battery charge configuration changes.",
+                .items = POWER_BATTERY_CHARGE_CONFIG_CHANGED_ITEMS,
+            },
+        }
+    };
+    static_assert(EVENT_SPECS.size() == static_cast<size_t>(EventId::Max));
 
 public:
     static constexpr std::string_view get_name()
@@ -350,29 +275,24 @@ public:
 
     static std::span<const FunctionSchema> get_function_schemas()
     {
-        static const std::array<FunctionSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(FunctionId::Max)> FUNCTION_SCHEMAS = {{
-                function_schema_get_capabilities(),
-                function_schema_get_board_info(),
-                function_schema_get_camera_device_infos(),
-                function_schema_get_network_connectivity_info(),
-                function_schema_get_power_battery_info(),
-                function_schema_get_power_battery_state(),
-                function_schema_get_power_battery_charge_config(),
-                function_schema_set_power_battery_charge_config(),
-                function_schema_set_power_battery_charging_enabled(),
-            }
-        };
-        return std::span<const FunctionSchema>(FUNCTION_SCHEMAS);
+        static std::array<FunctionSchema, FUNCTION_SPECS.size()> schemas;
+        static const bool initialized = [] {
+            detail::static_schema::materialize_function_schemas(FUNCTION_SPECS, schemas);
+            return true;
+        }();
+        static_cast<void>(initialized);
+        return schemas;
     }
 
     static std::span<const EventSchema> get_event_schemas()
     {
-        static const std::array<EventSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(EventId::Max)> EVENT_SCHEMAS = {{
-                event_schema_power_battery_state_changed(),
-                event_schema_power_battery_charge_config_changed(),
-            }
-        };
-        return std::span<const EventSchema>(EVENT_SCHEMAS);
+        static std::array<EventSchema, EVENT_SPECS.size()> schemas;
+        static const bool initialized = [] {
+            detail::static_schema::materialize_event_schemas(EVENT_SPECS, schemas);
+            return true;
+        }();
+        static_cast<void>(initialized);
+        return schemas;
     }
 };
 
@@ -387,9 +307,5 @@ BROOKESIA_DESCRIBE_STRUCT(
 BROOKESIA_DESCRIBE_ENUM(
     Device::EventId, PowerBatteryStateChanged, PowerBatteryChargeConfigChanged, Max
 );
-BROOKESIA_DESCRIBE_ENUM(Device::FunctionSetPowerBatteryChargeConfigParam, Config);
-BROOKESIA_DESCRIBE_ENUM(Device::FunctionSetPowerBatteryChargingEnabledParam, Enabled);
-BROOKESIA_DESCRIBE_ENUM(Device::EventPowerBatteryStateChangedParam, State);
-BROOKESIA_DESCRIBE_ENUM(Device::EventPowerBatteryChargeConfigChangedParam, Config);
 
 } // namespace esp_brookesia::service::helper

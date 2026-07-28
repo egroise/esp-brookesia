@@ -100,7 +100,7 @@ private:
         .description = "Expose application-defined functions and events.",
         .version = get_component_version(),
 #if BROOKESIA_SERVICE_CUSTOM_ENABLE_WORKER
-        .task_scheduler_config = lib_utils::TaskScheduler::StartConfig{
+        .task_scheduler_config = lib_utils::TaskSchedulerStartConfig{
             .worker_configs = {
                 lib_utils::ThreadConfig{
                     .name = BROOKESIA_SERVICE_CUSTOM_WORKER_NAME,

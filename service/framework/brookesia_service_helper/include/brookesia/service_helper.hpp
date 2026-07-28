@@ -10,13 +10,17 @@
  */
 
 #include "service_helper/media/audio.hpp"
+#include "service_helper/media/bt_speaker.hpp"
 #include "brookesia/service_manager/helper/base.hpp"
 #include "service_helper/system/device.hpp"
 #include "service_helper/framework/manager.hpp"
+#include "service_helper/framework/dataflow.hpp"
 #include "service_helper/framework/utils.hpp"
 #include "service_helper/media/display.hpp"
 #include "service_helper/media/picodet.hpp"
 #include "service_helper/network/http.hpp"
+#include "service_helper/network/ble.hpp"
+#include "service_helper/network/bt.hpp"
 #include "service_helper/emulation/nes.hpp"
 #include "service_helper/system/storage.hpp"
 #include "service_helper/media/video.hpp"

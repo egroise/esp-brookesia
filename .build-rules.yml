@@ -7,6 +7,10 @@
 .general_target_enable: &general_target_enable
   enable:
     - if: IDF_TARGET in ["esp32s3", "esp32p4", "esp32c5", "esp32s31"]
+# Define common enable condition for dl test apps as anchor
+.general_target_enable_dl: &general_target_enable_dl
+  enable:
+    - if: IDF_TARGET in ["esp32s3", "esp32p4"]
 
 #
 # Test Apps
@@ -59,6 +63,12 @@ runtime/brookesia_runtime_elf/test_apps:
 # brookesia_service_audio
 service/media/brookesia_service_audio/test_apps:
   <<: *general_target_enable
+# brookesia_service_bt
+service/network/brookesia_service_bt/test_apps:
+  <<: *general_target_enable
+# brookesia_service_bt_speaker
+service/media/brookesia_service_bt_speaker/test_apps:
+  <<: *general_target_enable
 # brookesia_service_custom
 service/framework/brookesia_service_custom/test_apps:
   <<: *general_target_enable
@@ -68,6 +78,9 @@ service/system/brookesia_service_device/test_apps:
 # brookesia_service_display
 service/media/brookesia_service_display/test_apps:
   <<: *general_target_enable
+# brookesia_service_picodet
+service/media/brookesia_service_picodet/test_apps:
+  <<: *general_target_enable_dl
 # brookesia_service_http
 service/network/brookesia_service_http/test_apps:
   <<: *general_target_enable

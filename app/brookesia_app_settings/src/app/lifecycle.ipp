@@ -93,6 +93,33 @@ std::expected<void, std::string> SettingsApp::on_start(system::core::AppContext 
     const auto active_gui = context.gui().get_theme_language();
     current_locale_ = normalize_locale(active_gui.language);
     current_theme_id_ = active_gui.theme_id == THEME_DARK ? THEME_DARK : THEME_LIGHT;
+    restart_iface_ = hal::acquire_first_interface<hal::system::GeneralIface>();
+    if (restart_iface_ == nullptr) {
+        BROOKESIA_LOGW("Settings restart interface is unavailable");
+    }
+    pending_language_locale_.clear();
+    const auto supported_languages = normalize_language_list(context.gui().list_supported_languages());
+    if (const auto stored_language = context.gui().get_stored_language_preference();
+            stored_language.has_value()) {
+        const auto stored_locale = normalize_locale(*stored_language);
+        if (std::find(supported_languages.begin(), supported_languages.end(), stored_locale) ==
+                supported_languages.end()) {
+            BROOKESIA_LOGW("Ignore unsupported stored GUI language preference: %1%", stored_locale);
+        } else if (stored_locale != current_locale_) {
+            pending_language_locale_ = stored_locale;
+        }
+    }
+    pending_theme_id_.clear();
+    if (const auto stored_theme = context.gui().get_stored_theme_preference();
+            stored_theme.has_value()) {
+        if (*stored_theme != THEME_LIGHT && *stored_theme != THEME_DARK) {
+            BROOKESIA_LOGW("Ignore unsupported stored GUI theme preference: %1%", *stored_theme);
+        } else if (*stored_theme != current_theme_id_) {
+            pending_theme_id_ = *stored_theme;
+        }
+    }
+    restart_prompt_kind_ = RestartPromptKind::None;
+    restart_in_progress_ = false;
     current_page_ = PAGE_HOME;
     ++wifi_operation_generation_;
     log_start_profile("init_state", stage_started_at, start_profile_started_at);
@@ -213,18 +240,6 @@ std::expected<void, std::string> SettingsApp::on_stop(system::core::AppContext &
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
     ++wifi_operation_generation_;
-    if (pending_language_timer_id_ != system::core::INVALID_TIMER_ID) {
-        if (!context.timer().stop(pending_language_timer_id_)) {
-            BROOKESIA_LOGW("Failed to stop pending Settings language switch timer: %1%", pending_language_timer_id_);
-        }
-        pending_language_timer_id_ = system::core::INVALID_TIMER_ID;
-    }
-    if (pending_theme_timer_id_ != system::core::INVALID_TIMER_ID) {
-        if (!context.timer().stop(pending_theme_timer_id_)) {
-            BROOKESIA_LOGW("Failed to stop pending Settings theme switch timer: %1%", pending_theme_timer_id_);
-        }
-        pending_theme_timer_id_ = system::core::INVALID_TIMER_ID;
-    }
     cancel_wifi_scan_retry_timer(context);
     if (pending_wifi_connected_hide_timer_id_ != system::core::INVALID_TIMER_ID) {
         if (!context.timer().stop(pending_wifi_connected_hide_timer_id_)) {
@@ -244,13 +259,9 @@ std::expected<void, std::string> SettingsApp::on_stop(system::core::AppContext &
         }
         pending_wifi_connected_scroll_timer_id_ = system::core::INVALID_TIMER_ID;
     }
-    pending_language_locale_.clear();
-    pending_theme_id_.clear();
+    restart_prompt_kind_ = RestartPromptKind::None;
+    restart_in_progress_ = false;
     reset_debug_entry_click_state();
-    language_switch_in_progress_ = false;
-    theme_switch_in_progress_ = false;
-    hide_language_loading_if_visible(context);
-    hide_theme_loading_if_visible(context);
     hide_message_dialog_if_visible(context);
     cancel_wifi_keyboard_if_active(context);
     if (wifi_refresh_animation_id_ != 0) {
@@ -265,6 +276,7 @@ std::expected<void, std::string> SettingsApp::on_stop(system::core::AppContext &
     release_device_service();
     release_display_service();
     release_audio_service();
+    restart_iface_ = {};
     release_sntp_service();
     release_utils_debug_service();
     clear_language_options(context);
@@ -296,24 +308,6 @@ std::expected<void, std::string> SettingsApp::on_timer(
 )
 {
     BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
-    if (name == THEME_SWITCH_TIMER_NAME) {
-        if (timer_id != pending_theme_timer_id_) {
-            BROOKESIA_LOGW(
-                "Ignore stale Settings theme switch timer: timer_id(%1%), pending(%2%)",
-                timer_id, pending_theme_timer_id_
-            );
-            return {};
-        }
-
-        pending_theme_timer_id_ = system::core::INVALID_TIMER_ID;
-        std::string theme_id = std::move(pending_theme_id_);
-        pending_theme_id_.clear();
-        if (theme_id.empty()) {
-            hide_theme_loading_if_visible(context);
-            return {};
-        }
-        return commit_theme_switch(context, theme_id);
-    }
     if (name == WIFI_SCAN_RETRY_TIMER_NAME) {
         if (timer_id != pending_wifi_scan_retry_timer_id_) {
             BROOKESIA_LOGW(
@@ -371,25 +365,7 @@ std::expected<void, std::string> SettingsApp::on_timer(
         }
         return {};
     }
-    if (name != LANGUAGE_SWITCH_TIMER_NAME) {
-        return {};
-    }
-    if (timer_id != pending_language_timer_id_) {
-        BROOKESIA_LOGW(
-            "Ignore stale Settings language switch timer: timer_id(%1%), pending(%2%)",
-            timer_id, pending_language_timer_id_
-        );
-        return {};
-    }
-
-    pending_language_timer_id_ = system::core::INVALID_TIMER_ID;
-    std::string locale = std::move(pending_language_locale_);
-    pending_language_locale_.clear();
-    if (locale.empty()) {
-        hide_language_loading_if_visible(context);
-        return {};
-    }
-    return commit_language_switch(context, locale);
+    return {};
 }
 
 std::expected<void, std::string> SettingsApp::on_action(

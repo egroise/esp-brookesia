@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <condition_variable>
 #include <mutex>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -324,6 +325,83 @@ BROOKESIA_TEST_CASE(get_outputs, "Test ServiceDisplay - get outputs", "[service]
     TEST_ASSERT_TRUE(rpc_outputs[0].slot == DisplayHelper::OutputSlot::HalPanel);
     TEST_ASSERT_TRUE(rpc_outputs[0].touch.has_value());
     TEST_ASSERT_TRUE(rpc_outputs[0].backlight.has_value());
+}
+
+BROOKESIA_TEST_CASE(
+    dataflow_visual_operation,
+    "Test ServiceDisplay - DataFlow visual operation",
+    "[service][display][dataflow]"
+)
+{
+    TEST_ASSERT_TRUE_MESSAGE(startup(), "Failed to startup");
+    lib_utils::FunctionGuard shutdown_guard([]() {
+        shutdown();
+    });
+
+    auto providers = service_manager.get_dataflow_registry().list_providers();
+    auto provider = std::find_if(providers.begin(), providers.end(), [](const auto & info) {
+        return info.id == "Display" && info.available &&
+               (std::find(info.models.begin(), info.models.end(), service::dataflow::Model::Visual) !=
+                info.models.end());
+    });
+    TEST_ASSERT_TRUE(provider != providers.end());
+
+    service::dataflow::VisualOperationConfig config;
+    config.owner = "display-dataflow-test";
+    config.provider_id = {};
+    config.model = service::dataflow::Model::Visual;
+    config.source = {
+        .name = "dataflow-source",
+        .role = "test",
+        .preferred_outputs = {},
+        .priority = 0,
+    };
+    auto operation_result = service_manager.get_dataflow_registry().open_visual_operation(std::move(config));
+    TEST_ASSERT_TRUE_MESSAGE(operation_result.has_value(), "Failed to open DataFlow visual operation");
+    auto operation = operation_result.value();
+    TEST_ASSERT_TRUE(operation->is_available());
+
+    const auto outputs = operation->get_outputs();
+    TEST_ASSERT_FALSE(outputs.empty());
+    const auto &output = outputs.front();
+    TEST_ASSERT_EQUAL_STRING("Display", output.output.provider_id.c_str());
+    TEST_ASSERT_TRUE(output.output.model == service::dataflow::Model::Visual);
+    TEST_ASSERT_TRUE(operation->request_output(output.output.name).has_value());
+    TEST_ASSERT_TRUE(operation->set_active_source(output.output.name).has_value());
+
+    const service::dataflow::VisualFrameInfo frame{
+        .x = 0,
+        .y = 0,
+        .width = 4,
+        .height = 4,
+        .pixel_format = output.pixel_format,
+    };
+    const auto bytes_per_pixel = output.pixel_format == service::dataflow::VisualPixelFormat::RGB565 ? 2U : 3U;
+    std::vector<uint8_t> frame_data(frame.width * frame.height * bytes_per_pixel, 0x5A);
+    const auto present_result = operation->present_frame_sync(
+                                    output.output.name, frame,
+                                    std::span<const uint8_t>(frame_data.data(), frame_data.size()), DRAW_TIMEOUT_MS
+                                );
+    TEST_ASSERT_TRUE(present_result == service::dataflow::VisualPresentResult::Presented);
+
+    TEST_ASSERT_TRUE(operation->release_output(output.output.name).has_value());
+    size_t completion_count = 0;
+    auto completion_result = service::dataflow::VisualPresentResult::Presented;
+    const auto async_result = operation->present_frame_async(
+                                  output.output.name, frame,
+                                  std::span<const uint8_t>(frame_data.data(), frame_data.size()),
+    [&completion_count, &completion_result](uint32_t, service::dataflow::VisualPresentResult result) {
+        ++completion_count;
+        completion_result = result;
+    },
+    DRAW_TIMEOUT_MS
+                              );
+    TEST_ASSERT_TRUE(async_result.state == service::dataflow::VisualPresentSubmitState::DroppedNotActive);
+    TEST_ASSERT_EQUAL_size_t(1, completion_count);
+    TEST_ASSERT_TRUE(completion_result == service::dataflow::VisualPresentResult::DroppedNotActive);
+
+    operation->close();
+    TEST_ASSERT_FALSE(operation->is_available());
 }
 
 BROOKESIA_TEST_CASE(

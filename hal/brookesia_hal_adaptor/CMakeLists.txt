@@ -7,6 +7,7 @@ set(COMPONENT_PRIV_REQUIRES
     esp_event
     esp_http_server
     esp_netif
+    esp_system
     esp_timer
     esp_wifi
     lwip
@@ -104,6 +105,9 @@ set(BROOKESIA_HAL_ADAPTOR_NEEDS_SPIFFS FALSE)
 set(BROOKESIA_HAL_ADAPTOR_NEEDS_FATFS FALSE)
 set(BROOKESIA_HAL_ADAPTOR_NEEDS_WEAR_LEVELLING FALSE)
 set(BROOKESIA_HAL_ADAPTOR_NEEDS_WIFI_STACK FALSE)
+set(BROOKESIA_HAL_ADAPTOR_NEEDS_BLE_STACK FALSE)
+set(BROOKESIA_HAL_ADAPTOR_NEEDS_BT_STACK FALSE)
+set(BROOKESIA_HAL_ADAPTOR_NEEDS_BT_AUDIO FALSE)
 set(BROOKESIA_HAL_ADAPTOR_NEEDS_SNTP_STACK FALSE)
 set(BROOKESIA_HAL_ADAPTOR_NEEDS_HTTP_STACK FALSE)
 set(BROOKESIA_HAL_ADAPTOR_NEEDS_APP_UPDATE FALSE)
@@ -122,6 +126,9 @@ if(CONFIG_BROOKESIA_HAL_ADAPTOR_ENABLE_SYSTEM_DEVICE)
         if(CONFIG_ESP_BOARD_NAME)
             set(BROOKESIA_HAL_ADAPTOR_NEEDS_BOARD_MANAGER TRUE)
         endif()
+    endif()
+    if(CONFIG_BROOKESIA_HAL_ADAPTOR_SYSTEM_ENABLE_RESTART_IMPL)
+        brookesia_hal_adaptor_append_sources(${COMPONENT_DIR}/src/system/restart_impl.cpp)
     endif()
 endif()
 
@@ -227,6 +234,32 @@ if(CONFIG_BROOKESIA_HAL_ADAPTOR_ENABLE_WIFI_DEVICE)
     set(BROOKESIA_HAL_ADAPTOR_NEEDS_NVS_FLASH TRUE)
 endif()
 
+if(CONFIG_BROOKESIA_HAL_ADAPTOR_ENABLE_BLE_DEVICE)
+    file(GLOB_RECURSE BLE_SRCS_CPP ${COMPONENT_DIR}/src/bluetooth/ble/*.cpp)
+    brookesia_hal_adaptor_append_sources(${BLE_SRCS_CPP})
+    set(BROOKESIA_HAL_ADAPTOR_NEEDS_BLE_STACK TRUE)
+endif()
+
+if(CONFIG_BROOKESIA_HAL_ADAPTOR_ENABLE_BT_DEVICE)
+    brookesia_hal_adaptor_append_sources(
+        ${COMPONENT_DIR}/src/bluetooth/device.cpp
+        ${COMPONENT_DIR}/src/bluetooth/a2dp_sink.cpp
+    )
+    set(BROOKESIA_HAL_ADAPTOR_NEEDS_BT_STACK TRUE)
+    if(CONFIG_BT_CONTROLLER_ENABLED AND CONFIG_BT_CLASSIC_ENABLED AND CONFIG_BT_BLUEDROID_ENABLED AND CONFIG_BT_A2DP_ENABLE AND
+       CONFIG_ESP_BT_AUDIO_GMF_IO_SUPPORT)
+        set(BROOKESIA_HAL_ADAPTOR_NEEDS_BT_AUDIO TRUE)
+    endif()
+endif()
+
+# The coordinator is shared by the BLE GATT and Classic Bluetooth profiles.  Keep
+# it in the adaptor whenever either profile is enabled so a target-specific A2DP
+# implementation can be built without also enabling BLE.
+if(CONFIG_BROOKESIA_HAL_ADAPTOR_ENABLE_BLE_DEVICE OR
+   CONFIG_BROOKESIA_HAL_ADAPTOR_ENABLE_BT_DEVICE)
+    brookesia_hal_adaptor_append_sources(${COMPONENT_DIR}/src/bluetooth/host_coordinator.cpp)
+endif()
+
 if(BROOKESIA_HAL_ADAPTOR_NEEDS_NVS_FLASH)
     brookesia_hal_adaptor_append_sources(${COMPONENT_DIR}/src/private/nvs_flash_manager.cpp)
 endif()
@@ -285,6 +318,22 @@ brookesia_hal_adaptor_optional_private_requires(BROOKESIA_HAL_ADAPTOR_NEEDS_WIFI
     esp_wifi
     lwip
 )
+brookesia_hal_adaptor_optional_private_requires(BROOKESIA_HAL_ADAPTOR_NEEDS_BLE_STACK bt)
+brookesia_hal_adaptor_optional_private_requires(BROOKESIA_HAL_ADAPTOR_NEEDS_BT_STACK bt)
+brookesia_hal_adaptor_optional_private_requires(BROOKESIA_HAL_ADAPTOR_NEEDS_BT_AUDIO
+    esp_bt_audio
+    espressif__esp_bt_audio
+    gmf_audio
+    espressif__gmf_audio
+    gmf_io
+    espressif__gmf_io
+    gmf_core
+    espressif__gmf_core
+    esp_audio_codec
+    espressif__esp_audio_codec
+    esp_codec_dev
+    espressif__esp_codec_dev
+)
 brookesia_hal_adaptor_optional_private_requires(BROOKESIA_HAL_ADAPTOR_NEEDS_SNTP_STACK
     esp_event
     esp_netif
@@ -307,6 +356,19 @@ if(CONFIG_BROOKESIA_HAL_ADAPTOR_ENABLE_WIFI_DEVICE)
             esp_hosted espressif__esp_hosted
         )
     endif()
+endif()
+if(CONFIG_BROOKESIA_HAL_ADAPTOR_ENABLE_BLE_DEVICE)
+    if(CONFIG_BT_CONTROLLER_DISABLED)
+        idf_component_optional_requires(PRIVATE esp_hosted espressif__esp_hosted)
+    endif()
+endif()
+
+if(CONFIG_BROOKESIA_HAL_ADAPTOR_ENABLE_BT_DEVICE)
+    set(BROOKESIA_HAL_ADAPTOR_BT_DEVICE_PLUGIN_SYMBOL bluetooth_device_symbol)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE
+        BROOKESIA_HAL_ADAPTOR_BT_DEVICE_PLUGIN_SYMBOL=${BROOKESIA_HAL_ADAPTOR_BT_DEVICE_PLUGIN_SYMBOL}
+    )
+    target_link_libraries(${COMPONENT_LIB} PRIVATE "-u ${BROOKESIA_HAL_ADAPTOR_BT_DEVICE_PLUGIN_SYMBOL}")
 endif()
 
 if(CONFIG_BROOKESIA_HAL_ADAPTOR_ENABLE_SYSTEM_DEVICE)
@@ -339,6 +401,14 @@ if(CONFIG_BROOKESIA_HAL_ADAPTOR_ENABLE_WIFI_DEVICE)
         BROOKESIA_HAL_ADAPTOR_WIFI_DEVICE_PLUGIN_SYMBOL=${BROOKESIA_HAL_ADAPTOR_WIFI_DEVICE_PLUGIN_SYMBOL}
     )
     target_link_libraries(${COMPONENT_LIB} PRIVATE "-u ${BROOKESIA_HAL_ADAPTOR_WIFI_DEVICE_PLUGIN_SYMBOL}")
+endif()
+
+if(CONFIG_BROOKESIA_HAL_ADAPTOR_ENABLE_BLE_DEVICE)
+    set(BROOKESIA_HAL_ADAPTOR_BLE_DEVICE_PLUGIN_SYMBOL ble_device_symbol)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE
+        BROOKESIA_HAL_ADAPTOR_BLE_DEVICE_PLUGIN_SYMBOL=${BROOKESIA_HAL_ADAPTOR_BLE_DEVICE_PLUGIN_SYMBOL}
+    )
+    target_link_libraries(${COMPONENT_LIB} PRIVATE "-u ${BROOKESIA_HAL_ADAPTOR_BLE_DEVICE_PLUGIN_SYMBOL}")
 endif()
 
 if(CONFIG_BROOKESIA_HAL_ADAPTOR_ENABLE_DISPLAY_DEVICE)

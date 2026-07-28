@@ -8,12 +8,15 @@ set(COMPONENT_SRCS_CPP "")
 set(COMPONENT_SRCS_C_COMPILE_FLAGS "")
 set(COMPONENT_SRCS_CPP_COMPILE_FLAGS "")
 
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/compile_policy.cmake)
+
 file(GLOB_RECURSE SYSTEM_SUPER_SRCS_C ${COMPONENT_SRC_DIR}/*.c)
 file(GLOB_RECURSE SYSTEM_SUPER_SRCS_CPP ${COMPONENT_SRC_DIR}/*.cpp)
 list(APPEND COMPONENT_SRCS_C ${SYSTEM_SUPER_SRCS_C})
 list(APPEND COMPONENT_SRCS_CPP ${SYSTEM_SUPER_SRCS_CPP})
 list(APPEND COMPONENT_REQUIRES
     brookesia_lib_utils
+    brookesia_service_manager
     brookesia_service_storage
 )
 

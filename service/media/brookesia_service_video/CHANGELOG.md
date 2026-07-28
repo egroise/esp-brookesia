@@ -1,5 +1,15 @@
 # ChangeLog
 
+## v0.8.2 - 2026-07-27
+
+### Enhancements:
+
+- feat(dataflow): align video integration with provider-neutral media routing.
+
+### Bug Fixes:
+
+- fix(deps): remove the obsolete direct display dependency from the video service.
+
 ## v0.8.1 - 2026-07-13
 
 ### Enhancements:

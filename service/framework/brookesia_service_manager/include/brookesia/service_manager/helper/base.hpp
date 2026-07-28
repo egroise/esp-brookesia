@@ -5,6 +5,7 @@
  */
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -21,6 +22,7 @@
 #include "boost/format.hpp"
 #include "brookesia/service_manager/function/definition.hpp"
 #include "brookesia/service_manager/event/definition.hpp"
+#include "brookesia/service_manager/event/registry.hpp"
 #include "brookesia/service_manager/service/manager.hpp"
 
 namespace esp_brookesia::service::helper {
@@ -1259,16 +1261,9 @@ public:
  * BROOKESIA_SERVICE_HELPER_FUNC_HANDLER_0(MyService, MyService::FunctionId::GetVolume, function_get_volume())
  */
 #define BROOKESIA_SERVICE_HELPER_FUNC_HANDLER_0(Derived, function_id, func_call) \
-    [&]() { \
-        auto schema = esp_brookesia::service::helper::Base<Derived>::get_function_schema(function_id); \
-        std::string func_name = (schema && !schema->name.empty()) ? schema->name : ""; \
-        return std::make_pair( \
-            std::move(func_name), \
-            [this](esp_brookesia::service::FunctionParameterMap &&) -> esp_brookesia::service::FunctionResult { \
-                return esp_brookesia::service::helper::Base<Derived>::to_function_result(func_call); \
-            } \
-        ); \
-    }()
+    [this](esp_brookesia::service::FunctionParameterMap &&) -> esp_brookesia::service::FunctionResult { \
+        return esp_brookesia::service::helper::Base<Derived>::to_function_result(func_call); \
+    }
 
 /**
  * @brief Create a single-parameter function handler based on Derived and FunctionId
@@ -1284,35 +1279,15 @@ public:
 #define BROOKESIA_SERVICE_HELPER_FUNC_HANDLER_1(Derived, function_id, param_type, func_call) \
     [&]() { \
         auto schema = esp_brookesia::service::helper::Base<Derived>::get_function_schema(function_id); \
-        std::string func_name = (schema && !schema->name.empty()) ? schema->name : ""; \
-        std::string param_name = (schema && !schema->parameters.empty() && !schema->parameters[0].name.empty()) ? schema->parameters[0].name : ""; \
-        return std::make_pair( \
-            std::move(func_name), \
-            [this, param_name = std::move(param_name)](esp_brookesia::service::FunctionParameterMap &&args) -> esp_brookesia::service::FunctionResult { \
-                if (param_name.empty()) { \
-                    return esp_brookesia::service::FunctionResult{ \
-                        .success = false, \
-                        .error_message = "Parameter name is empty" \
-                    }; \
-                } \
-                auto it = args.find(param_name); \
-                if (it == args.end()) { \
-                    return esp_brookesia::service::FunctionResult{ \
-                        .success = false, \
-                        .error_message = "Parameter not found: " + param_name \
-                    }; \
-                } \
-                auto *param_ptr = std::get_if<param_type>(&it->second); \
-                if (!param_ptr) { \
-                    return esp_brookesia::service::FunctionResult{ \
-                        .success = false, \
-                        .error_message = "Parameter type mismatch for: " + param_name \
-                    }; \
-                } \
-                auto &PARAM = *param_ptr; \
-                return esp_brookesia::service::helper::Base<Derived>::to_function_result(func_call); \
+        const std::string *param_name = (schema && !schema->parameters.empty()) ? &schema->parameters[0].name : nullptr; \
+        return [this, param_name](esp_brookesia::service::FunctionParameterMap &&args) -> esp_brookesia::service::FunctionResult { \
+            auto parameter = esp_brookesia::service::get_function_parameter<param_type>(args, param_name); \
+            if (!parameter) { \
+                return std::move(parameter.error()); \
             } \
-        ); \
+            auto &PARAM = *parameter.value(); \
+            return esp_brookesia::service::helper::Base<Derived>::to_function_result(func_call); \
+        }; \
     }()
 
 /**
@@ -1331,51 +1306,21 @@ public:
 #define BROOKESIA_SERVICE_HELPER_FUNC_HANDLER_2(Derived, function_id, param1_type, param2_type, func_call) \
     [&]() { \
         auto schema = esp_brookesia::service::helper::Base<Derived>::get_function_schema(function_id); \
-        std::string func_name = (schema && !schema->name.empty()) ? schema->name : ""; \
-        std::string param1_name = (schema && schema->parameters.size() >= 1 && !schema->parameters[0].name.empty()) ? schema->parameters[0].name : ""; \
-        std::string param2_name = (schema && schema->parameters.size() >= 2 && !schema->parameters[1].name.empty()) ? schema->parameters[1].name : ""; \
-        return std::make_pair( \
-            std::move(func_name), \
-            [this, param1_name = std::move(param1_name), param2_name = std::move(param2_name)](esp_brookesia::service::FunctionParameterMap &&args) -> esp_brookesia::service::FunctionResult { \
-                if (param1_name.empty() || param2_name.empty()) { \
-                    return esp_brookesia::service::FunctionResult{ \
-                        .success = false, \
-                        .error_message = "Parameter name is empty" \
-                    }; \
-                } \
-                auto it1 = args.find(param1_name); \
-                if (it1 == args.end()) { \
-                    return esp_brookesia::service::FunctionResult{ \
-                        .success = false, \
-                        .error_message = "Parameter not found: " + param1_name \
-                    }; \
-                } \
-                auto it2 = args.find(param2_name); \
-                if (it2 == args.end()) { \
-                    return esp_brookesia::service::FunctionResult{ \
-                        .success = false, \
-                        .error_message = "Parameter not found: " + param2_name \
-                    }; \
-                } \
-                auto *param1_ptr = std::get_if<param1_type>(&it1->second); \
-                if (!param1_ptr) { \
-                    return esp_brookesia::service::FunctionResult{ \
-                        .success = false, \
-                        .error_message = "Parameter type mismatch for: " + param1_name \
-                    }; \
-                } \
-                auto *param2_ptr = std::get_if<param2_type>(&it2->second); \
-                if (!param2_ptr) { \
-                    return esp_brookesia::service::FunctionResult{ \
-                        .success = false, \
-                        .error_message = "Parameter type mismatch for: " + param2_name \
-                    }; \
-                } \
-                auto &PARAM1 = *param1_ptr; \
-                auto &PARAM2 = *param2_ptr; \
-                return esp_brookesia::service::helper::Base<Derived>::to_function_result(func_call); \
+        const std::string *param1_name = (schema && schema->parameters.size() >= 1) ? &schema->parameters[0].name : nullptr; \
+        const std::string *param2_name = (schema && schema->parameters.size() >= 2) ? &schema->parameters[1].name : nullptr; \
+        return [this, param1_name, param2_name](esp_brookesia::service::FunctionParameterMap &&args) -> esp_brookesia::service::FunctionResult { \
+            auto parameter1 = esp_brookesia::service::get_function_parameter<param1_type>(args, param1_name); \
+            if (!parameter1) { \
+                return std::move(parameter1.error()); \
             } \
-        ); \
+            auto parameter2 = esp_brookesia::service::get_function_parameter<param2_type>(args, param2_name); \
+            if (!parameter2) { \
+                return std::move(parameter2.error()); \
+            } \
+            auto &PARAM1 = *parameter1.value(); \
+            auto &PARAM2 = *parameter2.value(); \
+            return esp_brookesia::service::helper::Base<Derived>::to_function_result(func_call); \
+        }; \
     }()
 
 /**
@@ -1395,64 +1340,68 @@ public:
 #define BROOKESIA_SERVICE_HELPER_FUNC_HANDLER_3(Derived, function_id, param1_type, param2_type, param3_type, func_call) \
     [&]() { \
         auto schema = esp_brookesia::service::helper::Base<Derived>::get_function_schema(function_id); \
+        const std::string *param1_name = (schema && schema->parameters.size() >= 1) ? &schema->parameters[0].name : nullptr; \
+        const std::string *param2_name = (schema && schema->parameters.size() >= 2) ? &schema->parameters[1].name : nullptr; \
+        const std::string *param3_name = (schema && schema->parameters.size() >= 3) ? &schema->parameters[2].name : nullptr; \
+        return [this, param1_name, param2_name, param3_name](esp_brookesia::service::FunctionParameterMap &&args) -> esp_brookesia::service::FunctionResult { \
+            auto parameter1 = esp_brookesia::service::get_function_parameter<param1_type>(args, param1_name); \
+            if (!parameter1) { \
+                return std::move(parameter1.error()); \
+            } \
+            auto parameter2 = esp_brookesia::service::get_function_parameter<param2_type>(args, param2_name); \
+            if (!parameter2) { \
+                return std::move(parameter2.error()); \
+            } \
+            auto parameter3 = esp_brookesia::service::get_function_parameter<param3_type>(args, param3_name); \
+            if (!parameter3) { \
+                return std::move(parameter3.error()); \
+            } \
+            auto &PARAM1 = *parameter1.value(); \
+            auto &PARAM2 = *parameter2.value(); \
+            auto &PARAM3 = *parameter3.value(); \
+            return esp_brookesia::service::helper::Base<Derived>::to_function_result(func_call); \
+        }; \
+    }()
+
+/**
+ * @brief Create a four-parameter function handler based on Derived and FunctionId.
+ */
+#define BROOKESIA_SERVICE_HELPER_FUNC_HANDLER_4( \
+    Derived, function_id, param1_type, param2_type, param3_type, param4_type, func_call \
+) \
+    [&]() { \
+        auto schema = esp_brookesia::service::helper::Base<Derived>::get_function_schema(function_id); \
         std::string func_name = (schema && !schema->name.empty()) ? schema->name : ""; \
-        std::string param1_name = (schema && schema->parameters.size() >= 1 && !schema->parameters[0].name.empty()) ? schema->parameters[0].name : ""; \
-        std::string param2_name = (schema && schema->parameters.size() >= 2 && !schema->parameters[1].name.empty()) ? schema->parameters[1].name : ""; \
-        std::string param3_name = (schema && schema->parameters.size() >= 3 && !schema->parameters[2].name.empty()) ? schema->parameters[2].name : ""; \
+        std::array<std::string, 4> param_names; \
+        if (schema && schema->parameters.size() >= param_names.size()) { \
+            for (std::size_t i = 0; i < param_names.size(); ++i) { \
+                param_names[i] = schema->parameters[i].name; \
+            } \
+        } \
         return std::make_pair( \
             std::move(func_name), \
-            [this, param1_name = std::move(param1_name), param2_name = std::move(param2_name), param3_name = std::move(param3_name)](esp_brookesia::service::FunctionParameterMap &&args) -> esp_brookesia::service::FunctionResult { \
-                if (param1_name.empty() || param2_name.empty() || param3_name.empty()) { \
-                    return esp_brookesia::service::FunctionResult{ \
-                        .success = false, \
-                        .error_message = "Parameter name is empty" \
-                    }; \
+            [this, param_names = std::move(param_names)]( \
+                esp_brookesia::service::FunctionParameterMap &&args \
+            ) -> esp_brookesia::service::FunctionResult { \
+                for (const auto &param_name : param_names) { \
+                    if (param_name.empty()) { \
+                        return {.success = false, .error_message = "Parameter name is empty"}; \
+                    } \
+                    if (!args.contains(param_name)) { \
+                        return {.success = false, .error_message = "Parameter not found: " + param_name}; \
+                    } \
                 } \
-                auto it1 = args.find(param1_name); \
-                if (it1 == args.end()) { \
-                    return esp_brookesia::service::FunctionResult{ \
-                        .success = false, \
-                        .error_message = "Parameter not found: " + param1_name \
-                    }; \
-                } \
-                auto it2 = args.find(param2_name); \
-                if (it2 == args.end()) { \
-                    return esp_brookesia::service::FunctionResult{ \
-                        .success = false, \
-                        .error_message = "Parameter not found: " + param2_name \
-                    }; \
-                } \
-                auto it3 = args.find(param3_name); \
-                if (it3 == args.end()) { \
-                    return esp_brookesia::service::FunctionResult{ \
-                        .success = false, \
-                        .error_message = "Parameter not found: " + param3_name \
-                    }; \
-                } \
-                auto *param1_ptr = std::get_if<param1_type>(&it1->second); \
-                if (!param1_ptr) { \
-                    return esp_brookesia::service::FunctionResult{ \
-                        .success = false, \
-                        .error_message = "Parameter type mismatch for: " + param1_name \
-                    }; \
-                } \
-                auto *param2_ptr = std::get_if<param2_type>(&it2->second); \
-                if (!param2_ptr) { \
-                    return esp_brookesia::service::FunctionResult{ \
-                        .success = false, \
-                        .error_message = "Parameter type mismatch for: " + param2_name \
-                    }; \
-                } \
-                auto *param3_ptr = std::get_if<param3_type>(&it3->second); \
-                if (!param3_ptr) { \
-                    return esp_brookesia::service::FunctionResult{ \
-                        .success = false, \
-                        .error_message = "Parameter type mismatch for: " + param3_name \
-                    }; \
+                auto *param1_ptr = std::get_if<param1_type>(&args.at(param_names[0])); \
+                auto *param2_ptr = std::get_if<param2_type>(&args.at(param_names[1])); \
+                auto *param3_ptr = std::get_if<param3_type>(&args.at(param_names[2])); \
+                auto *param4_ptr = std::get_if<param4_type>(&args.at(param_names[3])); \
+                if (!param1_ptr || !param2_ptr || !param3_ptr || !param4_ptr) { \
+                    return {.success = false, .error_message = "Parameter type mismatch"}; \
                 } \
                 auto &PARAM1 = *param1_ptr; \
                 auto &PARAM2 = *param2_ptr; \
                 auto &PARAM3 = *param3_ptr; \
+                auto &PARAM4 = *param4_ptr; \
                 return esp_brookesia::service::helper::Base<Derived>::to_function_result(func_call); \
             } \
         ); \

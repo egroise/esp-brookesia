@@ -8,6 +8,10 @@
 
 For more information, see the [ESP-Brookesia Programming Guide](https://docs.espressif.com/projects/esp-brookesia/en/latest/service/video.html).
 
+## DataFlow Integration
+
+When a display sink is configured, the encoder and decoder use the provider-neutral visual DataFlow operation to discover outputs, select sources, and present frames. The video service no longer needs a direct dependency on the display provider implementation.
+
 ## How to Use
 
 ### Environment Requirements

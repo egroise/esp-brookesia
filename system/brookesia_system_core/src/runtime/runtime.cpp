@@ -8,6 +8,7 @@
 #   define BROOKESIA_LOG_DISABLE_DEBUG_TRACE 1
 #endif
 #include "private/utils.hpp"
+#include "private/runtime/call_context.hpp"
 #include "private/system/impl.hpp"
 
 #include <charconv>
@@ -18,8 +19,6 @@
 namespace esp_brookesia::system::core {
 
 namespace {
-
-constexpr const char *RUNTIME_APP_ID_CALL_CONTEXT_KEY = "brookesia.system.runtime_app_id";
 
 bool is_missing_runtime_function_error(std::string_view error)
 {

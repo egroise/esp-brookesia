@@ -6,13 +6,14 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <span>
 #include <string>
 #include <string_view>
 
-#include "boost/format.hpp"
 #include "brookesia/lib_utils/describe_helpers.hpp"
+#include "brookesia/service_manager/detail/static_schema.hpp"
 #include "brookesia/service_manager/helper/base.hpp"
 
 namespace esp_brookesia::service::helper {
@@ -90,203 +91,170 @@ public:
         Max,
     };
 
-    enum class FunctionLoadParam {
-        Config,
-    };
 
-    enum class FunctionSetGamepadStateParam {
-        State,
-    };
 
-    enum class EventStateChangedParam {
-        State,
-    };
 
-    enum class EventErrorParam {
-        Message,
-    };
 
-    enum class EventSaveCompletedParam {
-        SavePath,
-    };
 
     static constexpr std::string_view get_name()
     {
         return "NES";
     }
 
+private:
+    using EventItemSpec = detail::static_schema::EventItemSpec;
+    using EventSpec = detail::static_schema::EventSpec;
+    using FunctionParameterSpec = detail::static_schema::FunctionParameterSpec;
+    using FunctionReturnSpec = detail::static_schema::FunctionReturnSpec;
+    using FunctionSpec = detail::static_schema::FunctionSpec;
+
+    inline static constexpr std::span<const FunctionParameterSpec> EMPTY_PARAMETERS = {};
+
+    inline static constexpr std::array<FunctionParameterSpec, 1> LOAD_PARAMETERS = {{
+            {
+                .name = "Config",
+                .description = "NES runtime configuration. video_area uses the full output when width/height are 0.",
+                .type = FunctionValueType::Object,
+            },
+        }
+    };
+
+    inline static constexpr std::array<FunctionParameterSpec, 1> GAMEPAD_STATE_PARAMETERS = {{
+            {
+                .name = "State",
+                .description = "Gamepad state object.",
+                .type = FunctionValueType::Object,
+            },
+        }
+    };
+
+    inline static constexpr std::array<FunctionSpec, static_cast<std::size_t>(FunctionId::Max)> FUNCTION_SPECS = {{
+            {
+                .name = "Load",
+                .description =
+                R"(Load a NES ROM. Example config: {"rom_path":"/sdcard/roms/demo.nes","save_path":"/sdcard/roms/demo_nes.save","display_output_name":"Output0","display_source_name":"NES","video_area":{"x":0,"y":0,"width":0,"height":0},"video_mode":"Fit","audio_mode":"Auto","auto_activate_display":false})",
+                .parameters = LOAD_PARAMETERS,
+            },
+            {
+                .name = "Start",
+                .description = "Start or continue the loaded NES runtime.",
+                .parameters = EMPTY_PARAMETERS,
+            },
+            {
+                .name = "Pause",
+                .description = "Pause the NES runtime.",
+                .parameters = EMPTY_PARAMETERS,
+            },
+            {
+                .name = "Resume",
+                .description = "Resume the NES runtime.",
+                .parameters = EMPTY_PARAMETERS,
+            },
+            {
+                .name = "Stop",
+                .description = "Stop the NES runtime.",
+                .parameters = EMPTY_PARAMETERS,
+            },
+            {
+                .name = "Reset",
+                .description = "Soft reset the loaded NES runtime.",
+                .parameters = EMPTY_PARAMETERS,
+            },
+            {
+                .name = "Save",
+                .description = "Save SRAM to the configured save path.",
+                .parameters = EMPTY_PARAMETERS,
+            },
+            {
+                .name = "SetGamepadState",
+                .description =
+                R"(Set current NES gamepad state. Example: {"up":false,"down":false,"left":false,"right":false,"a":false,"b":false,"select":false,"start":false,"x":false})",
+                .parameters = GAMEPAD_STATE_PARAMETERS,
+                .require_scheduler = false,
+            },
+            {
+                .name = "GetState",
+                .description = "Get NES runtime state.",
+                .parameters = EMPTY_PARAMETERS,
+                .require_scheduler = false,
+                .return_value = FunctionReturnSpec{
+                    .type = FunctionValueType::String,
+                    .description = R"(Example: "Running")",
+                },
+            },
+        }
+    };
+
+    inline static constexpr std::array<EventItemSpec, 1> STATE_CHANGED_ITEMS = {{
+            {
+                .name = "State",
+                .description = "Runtime state.",
+                .type = EventItemType::String,
+            },
+        }
+    };
+
+    inline static constexpr std::array<EventItemSpec, 1> ERROR_ITEMS = {{
+            {
+                .name = "Message",
+                .description = "Error message.",
+                .type = EventItemType::String,
+            },
+        }
+    };
+
+    inline static constexpr std::array<EventItemSpec, 1> SAVE_COMPLETED_ITEMS = {{
+            {
+                .name = "SavePath",
+                .description = "Save path.",
+                .type = EventItemType::String,
+            },
+        }
+    };
+
+    inline static constexpr std::array<EventSpec, static_cast<std::size_t>(EventId::Max)> EVENT_SPECS = {{
+            {
+                .name = "StateChanged",
+                .description = "NES runtime state changed.",
+                .items = STATE_CHANGED_ITEMS,
+            },
+            {
+                .name = "Error",
+                .description = "NES runtime error.",
+                .items = ERROR_ITEMS,
+            },
+            {
+                .name = "SaveCompleted",
+                .description = "NES SRAM save completed.",
+                .items = SAVE_COMPLETED_ITEMS,
+            },
+        }
+    };
+
+    static_assert(FUNCTION_SPECS.size() == static_cast<std::size_t>(FunctionId::Max));
+    static_assert(EVENT_SPECS.size() == static_cast<std::size_t>(EventId::Max));
+
+public:
     static std::span<const FunctionSchema> get_function_schemas()
     {
-        static const std::array<FunctionSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(FunctionId::Max)> FUNCTION_SCHEMAS = {{
-                function_schema_load(),
-                function_schema_start(),
-                function_schema_pause(),
-                function_schema_resume(),
-                function_schema_stop(),
-                function_schema_reset(),
-                function_schema_save(),
-                function_schema_set_gamepad_state(),
-                function_schema_get_state(),
-            }
-        };
-        return std::span<const FunctionSchema>(FUNCTION_SCHEMAS);
+        static std::array<FunctionSchema, FUNCTION_SPECS.size()> schemas;
+        static const bool initialized = [] {
+            detail::static_schema::materialize_function_schemas(FUNCTION_SPECS, schemas);
+            return true;
+        }();
+        static_cast<void>(initialized);
+        return schemas;
     }
 
     static std::span<const EventSchema> get_event_schemas()
     {
-        static const std::array<EventSchema, BROOKESIA_DESCRIBE_ENUM_TO_NUM(EventId::Max)> EVENT_SCHEMAS = {{
-                event_schema_state_changed(),
-                event_schema_error(),
-                event_schema_save_completed(),
-            }
-        };
-        return std::span<const EventSchema>(EVENT_SCHEMAS);
-    }
-
-private:
-    static FunctionSchema function_schema_load()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(FunctionId::Load),
-            .description = (boost::format("Load a NES ROM. Example config: %1%")
-            % BROOKESIA_DESCRIBE_JSON_SERIALIZE((Config{
-                .rom_path = "/sdcard/roms/demo.nes",
-                .save_path = "/sdcard/roms/demo_nes.save",
-                .display_output_name = "Output0",
-                .video_area = VideoArea{},
-            }))).str(),
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionLoadParam::Config),
-                    .description = "NES runtime configuration. video_area uses the full output when width/height are 0.",
-                    .type = FunctionValueType::Object,
-                },
-            },
-        };
-    }
-
-    static FunctionSchema function_schema_start()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(FunctionId::Start),
-            .description = "Start or continue the loaded NES runtime.",
-        };
-    }
-
-    static FunctionSchema function_schema_pause()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(FunctionId::Pause),
-            .description = "Pause the NES runtime.",
-        };
-    }
-
-    static FunctionSchema function_schema_resume()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(FunctionId::Resume),
-            .description = "Resume the NES runtime.",
-        };
-    }
-
-    static FunctionSchema function_schema_stop()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(FunctionId::Stop),
-            .description = "Stop the NES runtime.",
-        };
-    }
-
-    static FunctionSchema function_schema_reset()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(FunctionId::Reset),
-            .description = "Soft reset the loaded NES runtime.",
-        };
-    }
-
-    static FunctionSchema function_schema_save()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(FunctionId::Save),
-            .description = "Save SRAM to the configured save path.",
-        };
-    }
-
-    static FunctionSchema function_schema_set_gamepad_state()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(FunctionId::SetGamepadState),
-            .description = (boost::format("Set current NES gamepad state. Example: %1%")
-            % BROOKESIA_DESCRIBE_JSON_SERIALIZE(GamepadState{})).str(),
-            .parameters = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(FunctionSetGamepadStateParam::State),
-                    .description = "Gamepad state object.",
-                    .type = FunctionValueType::Object,
-                },
-            },
-            .require_scheduler = false,
-        };
-    }
-
-    static FunctionSchema function_schema_get_state()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(FunctionId::GetState),
-            .description = "Get NES runtime state.",
-            .require_scheduler = false,
-            .return_value = FunctionReturnSchema{
-                .type = FunctionValueType::String,
-                .description = (boost::format("Example: \"%1%\"")
-                                % BROOKESIA_DESCRIBE_ENUM_TO_STR(State::Running)).str(),
-            },
-        };
-    }
-
-    static EventSchema event_schema_state_changed()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(EventId::StateChanged),
-            .description = "NES runtime state changed.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventStateChangedParam::State),
-                    .description = "Runtime state.",
-                    .type = EventItemType::String,
-                },
-            },
-        };
-    }
-
-    static EventSchema event_schema_error()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(EventId::Error),
-            .description = "NES runtime error.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventErrorParam::Message),
-                    .description = "Error message.",
-                    .type = EventItemType::String,
-                },
-            },
-        };
-    }
-
-    static EventSchema event_schema_save_completed()
-    {
-        return {
-            .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(EventId::SaveCompleted),
-            .description = "NES SRAM save completed.",
-            .items = {
-                {
-                    .name = BROOKESIA_DESCRIBE_TO_STR(EventSaveCompletedParam::SavePath),
-                    .description = "Save path.",
-                    .type = EventItemType::String,
-                },
-            },
-        };
+        static std::array<EventSchema, EVENT_SPECS.size()> schemas;
+        static const bool initialized = [] {
+            detail::static_schema::materialize_event_schemas(EVENT_SPECS, schemas);
+            return true;
+        }();
+        static_cast<void>(initialized);
+        return schemas;
     }
 };
 
@@ -310,10 +278,5 @@ BROOKESIA_DESCRIBE_ENUM(
     Nes::FunctionId, Load, Start, Pause, Resume, Stop, Reset, Save, SetGamepadState, GetState, Max
 );
 BROOKESIA_DESCRIBE_ENUM(Nes::EventId, StateChanged, Error, SaveCompleted, Max);
-BROOKESIA_DESCRIBE_ENUM(Nes::FunctionLoadParam, Config);
-BROOKESIA_DESCRIBE_ENUM(Nes::FunctionSetGamepadStateParam, State);
-BROOKESIA_DESCRIBE_ENUM(Nes::EventStateChangedParam, State);
-BROOKESIA_DESCRIBE_ENUM(Nes::EventErrorParam, Message);
-BROOKESIA_DESCRIBE_ENUM(Nes::EventSaveCompletedParam, SavePath);
 
 } // namespace esp_brookesia::service::helper

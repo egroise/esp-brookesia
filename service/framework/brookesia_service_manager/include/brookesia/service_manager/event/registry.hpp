@@ -11,7 +11,6 @@
 #include <optional>
 #include <string>
 #include "boost/json.hpp"
-#include "brookesia/lib_utils/signal.hpp"
 #include "boost/thread/mutex.hpp"
 #include "boost/thread/lock_guard.hpp"
 #include "brookesia/service_manager/event/definition.hpp"
@@ -26,15 +25,15 @@ public:
     /**
      * @brief Signal type used for local in-process event listeners.
      */
-    using Signal = esp_brookesia::lib_utils::signal < void(const std::string &event_name, const EventItemMap &event_items) >;
+    using Signal = EventSignal;
     /**
      * @brief RAII connection handle returned by `Signal::connect()`.
      */
-    using SignalConnection = esp_brookesia::lib_utils::scoped_connection;
+    using SignalConnection = EventSignalConnection;
     /**
      * @brief Slot type accepted by `subscribe_event()`.
      */
-    using SignalSlot = Signal::slot_type;
+    using SignalSlot = EventSignalSlot;
 
     EventRegistry() = default;
     ~EventRegistry() = default;

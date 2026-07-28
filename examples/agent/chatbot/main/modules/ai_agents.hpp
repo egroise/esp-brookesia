@@ -50,6 +50,7 @@ private:
     void process_agent_general_events();
     void process_agent_general_unexpected_events();
     void process_agent_general_suspend_status_changed();
+    void process_bt_speaker_events();
 
     void process_emote();
     void process_emote_when_general_action_triggered();
@@ -114,6 +115,8 @@ private:
     bool is_sleeping_ = false;
     bool is_stopped_ = false;
     bool is_wifi_connected_ = false;
+    std::atomic_bool should_resume_bt_speaker_{false};
+    std::atomic_int paused_bt_connection_id_{-1};
 
     // Keep service bindings to avoid frequent start and stop of services
     std::vector<esp_brookesia::service::ServiceBinding> service_bindings_;

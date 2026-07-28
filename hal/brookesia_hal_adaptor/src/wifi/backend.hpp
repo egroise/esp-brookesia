@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <mutex>
 #include <span>
 #include <string>
 #include "brookesia/hal_adaptor/macro_configs.h"
@@ -128,7 +129,7 @@ private:
     {
         return task_scheduler_;
     }
-    lib_utils::TaskScheduler::Group get_task_group() const
+    lib_utils::TaskSchedulerGroup get_task_group() const
     {
         return task_group_;
     }
@@ -191,7 +192,8 @@ private:
     WifiStateFlags state_flags_;
 
     std::shared_ptr<lib_utils::TaskScheduler> task_scheduler_;
-    lib_utils::TaskScheduler::Group task_group_;
+    lib_utils::TaskSchedulerGroup task_group_;
+    mutable std::mutex callbacks_mutex_;
     wifi::BasicIface::Callbacks basic_callbacks_;
     wifi::StationIface::Callbacks station_callbacks_;
     wifi::SoftApIface::Callbacks softap_callbacks_;
@@ -214,9 +216,9 @@ private:
     bool is_scanning_ = false;
     bool scan_one_shot_running_ = false;
     wifi::ScanParams scan_params_{};
-    lib_utils::TaskScheduler::TaskId scan_periodic_task_ = 0;
-    lib_utils::TaskScheduler::TaskId scan_delayed_start_task_ = 0;
-    lib_utils::TaskScheduler::TaskId scan_ap_timeout_task_ = 0;
+    lib_utils::TaskSchedulerTaskId scan_periodic_task_ = 0;
+    lib_utils::TaskSchedulerTaskId scan_delayed_start_task_ = 0;
+    lib_utils::TaskSchedulerTaskId scan_ap_timeout_task_ = 0;
 
     wifi::SoftApParams softap_params_cache_{};
     std::unique_ptr<SoftAp> softap_;

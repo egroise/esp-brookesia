@@ -11,6 +11,7 @@
 #include "private/utils.hpp"
 
 #include <algorithm>
+#include <memory>
 
 namespace esp_brookesia::gui::lvgl {
 
@@ -198,11 +199,20 @@ void apply_animations(Record &record, const std::vector<Animation> &animations)
 
     BROOKESIA_LOGD("Params: record(%1%), animations(count=%2%)", record, animations.size());
 
-    if (animations_equal(record.animations, animations)) {
+    if ((record.animation_payload == nullptr && animations.empty()) ||
+            (record.animation_payload != nullptr && animations_equal(record.animation_payload->values, animations))) {
         return;
     }
 
-    record.animations = animations;
+    if (animations.empty()) {
+        record.animation_payload.reset();
+        return;
+    }
+
+    if (record.animation_payload == nullptr) {
+        record.animation_payload = std::make_unique<Record::AnimationPayload>();
+    }
+    record.animation_payload->values = animations;
     run_animations(record, AnimationTrigger::Mount);
     if (!record.hidden) {
         run_animations(record, AnimationTrigger::Show);
@@ -211,11 +221,11 @@ void apply_animations(Record &record, const std::vector<Animation> &animations)
 
 void run_animations(Record &record, AnimationTrigger trigger)
 {
-    if (record.object == nullptr) {
+    if (record.object == nullptr || record.animation_payload == nullptr) {
         return;
     }
 
-    for (const auto &animation : record.animations) {
+    for (const auto &animation : record.animation_payload->values) {
         if (animation.trigger != trigger) {
             continue;
         }

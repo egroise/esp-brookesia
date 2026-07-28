@@ -4,4 +4,5 @@
 # Keep the following files
 !.gitignore
 !CMakeLists.txt
+!dataflow_test.cpp
 !main.cpp

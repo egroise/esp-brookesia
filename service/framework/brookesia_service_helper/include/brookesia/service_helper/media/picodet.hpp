@@ -57,7 +57,7 @@ public:
     struct AttachConfig {
         std::string frame_source = "VideoEncoder0";        ///< Service publishing the frame event.
         std::string frame_event = "StreamSinkFrameReady";  ///< Frame event name on that service.
-        std::string display_output;     ///< Display output to present annotated frames to; empty = detection-only.
+        std::string display_output;     ///< Visual output for annotated frames; empty = detection-only.
         int detect_every_n_frames = 5;  ///< Inference decimation; 1 = detect on every frame.
     };
 
@@ -66,7 +66,7 @@ public:
         Detect,     ///< Run inference on one image file, return boxes.
         Close,      ///< Unload the model.
         GetInfo,    ///< Query loaded state / input size / labels.
-        Attach,     ///< Subscribe to a frame event and optionally present annotated frames.
+        Attach,     ///< Subscribe to a frame event and optionally present annotated frames through DataFlow.
         Detach,     ///< Unwire the detector from the pipeline.
         Max,
     };
@@ -191,8 +191,8 @@ private:
                                 "Wire the detector into the pipeline: subscribe to 'frame_event' on the "
                                 "'frame_source' service (the caller owns that service's lifecycle) and run "
                                 "inference every N frames, publishing DetectionUpdated. When 'display_output' "
-                                "is set, also draw the boxes onto each frame and present it to that display "
-                                "output. Requires Open first. Example config: %1%"
+                                "is set, also draw the boxes onto each frame and present it through the visual "
+                                "DataFlow output. Requires Open first. Example config: %1%"
                             )
             % BROOKESIA_DESCRIBE_JSON_SERIALIZE((AttachConfig{
                 .frame_source = "VideoEncoder0", .frame_event = "StreamSinkFrameReady",
@@ -214,7 +214,7 @@ private:
     {
         return {
             .name = BROOKESIA_DESCRIBE_ENUM_TO_STR(FunctionId::Detach),
-            .description = "Unwire the detector from the frame source and release the display output.",
+            .description = "Unwire the detector from the frame source and release the visual output.",
             .default_timeout_ms = 5000,
         };
     }

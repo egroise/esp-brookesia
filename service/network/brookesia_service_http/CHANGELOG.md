@@ -1,5 +1,15 @@
 # ChangeLog
 
+## v0.8.2 - 2026-07-27
+
+### Enhancements:
+
+- chore(build): use lightweight scheduler and service schema APIs.
+
+### Bug Fixes:
+
+- fix(events): preserve stable HTTP event parameter names after schema metadata changes.
+
 ## v0.8.1 - 2026-07-13
 
 ### Enhancements:
