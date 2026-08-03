@@ -16,6 +16,50 @@ namespace esp_brookesia::gui::lvgl {
 
 namespace {
 
+static void append_pointer_payload(BackendEvent &event)
+{
+    auto *indev = lv_indev_active();
+    if (indev == nullptr) {
+        return;
+    }
+
+    lv_point_t point{};
+    lv_indev_get_point(indev, &point);
+    event.payload["x"] = point.x;
+    event.payload["y"] = point.y;
+}
+
+static void append_value_payload(const Record &record, BackendEvent &event)
+{
+    if (record.object == nullptr) {
+        return;
+    }
+
+    switch (record.type) {
+    case NodeType::TextInput:
+        event.payload["text"] = lv_textarea_get_text(record.object);
+        break;
+    case NodeType::Slider:
+        event.payload["value"] = lv_slider_get_value(record.object);
+        break;
+    case NodeType::Switch:
+    case NodeType::Checkbox:
+        event.payload["checked"] = lv_obj_has_state(record.object, LV_STATE_CHECKED);
+        break;
+    case NodeType::Dropdown:
+        event.payload["selectedIndex"] = static_cast<int32_t>(lv_dropdown_get_selected(record.object));
+        break;
+    case NodeType::ProgressBar:
+        event.payload["value"] = lv_bar_get_value(record.object);
+        break;
+    case NodeType::Arc:
+        event.payload["value"] = lv_arc_get_value(record.object);
+        break;
+    default:
+        break;
+    }
+}
+
 static void on_lvgl_event(lv_event_t *event)
 {
     BROOKESIA_LOG_TRACE_GUARD();
@@ -34,8 +78,21 @@ static void on_lvgl_event(lv_event_t *event)
         .payload = {},
     };
 
+    if (
+        context->type == EventType::Pressed ||
+        context->type == EventType::Pressing ||
+        context->type == EventType::PressLost ||
+        context->type == EventType::Released
+    ) {
+        append_pointer_payload(backend_event);
+    }
+
     if (context->type == EventType::Gesture) {
         auto *indev = lv_indev_active();
+        if (indev == nullptr) {
+            context->impl->event_sink(backend_event);
+            return;
+        }
         switch (lv_indev_get_gesture_dir(indev)) {
         case LV_DIR_LEFT:
             backend_event.payload["direction"] = "left";
@@ -54,36 +111,17 @@ static void on_lvgl_event(lv_event_t *event)
         }
     }
 
-    if (context->type != EventType::ValueChanged) {
-        context->impl->event_sink(backend_event);
-        return;
+    const auto *record = context->impl->find_record(context->handle);
+    const bool should_append_value = context->type == EventType::ValueChanged ||
+                                     (context->type == EventType::Released &&
+                                      record != nullptr && record->type == NodeType::Slider);
+    if (should_append_value && record != nullptr) {
+        append_value_payload(*record, backend_event);
     }
 
-    auto *record = context->impl->find_record(context->handle);
-    if (record != nullptr && record->object != nullptr) {
-        switch (record->type) {
-        case NodeType::TextInput:
-            backend_event.payload["text"] = lv_textarea_get_text(record->object);
-            break;
-        case NodeType::Slider:
-            backend_event.payload["value"] = lv_slider_get_value(record->object);
-            break;
-        case NodeType::Switch:
-        case NodeType::Checkbox:
-            backend_event.payload["checked"] = lv_obj_has_state(record->object, LV_STATE_CHECKED);
-            break;
-        case NodeType::Dropdown:
-            backend_event.payload["selectedIndex"] = static_cast<int32_t>(lv_dropdown_get_selected(record->object));
-            break;
-        case NodeType::ProgressBar:
-            backend_event.payload["value"] = lv_bar_get_value(record->object);
-            break;
-        case NodeType::Arc:
-            backend_event.payload["value"] = lv_arc_get_value(record->object);
-            break;
-        default:
-            break;
-        }
+    if (!should_append_value) {
+        context->impl->event_sink(backend_event);
+        return;
     }
 
     context->impl->event_sink(backend_event);
