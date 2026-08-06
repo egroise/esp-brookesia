@@ -4,6 +4,7 @@
 *.o
 *.pyc
 *.orig
+*.egg-info/
 
 # gtags
 GTAGS
