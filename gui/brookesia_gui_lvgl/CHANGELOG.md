@@ -1,5 +1,11 @@
 # ChangeLog
 
+## v0.8.3 - 2026-08-05
+
+### Enhancements:
+
+- feat(event): expose pointer coordinates and released slider values through event payloads.
+
 ## v0.8.2 - 2026-07-27
 
 ### Enhancements:

@@ -1,5 +1,11 @@
 # ChangeLog
 
+## v0.8.3 - 2026-08-05
+
+### Bug Fixes:
+
+- fix(keyboard): make common punctuation and symbols available in the special-key layout.
+
 ## v0.8.2 - 2026-07-27
 
 ### Enhancements:
