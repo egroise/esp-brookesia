@@ -8,6 +8,18 @@
 
 For more information, see the [ESP-Brookesia Programming Guide](https://docs.espressif.com/projects/esp-brookesia/en/latest/system/core/index.html).
 
+## USB Host Bridge
+
+On supported ESP32-P4 targets, system core can bind the USB Serial/JTAG
+service for exclusive host control. It supports service calls, protected file
+uploads under the configured upload root, and BPK runtime app installation.
+Unsupported manifest fields are reported as warnings and do not prevent a
+package from being installed.
+
+See the [USB service documentation](../../service/system/brookesia_service_usb/README.md)
+and the [host CLI documentation](../../tools/brookesia_usb_cli/README.md) for
+configuration and usage details.
+
 ## How to Use
 
 ### Environment Requirements

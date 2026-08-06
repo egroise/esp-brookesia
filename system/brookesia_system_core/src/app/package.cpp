@@ -480,7 +480,7 @@ std::expected<runtime::BackendType, std::string> parse_backend_type(std::string_
 }
 
 template <size_t N>
-std::expected<void, std::string> reject_unknown_manifest_fields(
+void warn_unknown_manifest_fields(
     const boost::json::object &object,
     std::string_view owner,
     const std::array<std::string_view, N> &allowed_fields
@@ -490,12 +490,9 @@ std::expected<void, std::string> reject_unknown_manifest_fields(
         (void)value;
         const auto key_view = std::string_view(key.data(), key.size());
         if (std::find(allowed_fields.begin(), allowed_fields.end(), key_view) == allowed_fields.end()) {
-            return std::unexpected(
-                       "manifest." + std::string(owner) + " contains unsupported field: " + std::string(key_view)
-                   );
+            BROOKESIA_LOGW("Ignore unsupported manifest.%1% field: %2%", owner, key_view);
         }
     }
-    return {};
 }
 
 std::expected<GuiAppLayer, std::string> parse_gui_app_layer(std::string_view layer)
@@ -609,30 +606,23 @@ std::expected<AppManifest, std::string> parse_manifest_to_app_manifest(
     if (!runtime) {
         return std::unexpected(runtime.error());
     }
-    auto root_fields = reject_unknown_manifest_fields(root, "json", std::array<std::string_view, 2> {
+    warn_unknown_manifest_fields(root, "json", std::array<std::string_view, 2> {
         "package",
         "runtime",
     });
-    auto package_fields = reject_unknown_manifest_fields(**package, "package", std::array<std::string_view, 5> {
+    warn_unknown_manifest_fields(**package, "package", std::array<std::string_view, 5> {
         "id",
         "name",
         "version",
         "visible",
         "systems",
     });
-    auto runtime_fields = reject_unknown_manifest_fields(**runtime, "runtime", std::array<std::string_view, 4> {
+    warn_unknown_manifest_fields(**runtime, "runtime", std::array<std::string_view, 4> {
         "type",
         "entry",
         "resource_dir",
         "arguments",
     });
-    if (!root_fields || !package_fields || !runtime_fields) {
-        return std::unexpected(
-                   !root_fields ? root_fields.error() :
-                   !package_fields ? package_fields.error() :
-                   runtime_fields.error()
-               );
-    }
 
     auto id = get_required_string(**package, "package", "id");
     auto version = get_required_string(**package, "package", "version");

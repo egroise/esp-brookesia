@@ -1,5 +1,16 @@
 # ChangeLog
 
+## v0.8.3 - 2026-08-04
+
+### Enhancements:
+
+- feat(usb): add the USB Serial/JTAG host-control and runtime package bridge.
+- feat(app): expose runtime package installation to system-level integrations.
+
+### Bug Fixes:
+
+- fix(app): warn and continue when manifests contain unsupported fields.
+
 ## v0.8.2 - 2026-07-27
 
 ### Enhancements:

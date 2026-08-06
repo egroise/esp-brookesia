@@ -1,4 +1,4 @@
-version: "0.8.2"
+version: "0.8.3"
 description: ESP-Brookesia system core app, service, runtime, and GUI orchestration framework.
 url: https://github.com/espressif/esp-brookesia/tree/master/system/brookesia_system_core
 repository: https://github.com/espressif/esp-brookesia.git
@@ -18,6 +18,11 @@ dependencies:
     version: "0.8.*"
     override_path: ../../service/system/brookesia_service_storage
     require: public
+
+  espressif/brookesia_service_usb:
+    version: "0.8.*"
+    override_path: ../../service/system/brookesia_service_usb
+    require: private
 
   espressif/brookesia_runtime_manager:
     version: "0.8.*"

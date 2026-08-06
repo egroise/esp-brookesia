@@ -157,6 +157,20 @@ public:
 
     std::expected<AppId, std::string> install_app(std::shared_ptr<IApp> app);
     std::expected<AppId, std::string> install_runtime_app(const AppManifest &manifest);
+    /**
+     * @brief Install a validated runtime application package from a local path.
+     *
+     * Unsupported manifest fields are logged as warnings and do not stop
+     * installation. The package is staged and validated before activation.
+     *
+     * @param package_path Path to the BPK package.
+     * @param replace_existing Whether an installed package with the same ID may be replaced.
+     * @return The installed application ID, or an error string.
+     */
+    std::expected<AppId, std::string> install_runtime_app_package(
+        std::string_view package_path,
+        bool replace_existing = true
+    );
     std::expected<void, std::string> install_registered_apps();
     std::expected<void, std::string> uninstall_app(AppId app_id);
 

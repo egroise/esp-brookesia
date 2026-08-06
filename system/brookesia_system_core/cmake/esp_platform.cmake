@@ -4,6 +4,9 @@
 # Always declare mbedtls for release verify on ESP-IDF (see package_release_verify.cpp).
 set(_brookesia_system_core_esp_requires ${COMPONENT_REQUIRES})
 list(APPEND _brookesia_system_core_esp_requires mbedtls)
+if(CONFIG_BROOKESIA_SYSTEM_CORE_ENABLE_USB_BRIDGE)
+    list(APPEND _brookesia_system_core_esp_requires brookesia_service_usb)
+endif()
 
 idf_component_register(
     SRCS ${COMPONENT_SRCS_C} ${COMPONENT_SRCS_CPP}

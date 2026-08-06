@@ -1,4 +1,12 @@
 menu "ESP-Brookesia: System Core Configurations"
+    config BROOKESIA_SYSTEM_CORE_ENABLE_USB_BRIDGE
+        bool "Enable USB host command bridge"
+        depends on BROOKESIA_SERVICE_USB_ENABLE_AUTO_REGISTER
+        default y
+        help
+            Register the system-core file upload and BPK installation handlers with
+            the ESP-Brookesia USB CDC service.
+
     config BROOKESIA_SYSTEM_CORE_RUNTIME_APP_MAX_Z_ORDER
         int "Maximum runtime app z_order"
         default 100

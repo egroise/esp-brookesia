@@ -298,6 +298,12 @@ public:
     service::ServiceBinding system_service_binding_;
     service::ServiceBinding gui_service_binding_;
     service::ServiceBinding timer_service_binding_;
+#if defined(ESP_PLATFORM) && CONFIG_BROOKESIA_SYSTEM_CORE_ENABLE_USB_BRIDGE
+    // Keep the USB service bound for the lifetime of system core. Registering
+    // the bridge only makes the callbacks available; ServiceManager starts a
+    // service only while it has an active binding to it.
+    service::ServiceBinding usb_service_binding_;
+#endif
     std::map<AppId, AppRecord> apps_;
     std::map<std::string, AppId> manifest_id_to_app_;
     std::map<KeyboardRequestId, KeyboardRequestRecord> keyboard_requests_;
