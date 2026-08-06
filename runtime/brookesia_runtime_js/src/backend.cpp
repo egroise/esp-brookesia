@@ -138,6 +138,41 @@ std::expected<std::string, std::string> read_all(const std::string &path)
     return result.value();
 }
 
+/**
+ * File reader for QuickJS ES-module imports that routes reads through the Storage
+ * service (fs_read_text). The built-in js_load_file uses raw fopen on the calling
+ * task; when that task stack lives in PSRAM and XIP-from-PSRAM is disabled, the
+ * flash read disables the cache and faults (esp_task_stack_is_sane_cache_disabled).
+ * Storage routes the read onto a cache-safe worker, matching the entry-script path.
+ */
+uint8_t *brookesia_js_load_file(JSContext *ctx, size_t *pbuf_len, const char *filename)
+{
+    auto content = read_all(filename);
+    if (!content) {
+        *pbuf_len = 0;
+        return nullptr;
+    }
+    const std::string &data = content.value();
+    const size_t len = data.size();
+    auto *buf = static_cast<uint8_t *>(js_malloc(ctx, len + 1));
+    if (buf == nullptr) {
+        *pbuf_len = 0;
+        return nullptr;
+    }
+    std::memcpy(buf, data.data(), len);
+    buf[len] = '\0';
+    *pbuf_len = len;
+    return buf;
+}
+
+/** Custom module loader mirroring js_module_loader but with a cache-safe file reader. */
+JSModuleDef *brookesia_js_module_loader(
+    JSContext *ctx, const char *module_name, void *opaque, JSValueConst attributes
+)
+{
+    return js_module_load(ctx, module_name, opaque, attributes, brookesia_js_load_file);
+}
+
 std::string get_exception_string(JSContext *context)
 {
     JSValue exception = JS_GetException(context);
@@ -660,8 +695,10 @@ std::expected<void, std::string> Backend::load_app(AppId id, const AppConfig &co
         return std::unexpected("Failed to create JavaScript context");
     }
     js_std_add_helpers(app.context, 0, nullptr);
-    /* quickjs-ng: js_module_loader matches JSModuleLoaderFunc2 (import attributes). */
-    JS_SetModuleLoaderFunc2(app.runtime, nullptr, js_module_loader, js_module_check_attributes, nullptr);
+    /* quickjs-ng: js_module_loader matches JSModuleLoaderFunc2 (import attributes).
+     * Use a Storage-backed loader so ES-module imports are read on a cache-safe
+     * worker instead of raw fopen on this (possibly PSRAM) task stack. */
+    JS_SetModuleLoaderFunc2(app.runtime, nullptr, brookesia_js_module_loader, js_module_check_attributes, nullptr);
     app.app_state = AppState::Loaded;
     auto [it, inserted] = impl_->apps_.emplace(id, std::move(app));
     if (!inserted) {

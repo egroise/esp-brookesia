@@ -1,5 +1,11 @@
 # ChangeLog
 
+## v0.8.3 - 2026-08-05
+
+### Bug Fixes:
+
+- fix(loader): load JavaScript modules through the cache-safe Storage service path.
+
 ## v0.8.2 - 2026-07-27
 
 ### Enhancements:
