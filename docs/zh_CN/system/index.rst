@@ -27,3 +27,5 @@ System 组件位于服务、GUI、运行时、HAL 和内置应用之上，提供
 
    System Core <core/index>
    System Super <super/index>
+   Toolkit <toolkit>
+   USB CLI <usb_cli>
