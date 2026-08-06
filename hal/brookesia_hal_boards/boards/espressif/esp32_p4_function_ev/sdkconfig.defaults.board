@@ -18,6 +18,11 @@ CONFIG_CACHE_L2_CACHE_LINE_128B=y
 # so we manually enable it here
 CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y
 
+# Brookesia USB service: the USB Serial/JTAG CDC is shared by console logs and
+# the exclusive host-control session.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+CONFIG_USJ_ENABLE_USB_SERIAL_JTAG=y
+
 # Brookesia:Hal:Adaptor
 # System
 CONFIG_BROOKESIA_HAL_ADAPTOR_ENABLE_SYSTEM_DEVICE=y
