@@ -50,6 +50,7 @@ jobs:
             service/network/brookesia_service_wifi;
             service/system/brookesia_service_device;
             service/system/brookesia_service_storage;
+            service/system/brookesia_service_usb;
             system/brookesia_system_core;
             system/brookesia_system_super;
             utils/brookesia_lib_utils;

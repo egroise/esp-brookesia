@@ -52,7 +52,7 @@ When multiple matching devices are present, pass ``--port`` explicitly using a p
 .. _system-usb-cli-sec-03:
 
 Control Sessions and Security
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Commands that require a control session send ``hello`` and validate protocol version ``1``, the ``serial_jtag`` transport, and the ``exclusive`` session state before sending ``goodbye`` on exit.
 
@@ -114,7 +114,7 @@ The device writes data to a temporary file first and commits it only after size 
 .. _system-usb-cli-sec-07:
 
 Install an Application Package
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Send a complete BPK runtime app package to the device for validation and installation:
 
