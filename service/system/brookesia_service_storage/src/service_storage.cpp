@@ -298,6 +298,16 @@ std::expected<void, std::string> validate_no_symlink_components(
 
 std::expected<std::filesystem::path, std::string> make_weakly_canonical(const std::filesystem::path &path)
 {
+#if defined(ESP_PLATFORM)
+    // ESP storage backends currently exposed by FileSystemIface are SPIFFS, LittleFS
+    // and FATFS. None supports symbolic links through ESP-IDF VFS, so weakly_canonical()
+    // only adds flash metadata I/O (stat) while resolving to the lexically-normalized
+    // path. That flash read can execute on a task whose stack lives in PSRAM; with the
+    // cache disabled during the read the stack becomes inaccessible and asserts
+    // (esp_task_stack_is_sane_cache_disabled). Normalize lexically to stay cache-safe,
+    // matching the no-op ESP path in validate_no_symlink_components().
+    return path.lexically_normal();
+#else
     std::error_code error_code;
     auto canonical_path = std::filesystem::weakly_canonical(path, error_code);
     if (error_code) {
@@ -307,6 +317,7 @@ std::expected<std::filesystem::path, std::string> make_weakly_canonical(const st
                );
     }
     return canonical_path;
+#endif
 }
 
 std::vector<std::filesystem::path> get_file_system_roots(const StorageFsIface::Info &info)

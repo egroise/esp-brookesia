@@ -1,5 +1,15 @@
 # ChangeLog
 
+## v0.8.4 - 2026-08-04
+
+### Enhancements:
+
+- feat(usb): add typed status, transfer, event, and host-command helper contracts.
+
+### Bug Fixes:
+
+- fix(build): remove duplicate component version definition from ESP platform CMake.
+
 ## v0.8.3 - 2026-07-27
 
 ### Enhancements:

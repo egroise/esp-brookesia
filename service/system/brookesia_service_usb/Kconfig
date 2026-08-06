@@ -1,0 +1,71 @@
+menu "ESP-Brookesia: Service USB Configurations"
+    depends on SOC_USB_SERIAL_JTAG_SUPPORTED
+
+    config BROOKESIA_SERVICE_USB_ENABLE_AUTO_REGISTER
+        bool "Enable automatic plugin registration"
+        default y if USJ_ENABLE_USB_SERIAL_JTAG
+        default n if !USJ_ENABLE_USB_SERIAL_JTAG
+        select USJ_NO_AUTO_LS_ON_CONNECTION if PM_ENABLE && ESP_CONSOLE_USB_SERIAL_JTAG_ENABLED \
+            && !SOC_USB_SERIAL_JTAG_SUPPORT_LIGHT_SLEEP
+        help
+            Automatically register the USB service with ServiceManager.
+
+            The service uses the fixed-function USB Serial/JTAG CDC port.
+            Applications must reserve the Serial/JTAG RX stream for the
+            service while a host control session is active.
+
+    menuconfig BROOKESIA_SERVICE_USB_ENABLE_DEBUG_LOG
+        bool "Enable debug or lower level logs"
+        default n
+
+    config BROOKESIA_SERVICE_USB_UPLOAD_ROOT
+        string "Host upload root"
+        default "/littlefs/usb"
+        help
+            Absolute storage directory used for host file uploads and USB staging files.
+
+    config BROOKESIA_SERVICE_USB_MAX_TRANSFER_SIZE
+        int "Maximum transfer size"
+        default 8388608
+        range 1 67108864
+        help
+            Maximum number of bytes accepted for one host upload or BPK package.
+
+    config BROOKESIA_SERVICE_USB_FRAME_PAYLOAD_SIZE
+        int "Maximum binary frame payload"
+        default 16384
+        range 64 65536
+        help
+            Maximum payload size in one binary transfer frame.
+
+    config BROOKESIA_SERVICE_USB_RX_QUEUE_LENGTH
+        int "RX queue length"
+        default 8
+        range 2 64
+        help
+            Number of Serial/JTAG RX messages buffered before the protocol
+            worker handles them.
+
+    config BROOKESIA_SERVICE_USB_SERIAL_JTAG_RX_BUFFER_SIZE
+        int "Serial/JTAG RX buffer size"
+        default 4096
+        range 128 65536
+        help
+            RX ring-buffer size used when the service owns the Serial/JTAG
+            driver. The console-installed driver keeps its own configuration.
+
+    config BROOKESIA_SERVICE_USB_SERIAL_JTAG_TX_BUFFER_SIZE
+        int "Serial/JTAG TX buffer size"
+        default 4096
+        range 128 65536
+        help
+            TX ring-buffer size used when the service owns the Serial/JTAG
+            driver. The console-installed driver keeps its own configuration.
+
+    config BROOKESIA_SERVICE_USB_COMMAND_TIMEOUT_MS
+        int "Service call timeout"
+        default 30000
+        range 100 600000
+        help
+            Default timeout for service calls received from the USB host.
+endmenu
