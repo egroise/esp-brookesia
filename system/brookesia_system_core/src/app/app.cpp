@@ -1099,8 +1099,25 @@ std::expected<AppId, std::string> SystemApi::install_runtime_app_package(
     if (!is_native_system_app()) {
         return std::unexpected("Only native system apps can install runtime app packages");
     }
-
+    auto self = system_->get_app(app_id_);
     auto package_manifest = read_app_package_manifest(package_path, system_->get_system_type());
+    if (!package_manifest) {
+        return std::unexpected("Failed to read runtime app package manifest: " + package_manifest.error());
+    }
+    if (self && self->manifest.id == package_manifest->id) {
+        return std::unexpected("App cannot replace itself");
+    }
+    return system_->install_runtime_app_package(package_path, replace_existing);
+}
+
+std::expected<AppId, std::string> System::install_runtime_app_package(
+    std::string_view package_path,
+    bool replace_existing
+)
+{
+    BROOKESIA_LOG_TRACE_GUARD_WITH_THIS();
+
+    auto package_manifest = read_app_package_manifest(package_path, get_system_type());
     if (!package_manifest) {
         return std::unexpected("Failed to read runtime app package manifest: " + package_manifest.error());
     }
@@ -1108,12 +1125,7 @@ std::expected<AppId, std::string> SystemApi::install_runtime_app_package(
         return std::unexpected("Runtime app manifest id is not a safe directory name: " + package_manifest->id);
     }
 
-    auto self = system_->get_app(app_id_);
-    if (self && self->manifest.id == package_manifest->id) {
-        return std::unexpected("App cannot replace itself");
-    }
-
-    auto installed = find_app_by_manifest_id(*system_, package_manifest->id);
+    auto installed = find_app_by_manifest_id(*this, package_manifest->id);
     if (installed && !replace_existing) {
         return std::unexpected("Runtime app package is already installed: " + package_manifest->id);
     }
@@ -1135,7 +1147,7 @@ std::expected<AppId, std::string> SystemApi::install_runtime_app_package(
             return std::unexpected("Installed runtime app root is empty: " + package_manifest->id);
         }
     } else {
-        auto app_root_result = get_default_install_app_root(system_->get_storage_layout());
+        auto app_root_result = get_default_install_app_root(get_storage_layout());
         if (!app_root_result) {
             return std::unexpected(app_root_result.error());
         }
@@ -1160,7 +1172,7 @@ std::expected<AppId, std::string> SystemApi::install_runtime_app_package(
     auto unpacked_manifest = unpack_app_package_to(
                                  package_path,
                                  staging_parent.generic_string(),
-                                 system_->get_system_type()
+                                 get_system_type()
                              );
     if (!unpacked_manifest) {
         cleanup_staging();
@@ -1194,7 +1206,7 @@ std::expected<AppId, std::string> SystemApi::install_runtime_app_package(
     }
 
     if (installed) {
-        auto uninstall_result = system_->uninstall_app(installed->app_id);
+        auto uninstall_result = uninstall_app(installed->app_id);
         if (!uninstall_result) {
             cleanup_staging();
             return std::unexpected("Failed to uninstall existing app: " + uninstall_result.error());
@@ -1214,7 +1226,7 @@ std::expected<AppId, std::string> SystemApi::install_runtime_app_package(
     cleanup_staging();
     unpacked_manifest->app_path = install_dir.generic_string();
 
-    auto install_result = system_->install_runtime_app(*unpacked_manifest);
+    auto install_result = install_runtime_app(*unpacked_manifest);
     if (!install_result) {
         auto cleanup_result = remove_path_tree(install_dir, "runtime app directory");
         if (!cleanup_result) {

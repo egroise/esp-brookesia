@@ -23,6 +23,7 @@
 #include "service_helper/network/bt.hpp"
 #include "service_helper/emulation/nes.hpp"
 #include "service_helper/system/storage.hpp"
+#include "service_helper/system/usb.hpp"
 #include "service_helper/media/video.hpp"
 #include "service_helper/network/wifi.hpp"
 #include "service_helper/network/sntp.hpp"

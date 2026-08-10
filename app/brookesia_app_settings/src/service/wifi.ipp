@@ -63,61 +63,78 @@ std::expected<void, std::string> SettingsApp::sync_wifi_network_section(
 )
 {
     const auto slot_limit = get_wifi_list_page_size();
-    const auto visible_slot_count = std::min(visible_count, slot_limit);
+    const auto target_slot_count = std::min(visible_count, slot_limit);
 #if BROOKESIA_APP_SETTINGS_ENABLE_MEMORY_TRACE
     BROOKESIA_LOGI(
         "[HeapTrace][settings.sync_wifi] parent(%1%) prefix(%2%) slot_count(%3%) visible_count(%4%) "
         "networks(%5%) page_start(%6%) page_size(%7%) slots_to_create(%8%)",
-        std::string(parent), std::string(id_prefix), slot_count, visible_slot_count, networks.size(),
-        page_start, slot_limit, (visible_slot_count > slot_count ? visible_slot_count - slot_count : 0)
+        std::string(parent), std::string(id_prefix), slot_count, target_slot_count, networks.size(),
+        page_start, slot_limit, (target_slot_count > slot_count ? target_slot_count - slot_count : 0)
     );
 #endif
-    for (size_t i = slot_count; i < visible_slot_count; ++i) {
-        const auto heap = ::esp_brookesia::lib_utils::MemoryProfiler::take_raw_heap_snapshot();
-        if (heap.external_free != 0 && heap.external_free < WIFI_SLOT_MIN_FREE_PSRAM_BYTES) {
-            BROOKESIA_LOGW(
-                "[HeapTrace][settings.wifi_guard] stop creating rows: low PSRAM "
-                "(free=%1% largest=%2% reserve=%3% created=%4% requested=%5%)",
-                heap.external_free, heap.external_largest,
-                static_cast<size_t>(WIFI_SLOT_MIN_FREE_PSRAM_BYTES), slot_count, visible_slot_count
-            );
-            break;
-        }
-
+    const auto make_slot_id = [&id_prefix](size_t index) {
         auto slot_id = std::string(id_prefix);
         slot_id += "_";
-        slot_id += std::to_string(i);
+        slot_id += std::to_string(index);
+        return slot_id;
+    };
+
+    // Destroy rows that are no longer needed instead of leaving them hidden. Keeping
+    // slot_count aligned with the live GUI tree ensures a dynamic Wi-Fi screen rebuild
+    // can never leave stale rows behind that later trigger "binding update target not
+    // found" warnings when we try to hide them.
+    for (size_t i = target_slot_count; i < slot_count; ++i) {
+        const auto slot_id = make_slot_id(i);
+        const auto instance_path = join_path(parent, slot_id);
+        (void)context.gui().destroy_view(instance_path);
+        wifi_instance_to_network_.erase(slot_id);
+        std::erase(dynamic_wifi_paths_, instance_path);
+    }
+    if (slot_count > target_slot_count) {
+        slot_count = target_slot_count;
+    }
+    const auto retained_slot_count = slot_count;
+
+    // Ensure every row we are about to populate exists. create_view() is idempotent: an
+    // existing instance simply reports "View already exists" and is kept in place, while a
+    // row that was dropped by a screen rebuild is recreated. This self-heals any drift
+    // between the app-side bookkeeping and the live GUI tree.
+    slot_count = 0;
+    for (size_t i = 0; i < target_slot_count; ++i) {
+        if (i >= retained_slot_count) {
+            const auto heap = ::esp_brookesia::lib_utils::MemoryProfiler::take_raw_heap_snapshot();
+            if (heap.external_free != 0 && heap.external_free < WIFI_SLOT_MIN_FREE_PSRAM_BYTES) {
+                BROOKESIA_LOGW(
+                    "[HeapTrace][settings.wifi_guard] stop creating rows: low PSRAM "
+                    "(free=%1% largest=%2% reserve=%3% created=%4% requested=%5%)",
+                    heap.external_free, heap.external_largest,
+                    static_cast<size_t>(WIFI_SLOT_MIN_FREE_PSRAM_BYTES), slot_count, target_slot_count
+                );
+                break;
+            }
+        }
+
+        const auto slot_id = make_slot_id(i);
+        const auto instance_path = join_path(parent, slot_id);
         auto created = context.gui().create_view(WIFI_TEMPLATE_ID, parent, slot_id);
         if (!created) {
-            const auto instance_path = join_path(parent, slot_id);
             if (!created.error().starts_with("View already exists:")) {
                 return std::unexpected(created.error());
             }
-            // The page may have been reconstructed before an asynchronous Wi-Fi
-            // update arrived. Remove the stale row that is no longer tracked,
-            // then recreate it so slot_count remains consistent with the GUI.
-            if (!context.gui().destroy_view(instance_path)) {
-                return std::unexpected(created.error());
-            }
-            created = context.gui().create_view(WIFI_TEMPLATE_ID, parent, slot_id);
-            if (!created) {
-                return std::unexpected(created.error());
-            }
+        } else if (std::find(dynamic_wifi_paths_.begin(), dynamic_wifi_paths_.end(), instance_path) ==
+                   dynamic_wifi_paths_.end()) {
+            dynamic_wifi_paths_.push_back(instance_path);
         }
-
-        dynamic_wifi_paths_.push_back(join_path(parent, slot_id));
-        ++slot_count;
+        slot_count = i + 1;
     }
 
     std::vector<gui::BindingValueUpdate> updates;
     for (size_t i = 0; i < slot_count; ++i) {
-        auto slot_id = std::string(id_prefix);
-        slot_id += "_";
-        slot_id += std::to_string(i);
+        const auto slot_id = make_slot_id(i);
         const auto instance_path = join_path(parent, slot_id);
 
         const auto network_index = page_start + i;
-        if (i >= visible_slot_count || network_index >= networks.size()) {
+        if (network_index >= networks.size()) {
             wifi_instance_to_network_.erase(slot_id);
             add_binding_update(updates, instance_path, "commonProps.hidden", "true");
             continue;

@@ -27,3 +27,5 @@ System components provide the product-level framework above services, GUI, runti
 
    System Core <core/index>
    System Super <super/index>
+   Toolkit <toolkit>
+   USB CLI <usb_cli>

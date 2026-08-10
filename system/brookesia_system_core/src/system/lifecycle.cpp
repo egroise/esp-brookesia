@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include <array>
+#include <filesystem>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 #include "brookesia/system_core/macro_configs.h"
@@ -15,10 +18,49 @@
 #include "private/utils.hpp"
 #include "private/system/impl.hpp"
 
+#if defined(ESP_PLATFORM) && CONFIG_BROOKESIA_SYSTEM_CORE_ENABLE_USB_BRIDGE
+#include "brookesia/service_usb/service_usb.hpp"
+#endif
+
 namespace esp_brookesia::system::core {
 namespace {
 
 std::vector<lib_utils::ThreadConfig> make_scheduler_worker_configs();
+
+#if defined(ESP_PLATFORM) && CONFIG_BROOKESIA_SYSTEM_CORE_ENABLE_USB_BRIDGE
+bool has_raw_buffer_argument(
+    const service::FunctionSchema &function_schema, const boost::json::object &args
+)
+{
+    for (const auto &parameter : function_schema.parameters) {
+        if (parameter.type != service::FunctionValueType::RawBuffer) {
+            continue;
+        }
+        if (args.find(parameter.name) != args.end()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool is_service_call_validation_error(std::string_view message)
+{
+    static constexpr std::array<std::string_view, 5> validation_markers = {{
+            "failed to parse parameters",
+            "Missing required parameter:",
+            "Optional parameter",
+            "Invalid type for parameter",
+            "Unknown parameter:",
+        }
+    };
+    for (const auto marker : validation_markers) {
+        if (message.find(marker) != std::string_view::npos) {
+            return true;
+        }
+    }
+    return false;
+}
+#endif
 
 } // namespace
 
@@ -146,9 +188,135 @@ std::expected<void, std::string> System::init(Config config)
     if (!service_manager.add_service(impl_->timer_service_)) {
         return std::unexpected("Failed to add SystemTimer service");
     }
+#if defined(ESP_PLATFORM) && CONFIG_BROOKESIA_SYSTEM_CORE_ENABLE_USB_BRIDGE
+    lib_utils::FunctionGuard usb_bridge_cleanup([&]() {
+        service::Usb::get_instance().clear_service_call_bridge();
+        service::Usb::get_instance().clear_host_command_bridge();
+    });
+    auto usb_bridge = [this](
+                          service::Usb::HostCommand command,
+                          const service::Usb::TransferArtifact & artifact,
+                          std::string_view destination
+    ) -> std::expected<void, std::string> {
+        if (command == service::Usb::HostCommand::PutFile)
+        {
+            std::error_code error_code;
+            const std::filesystem::path destination_path(destination);
+            std::filesystem::create_directories(destination_path.parent_path(), error_code);
+            if (error_code) {
+                return std::unexpected("Failed to create upload destination directory: " + error_code.message());
+            }
+            if (!artifact.overwrite) {
+                const bool copied = std::filesystem::copy_file(
+                                        artifact.temporary_path,
+                                        destination_path,
+                                        std::filesystem::copy_options::none,
+                                        error_code
+                                    );
+                if (!copied) {
+                    if (error_code == std::errc::file_exists) {
+                        return std::unexpected("Upload destination already exists");
+                    }
+                    return std::unexpected("Failed to commit uploaded file: " + error_code.message());
+                }
+                return {};
+            }
+            std::filesystem::rename(artifact.temporary_path, destination_path, error_code);
+            if (error_code) {
+                return std::unexpected("Failed to commit uploaded file: " + error_code.message());
+            }
+            return {};
+        }
+        if (command == service::Usb::HostCommand::InstallBpk)
+        {
+            auto install_result = install_runtime_app_package(artifact.temporary_path, true);
+            if (!install_result) {
+                return std::unexpected(install_result.error());
+            }
+            return {};
+        }
+        return std::unexpected("Unsupported USB host command");
+    };
+    if (!service::Usb::get_instance().register_host_command_bridge(std::move(usb_bridge))) {
+        return std::unexpected("Failed to register USB host command bridge");
+    }
+    auto usb_service_call_bridge = [](
+                                       std::string_view service_name,
+                                       std::string_view function_name,
+                                       const boost::json::object & args,
+                                       uint32_t timeout_ms
+    ) -> service::Usb::ServiceCallResult {
+        if (service_name == service::Usb::Helper::get_name())
+        {
+            return std::unexpected(service::Usb::ServiceCallError{
+                .code = "path_denied",
+                .message = "recursive Usb calls are not allowed",
+            });
+        }
+
+        auto &service_manager = service::ServiceManager::get_instance();
+        const std::string service_name_string(service_name);
+        const std::string function_name_string(function_name);
+        auto function_schema = service_manager.get_service_function_schema(
+                                   service_name_string, function_name_string
+                               );
+        if (!function_schema)
+        {
+            return std::unexpected(service::Usb::ServiceCallError{
+                .code = "invalid_command",
+                .message = "service or function is not registered",
+            });
+        }
+        // RawBuffer contains a device-side address and cannot safely be supplied by a host JSON request.
+        if (has_raw_buffer_argument(*function_schema, args))
+        {
+            return std::unexpected(service::Usb::ServiceCallError{
+                .code = "invalid_command",
+                .message = "RawBuffer arguments are not supported by the USB JSON call interface",
+            });
+        }
+
+        auto binding = service_manager.bind(service_name_string);
+        if (!binding.is_valid())
+        {
+            return std::unexpected(service::Usb::ServiceCallError{
+                .code = "invalid_command",
+                .message = "service is unavailable",
+            });
+        }
+
+        auto result = binding.get_service()->call_function_sync(
+                          function_name_string, args, timeout_ms
+                      );
+        if (!result.success)
+        {
+            return std::unexpected(service::Usb::ServiceCallError{
+                .code = is_service_call_validation_error(result.error_message) ? "invalid_command" : "call_failed",
+                .message = result.error_message,
+            });
+        }
+        if (!result.has_data())
+        {
+            return boost::json::value(nullptr);
+        }
+        return BROOKESIA_DESCRIBE_TO_JSON(*result.data);
+    };
+    if (!service::Usb::get_instance().register_service_call_bridge(std::move(usb_service_call_bridge))) {
+        return std::unexpected("Failed to register USB service call bridge");
+    }
+#endif
     if (impl_->config_.start_service_manager && !service_manager.start()) {
         return std::unexpected("Failed to start ServiceManager");
     }
+#if defined(ESP_PLATFORM) && CONFIG_BROOKESIA_SYSTEM_CORE_ENABLE_USB_BRIDGE
+    lib_utils::FunctionGuard usb_binding_cleanup([this]() {
+        impl_->usb_service_binding_.release();
+    });
+    impl_->usb_service_binding_ = service_manager.bind(service::Usb::Helper::get_name().data());
+    if (!impl_->usb_service_binding_.is_valid()) {
+        return std::unexpected("Failed to bind USB service");
+    }
+#endif
     impl_->system_service_binding_ = service_manager.bind(BROOKESIA_SYSTEM_CORE_SERVICE_NAME);
     impl_->gui_service_binding_ = service_manager.bind(BROOKESIA_SYSTEM_CORE_GUI_SERVICE_NAME);
     impl_->timer_service_binding_ = service_manager.bind(BROOKESIA_SYSTEM_CORE_TIMER_SERVICE_NAME);
@@ -195,6 +363,10 @@ std::expected<void, std::string> System::init(Config config)
         }
     }
     BROOKESIA_LOGI("System core initialized: type(%1%)", impl_->system_type_);
+#if defined(ESP_PLATFORM) && CONFIG_BROOKESIA_SYSTEM_CORE_ENABLE_USB_BRIDGE
+    usb_binding_cleanup.release();
+    usb_bridge_cleanup.release();
+#endif
     startup_overlay_cleanup.release();
     return {};
 }
@@ -282,6 +454,11 @@ void System::deinit()
     impl_->system_service_binding_.release();
     impl_->gui_service_binding_.release();
     impl_->timer_service_binding_.release();
+#if defined(ESP_PLATFORM) && CONFIG_BROOKESIA_SYSTEM_CORE_ENABLE_USB_BRIDGE
+    impl_->usb_service_binding_.release();
+    service::Usb::get_instance().clear_service_call_bridge();
+    service::Usb::get_instance().clear_host_command_bridge();
+#endif
     auto &service_manager = service::ServiceManager::get_instance();
     service_manager.remove_service(BROOKESIA_SYSTEM_CORE_TIMER_SERVICE_NAME);
     service_manager.remove_service(BROOKESIA_SYSTEM_CORE_GUI_SERVICE_NAME);
