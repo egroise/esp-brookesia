@@ -89,4 +89,18 @@ menu "Example Configuration"
         bool "Enable Xiaozhi agent"
         select BROOKESIA_AGENT_XIAOZHI_ENABLE_AUTO_REGISTER
         default y
+
+    menuconfig EXAMPLE_AGENTS_ENABLE_CUSTOM_IA
+        bool "Enable CustomIA agent"
+        select BROOKESIA_AGENT_CUSTOM_IA_ENABLE_AUTO_REGISTER
+        default n
+
+    if EXAMPLE_AGENTS_ENABLE_CUSTOM_IA
+        config EXAMPLE_AGENTS_CUSTOM_IA_SERVER_URL
+            string "Backend server URL"
+            default "http://192.168.1.100:3000"
+            help
+                Base URL of the CustomIA HTTP backend, as reachable from the device (LAN address of the
+                machine running it). Must not have a trailing slash.
+    endif
 endmenu

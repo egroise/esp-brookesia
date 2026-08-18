@@ -15,6 +15,7 @@
 
 using namespace esp_brookesia;
 using AgentHelper = service::helper::AgentManager;
+using CustomIAHelper = service::helper::CustomIA;
 using WifiHelper = service::helper::Wifi;
 using DeviceHelper = service::helper::Device;
 using DisplayHelper = service::helper::Display;
@@ -24,6 +25,21 @@ constexpr uint8_t VOLUME_MAX = 100;
 constexpr uint8_t VOLUME_MIN = 0;
 constexpr uint8_t BRIGHTNESS_MAX = 100;
 constexpr uint8_t BRIGHTNESS_MIN = 0;
+
+namespace {
+
+// `ChatMode` is a manager-global setting, not per-agent (see `AgentManager::FunctionId::SetChatMode`).
+// CustomIA is push-to-talk only, so it needs `Manual` mode; every other agent expects the default
+// wake-word/VAD-driven `RealTime` mode.
+void apply_chat_mode_for_agent(const std::string &agent_name)
+{
+    auto mode = (agent_name == CustomIAHelper::get_name()) ?
+                AgentHelper::ChatMode::Manual : AgentHelper::ChatMode::RealTime;
+    auto result = AgentHelper::call_function_async(AgentHelper::FunctionId::SetChatMode, BROOKESIA_DESCRIBE_TO_STR(mode));
+    BROOKESIA_CHECK_FALSE_EXIT(result, "Failed to set chat mode for agent: %1%", agent_name);
+}
+
+} // namespace
 
 ScreenSettings::ScreenSettings():
     StateBase(BROOKESIA_DESCRIBE_TO_STR(DisplayScreen::Settings))
@@ -330,6 +346,7 @@ bool ScreenSettings::init_agent()
         if (it != agents_.end()) {
             lv_dropdown_set_selected(ui_SettingsDropdownAgents, std::distance(agents_.begin(), it));
         }
+        apply_chat_mode_for_agent(target_agent_);
     }
 
     auto agent_changed_slot = +[](lv_event_t *event) {
@@ -357,6 +374,8 @@ bool ScreenSettings::init_agent()
                                            AgentHelper::FunctionId::SetTargetAgent, agent_text
                                        );
         BROOKESIA_CHECK_FALSE_EXIT(set_target_agent_result, "Failed to set target agent");
+
+        apply_chat_mode_for_agent(agent_text);
     };
     lv_obj_add_event_cb(ui_SettingsDropdownAgents, agent_changed_slot, LV_EVENT_VALUE_CHANGED, this);
 

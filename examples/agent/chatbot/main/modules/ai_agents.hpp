@@ -37,6 +37,7 @@ public:
     void init_coze();
     void init_openai();
     void init_xiaozhi();
+    void init_custom_ia();
 
 private:
     AI_Agents() = default;
@@ -103,6 +104,7 @@ private:
 
     static boost::json::object get_agent_coze_info();
     static boost::json::object get_agent_openai_info();
+    static boost::json::object get_agent_custom_ia_info();
 
     std::shared_ptr<esp_brookesia::lib_utils::TaskScheduler> task_scheduler_;
     uint32_t emote_animation_duration_ms_ = 0;

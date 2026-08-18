@@ -44,27 +44,25 @@ extern "C" void app_main(void)
     /* Create a task scheduler for backend usage */
     std::shared_ptr<lib_utils::TaskScheduler> backend_scheduler;
     BROOKESIA_CHECK_EXCEPTION_EXIT(
-        backend_scheduler = std::make_shared<lib_utils::TaskScheduler>(), "Failed to create task scheduler"
-    );
-    auto start_result = backend_scheduler->start({
-        .worker_configs = {
-            {
-                .name = "BackendWorker1",
-                .core_id = 0,
-                .priority = 1,
-                .stack_size = 10 * 1024,
-            },
-            {
-                .name = "BackendWorker2",
-                .core_id = 1,
-                .priority = 1,
-                .stack_size = 10 * 1024,
-            },
-        }
-    });
+        backend_scheduler = std::make_shared<lib_utils::TaskScheduler>(), "Failed to create task scheduler");
+    auto start_result = backend_scheduler->start({.worker_configs = {
+                                                      {
+                                                          .name = "BackendWorker1",
+                                                          .core_id = 0,
+                                                          .priority = 1,
+                                                          .stack_size = 10 * 1024,
+                                                      },
+                                                      {
+                                                          .name = "BackendWorker2",
+                                                          .core_id = 1,
+                                                          .priority = 1,
+                                                          .stack_size = 10 * 1024,
+                                                      },
+                                                  }});
     BROOKESIA_CHECK_FALSE_EXIT(start_result, "Failed to start task scheduler");
 
-    auto setup_task = [backend_scheduler]() {
+    auto setup_task = [backend_scheduler]()
+    {
         /* Initialize general services */
         GeneralServices::get_instance().init(backend_scheduler);
         GeneralServices::get_instance().init_audio();
@@ -80,9 +78,10 @@ extern "C" void app_main(void)
         AI_Agents::get_instance().init({
             .task_scheduler = backend_scheduler,
         });
-        AI_Agents::get_instance().init_coze();
-        AI_Agents::get_instance().init_openai();
+        // AI_Agents::get_instance().init_coze();
+        // AI_Agents::get_instance().init_openai();
         AI_Agents::get_instance().init_xiaozhi();
+        AI_Agents::get_instance().init_custom_ia();
 
         /* Start display UI */
         Display::get_instance().start({

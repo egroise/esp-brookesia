@@ -96,4 +96,5 @@ private:
 
     std::unique_ptr<esp_brookesia::lib_utils::StateMachine> ui_state_machine_;
     bool is_ui_state_action_triggered_ = false;
+    std::string emote_screen_name_;
 };

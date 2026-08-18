@@ -34,6 +34,9 @@ dependencies:
   espressif/brookesia_agent_coze:
     version: 0.8.*
     override_path: ../../../../service/agent/brookesia_agent_coze
+  espressif/brookesia_agent_custom_ia:
+    version: 0.1.*
+    override_path: ../../../../service/agent/brookesia_agent_custom_ia
   espressif/brookesia_agent_openai:
     version: 0.8.*
     override_path: ../../../../service/agent/brookesia_agent_openai

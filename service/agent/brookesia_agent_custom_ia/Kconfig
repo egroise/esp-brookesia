@@ -1,0 +1,53 @@
+menu "ESP-Brookesia: Agent CustomIA Configurations"
+    config BROOKESIA_AGENT_CUSTOM_IA_ENABLE_AUTO_REGISTER
+        bool "Enable automatic plugin registration"
+        default y
+        help
+            Automatically register the agent as a plugin on startup.
+
+    config BROOKESIA_AGENT_CUSTOM_IA_ENABLE_DEBUG_LOG
+        bool "Enable debug or lower level logs"
+        default n
+
+    config BROOKESIA_AGENT_CUSTOM_IA_STT_SAMPLE_RATE
+        int "Uplink (recording) sample rate in Hz"
+        default 16000
+        help
+            Sample rate used to record and upload audio to the backend's STT endpoint.
+
+    config BROOKESIA_AGENT_CUSTOM_IA_TTS_SAMPLE_RATE
+        int "Downlink (playback) sample rate in Hz"
+        default 24000
+        help
+            Sample rate assumed for the WAV audio returned by the backend's TTS endpoint.
+            This must match what the backend actually sends (Gemini TTS defaults to 24000 Hz);
+            a mismatch plays audio back at the wrong pitch/speed since there is no on-device resampler.
+
+    config BROOKESIA_AGENT_CUSTOM_IA_MAX_RECORD_MS
+        int "Maximum recording duration in milliseconds"
+        default 15000
+        help
+            Caps how much audio is buffered while the screen is held, to bound RAM usage.
+
+    config BROOKESIA_AGENT_CUSTOM_IA_HTTP_TIMEOUT_MS
+        int "HTTP request timeout in milliseconds"
+        default 10000
+
+    config BROOKESIA_AGENT_CUSTOM_IA_POLL_INTERVAL_MS
+        int "Reply polling interval in milliseconds"
+        default 300
+        help
+            How often to poll the backend's `/out/{callId}` endpoint while waiting for the TTS reply.
+
+    config BROOKESIA_AGENT_CUSTOM_IA_POLL_TIMEOUT_MS
+        int "Reply polling timeout in milliseconds"
+        default 30000
+        help
+            Maximum total time to wait for the TTS reply before giving up.
+
+    config BROOKESIA_AGENT_CUSTOM_IA_WORKER_TASK_STACK_SIZE
+        int "Worker task stack size in bytes"
+        default 12288
+        help
+            Stack size of the dedicated FreeRTOS task that performs the blocking HTTP upload/poll/playback work.
+endmenu

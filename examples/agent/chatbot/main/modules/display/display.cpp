@@ -20,6 +20,8 @@
 #include "display.hpp"
 
 using namespace esp_brookesia;
+using AgentHelper = service::helper::AgentManager;
+using CustomIAHelper = service::helper::CustomIA;
 using EmoteHelper = service::helper::ExpressionEmote;
 using DisplayHelper = service::helper::Display;
 using VideoHelper = service::helper::Video;
@@ -257,8 +259,24 @@ bool Display::start_gesture()
             return;
         }
 
-        if (info.event_type == GestureEventType::Release) {
-            is_ui_state_action_triggered_ = false;
+        if ((info.event_type == GestureEventType::Press) || (info.event_type == GestureEventType::Release)) {
+            // Push-to-talk: only on the emote screen, and only while CustomIA is the active agent.
+            // This avoids interrupting other (RealTime-mode) agents' speech on a plain tap, and avoids
+            // spurious recordings while interacting with Settings-screen widgets, since those touches
+            // flow through this same gesture event bus.
+            if (ui_state_machine_->get_current_state() == emote_screen_name_) {
+                auto active_agent_result =
+                    AgentHelper::call_function_sync<std::string>(AgentHelper::FunctionId::GetActiveAgent);
+                if (active_agent_result && (active_agent_result.value() == CustomIAHelper::get_name())) {
+                    auto function_id = (info.event_type == GestureEventType::Press) ?
+                                        AgentHelper::FunctionId::ManualStartListening :
+                                        AgentHelper::FunctionId::ManualStopListening;
+                    AgentHelper::call_function_async(function_id);
+                }
+            }
+            if (info.event_type == GestureEventType::Release) {
+                is_ui_state_action_triggered_ = false;
+            }
             return;
         }
         if ((info.event_type != GestureEventType::Pressing) || is_ui_state_action_triggered_) {
@@ -333,6 +351,8 @@ bool Display::start_ui_state_machine()
     BROOKESIA_CHECK_FALSE_RETURN(add_settings_ret, false, "Failed to add state");
     auto add_emote_ret = ui_state_machine_->add_state(screen_emote);
     BROOKESIA_CHECK_FALSE_RETURN(add_emote_ret, false, "Failed to add state");
+
+    emote_screen_name_ = screen_emote->get_name();
 
     // Add transitions between states
     auto action_scroll_left = BROOKESIA_DESCRIBE_TO_STR(DisplayAction::ScrollLeft);

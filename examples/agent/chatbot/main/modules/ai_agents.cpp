@@ -31,6 +31,7 @@ using namespace esp_brookesia;
 
 using AgentHelper = esp_brookesia::service::helper::AgentManager;
 using CozeHelper = esp_brookesia::service::helper::Coze;
+using CustomIAHelper = esp_brookesia::service::helper::CustomIA;
 using OpenaiHelper = esp_brookesia::service::helper::Openai;
 using XiaoZhiHelper = esp_brookesia::service::helper::XiaoZhi;
 using EmoteHelper = esp_brookesia::service::helper::ExpressionEmote;
@@ -237,6 +238,31 @@ void AI_Agents::init_openai()
         BROOKESIA_LOGI("Set Openai agent info successfully");
     }
 #endif // CONFIG_EXAMPLE_AGENTS_ENABLE_OPENAI
+}
+
+void AI_Agents::init_custom_ia()
+{
+    if (!CustomIAHelper::is_available()) {
+        BROOKESIA_LOGW("CustomIA agent is not available, skip initialization");
+        return;
+    }
+
+    BROOKESIA_CHECK_FALSE_EXIT(is_initialized(), "AI agents are not initialized");
+
+#if !CONFIG_EXAMPLE_AGENTS_ENABLE_CUSTOM_IA
+    BROOKESIA_LOGW("CustomIA agent is not enabled, skip initialization");
+#else
+    BROOKESIA_LOGI("Setting CustomIA agent info...");
+    auto result = AgentHelper::call_function_sync(
+                      AgentHelper::FunctionId::SetAgentInfo, CustomIAHelper::get_name().data(),
+                      get_agent_custom_ia_info()
+                  );
+    if (!result) {
+        BROOKESIA_LOGE("Failed to set CustomIA agent info: %1%", result.error());
+    } else {
+        BROOKESIA_LOGI("Set CustomIA agent info successfully");
+    }
+#endif // CONFIG_EXAMPLE_AGENTS_ENABLE_CUSTOM_IA
 }
 
 void AI_Agents::init_xiaozhi()
@@ -1241,6 +1267,18 @@ boost::json::object AI_Agents::get_agent_openai_info()
 #else
     return boost::json::object {};
 #endif // CONFIG_EXAMPLE_AGENTS_ENABLE_OPENAI
+}
+
+boost::json::object AI_Agents::get_agent_custom_ia_info()
+{
+#if CONFIG_EXAMPLE_AGENTS_ENABLE_CUSTOM_IA
+    CustomIAHelper::Info custom_ia_info {
+        .server_url = CONFIG_EXAMPLE_AGENTS_CUSTOM_IA_SERVER_URL,
+    };
+    return BROOKESIA_DESCRIBE_TO_JSON(custom_ia_info).as_object();
+#else
+    return boost::json::object {};
+#endif // CONFIG_EXAMPLE_AGENTS_ENABLE_CUSTOM_IA
 }
 
 namespace {
