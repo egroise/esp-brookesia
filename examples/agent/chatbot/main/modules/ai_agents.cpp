@@ -26,6 +26,7 @@
 #include "private/utils.hpp"
 #include "modules/display/display.hpp"
 #include "modules/touch_pad.hpp"
+#include "modules/sd_settings.hpp"
 #include "ai_agents.hpp"
 
 using namespace esp_brookesia;
@@ -40,6 +41,7 @@ using WifiHelper = esp_brookesia::service::helper::Wifi;
 using DeviceHelper = esp_brookesia::service::helper::Device;
 
 #define XIAO_ZHI_AUDIO_URL_PREFIX "file://littlefs/xiaozhi/"
+#define SD_SETTINGS_CUSTOM_IA_SERVER_URL_KEY "CONFIG_EXAMPLE_AGENTS_CUSTOM_IA_SERVER_URL"
 
 bool AI_Agents::init(const Config &config)
 {
@@ -973,7 +975,8 @@ void AI_Agents::process_wifi_events()
 
 void AI_Agents::process_touch_pad_events()
 {
-    auto touch_pad_event_slot = [this](TouchPad::Event event) {
+    auto touch_pad_event_slot = [this](TouchPad::Event event)
+    {
         switch (event)
         {
         case TouchPad::Event::Touch:
@@ -1021,6 +1024,14 @@ boost::json::object AI_Agents::get_agent_custom_ia_info()
     CustomIAHelper::Info custom_ia_info{
         .server_url = CONFIG_EXAMPLE_AGENTS_CUSTOM_IA_SERVER_URL,
     };
+
+    if (auto server_url = SdSettings::get_instance().get_string(SD_SETTINGS_CUSTOM_IA_SERVER_URL_KEY);
+        server_url.has_value())
+    {
+        BROOKESIA_LOGI("Overriding CustomIA server URL from SD settings: %1%", *server_url);
+        custom_ia_info.server_url = std::move(*server_url);
+    }
+
     return BROOKESIA_DESCRIBE_TO_JSON(custom_ia_info).as_object();
 #else
     return boost::json::object{};
