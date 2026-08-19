@@ -25,6 +25,7 @@
 #include "brookesia/service_helper/media/bt_speaker.hpp"
 #include "private/utils.hpp"
 #include "modules/display/display.hpp"
+#include "modules/touch_pad.hpp"
 #include "ai_agents.hpp"
 
 using namespace esp_brookesia;
@@ -75,6 +76,7 @@ bool AI_Agents::init(const Config &config)
     process_agent_general_events();
     process_emote();
     process_wifi_events();
+    process_touch_pad_events();
 
     BROOKESIA_LOGI("AI agents initialized successfully");
 
@@ -967,6 +969,30 @@ void AI_Agents::process_wifi_events()
     BROOKESIA_CHECK_FALSE_EXIT(
         soft_ap_event_happened_connection.connected(), "Failed to subscribe to Agent WiFi soft AP event happened event");
     service_connections_.push_back(std::move(soft_ap_event_happened_connection));
+}
+
+void AI_Agents::process_touch_pad_events()
+{
+    auto touch_pad_event_slot = [this](TouchPad::Event event) {
+        switch (event)
+        {
+        case TouchPad::Event::Touch:
+            toggle_custom_ia_manual_listening();
+            break;
+        case TouchPad::Event::SlidePad1ToPad2:
+            BROOKESIA_LOGD("Touch pad slide: pad1 -> pad2");
+            break;
+        case TouchPad::Event::SlidePad2ToPad1:
+            BROOKESIA_LOGD("Touch pad slide: pad2 -> pad1");
+            break;
+        }
+    };
+
+    auto start_result = TouchPad::get_instance().start({
+        .task_scheduler = task_scheduler_,
+        .event_callback = touch_pad_event_slot,
+    });
+    BROOKESIA_CHECK_FALSE_EXIT(start_result, "Failed to start touch pad");
 }
 
 void AI_Agents::toggle_custom_ia_manual_listening()
