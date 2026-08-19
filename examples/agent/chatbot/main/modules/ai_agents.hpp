@@ -9,10 +9,13 @@
 #include <vector>
 #include "brookesia/service_manager/event/registry.hpp"
 #include "brookesia/service_manager/service/manager.hpp"
+#include "modules/touch_pads.hpp"
 
-class AI_Agents {
+class AI_Agents
+{
 public:
-    struct Config {
+    struct Config
+    {
         std::shared_ptr<esp_brookesia::lib_utils::TaskScheduler> task_scheduler;
         uint32_t afe_wakeup_start_timeout_ms = 30000;
         uint32_t afe_wakeup_end_timeout_ms = 10000;
@@ -34,9 +37,6 @@ public:
         return task_scheduler_ != nullptr;
     }
 
-    void init_coze();
-    void init_openai();
-    void init_xiaozhi();
     void init_custom_ia();
 
 private:
@@ -63,9 +63,10 @@ private:
     void process_emote_when_user_speaking_text_got();
     void process_emote_when_emote_got();
     void process_emote_when_power_battery_state_changed();
-    void process_emote_when_coze_event_happened();
 
     void process_wifi_events();
+    void process_touch_pad_events();
+    void toggle_custom_ia_manual_listening();
 
     bool is_listening() const
     {
@@ -102,14 +103,11 @@ private:
         return is_wifi_connected_;
     }
 
-    static boost::json::object get_agent_coze_info();
-    static boost::json::object get_agent_openai_info();
     static boost::json::object get_agent_custom_ia_info();
 
     std::shared_ptr<esp_brookesia::lib_utils::TaskScheduler> task_scheduler_;
     uint32_t emote_animation_duration_ms_ = 0;
     uint32_t agent_restart_delay_s_ = 0;
-    uint32_t coze_error_show_emote_delay_s_ = 0;
 
     bool is_listening_ = false;
     bool is_speaking_ = false;
@@ -124,4 +122,5 @@ private:
     std::vector<esp_brookesia::service::ServiceBinding> service_bindings_;
     // Keep event connections
     std::vector<esp_brookesia::service::EventRegistry::SignalConnection> service_connections_;
+    std::vector<TouchPads::SignalConnection> touch_pad_connections_;
 };

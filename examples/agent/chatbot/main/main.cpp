@@ -14,6 +14,7 @@
 #include "modules/ai_agents.hpp"
 #include "modules/general_services.hpp"
 #include "modules/profiler.hpp"
+#include "modules/touch_pads.hpp"
 #include "modules/display/display.hpp"
 
 using namespace esp_brookesia;
@@ -78,10 +79,13 @@ extern "C" void app_main(void)
         AI_Agents::get_instance().init({
             .task_scheduler = backend_scheduler,
         });
-        // AI_Agents::get_instance().init_coze();
-        // AI_Agents::get_instance().init_openai();
-        AI_Agents::get_instance().init_xiaozhi();
         AI_Agents::get_instance().init_custom_ia();
+
+        /* Start touch pads (PAD1/PAD2 simple-touch and slide gestures) */
+        TouchPads::get_instance().init({
+            .task_scheduler = backend_scheduler,
+        });
+        TouchPads::get_instance().start();
 
         /* Start display UI */
         Display::get_instance().start({
