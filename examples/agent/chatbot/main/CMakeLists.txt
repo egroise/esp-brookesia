@@ -15,8 +15,6 @@ idf_component_register(
     EMBED_TXTFILES ${EMBEDDED_FILES}
 )
 
-littlefs_create_partition_image(littlefs_data ../littlefs FLASH_IN_PROJECT)
-
 set(ASSETS_PARTITION_NAME "anim_icon")
 set(ASSETS_BIN_NAME ${ASSETS_PARTITION_NAME})
 set(SUPPORTED_RESOLUTIONS "320_240" "360_360" "1024_600")
