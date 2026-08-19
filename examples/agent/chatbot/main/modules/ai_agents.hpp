@@ -9,7 +9,6 @@
 #include <vector>
 #include "brookesia/service_manager/event/registry.hpp"
 #include "brookesia/service_manager/service/manager.hpp"
-#include "modules/touch_pads.hpp"
 
 class AI_Agents
 {
@@ -122,5 +121,4 @@ private:
     std::vector<esp_brookesia::service::ServiceBinding> service_bindings_;
     // Keep event connections
     std::vector<esp_brookesia::service::EventRegistry::SignalConnection> service_connections_;
-    std::vector<TouchPads::SignalConnection> touch_pad_connections_;
 };

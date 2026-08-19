@@ -75,7 +75,6 @@ bool AI_Agents::init(const Config &config)
     process_agent_general_events();
     process_emote();
     process_wifi_events();
-    process_touch_pad_events();
 
     BROOKESIA_LOGI("AI agents initialized successfully");
 
@@ -968,24 +967,6 @@ void AI_Agents::process_wifi_events()
     BROOKESIA_CHECK_FALSE_EXIT(
         soft_ap_event_happened_connection.connected(), "Failed to subscribe to Agent WiFi soft AP event happened event");
     service_connections_.push_back(std::move(soft_ap_event_happened_connection));
-}
-
-void AI_Agents::process_touch_pad_events()
-{
-    auto slot = [this](TouchPads::Event event)
-    {
-        BROOKESIA_LOG_TRACE_GUARD();
-
-        if (event != TouchPads::Event::SimpleTouch)
-        {
-            // Slide gestures are available but not wired to any action yet.
-            BROOKESIA_LOGD("Touch pad slide event: %1%", static_cast<int>(event));
-            return;
-        }
-        BROOKESIA_LOGD("Touch pad slide event: %1%", static_cast<int>(event));
-        toggle_custom_ia_manual_listening();
-    };
-    touch_pad_connections_.push_back(TouchPads::get_instance().connect_touch_event(slot));
 }
 
 void AI_Agents::toggle_custom_ia_manual_listening()
