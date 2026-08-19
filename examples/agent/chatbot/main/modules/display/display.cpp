@@ -204,8 +204,8 @@ bool Display::start_expression_emote_assets()
 
     {
         EmoteHelper::AssetSource source{
-            .source = ASSETS_PARTITION_NAME,
-            .type = EmoteHelper::AssetSourceType::PartitionLabel,
+            .source = ASSETS_SDCARD_PATH,
+            .type = EmoteHelper::AssetSourceType::Path,
             .flag_enable_mmap = false,
         };
         auto result = EmoteHelper::call_function_sync(
