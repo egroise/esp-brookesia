@@ -11,6 +11,7 @@
 #include "brookesia/lib_utils.hpp"
 #include "brookesia/service_manager.hpp"
 #include "modules/wifi_provisioning.hpp"
+#include "modules/sd_updater.hpp"
 #include "modules/ai_agents.hpp"
 #include "modules/general_services.hpp"
 #include "modules/profiler.hpp"
@@ -90,6 +91,12 @@ extern "C" void app_main(void)
             .task_scheduler = backend_scheduler,
         });
         WifiProvisioning::get_instance().start();
+
+        /* Start SD card updater: checks for file updates on the first WiFi connection */
+        SdUpdater::get_instance().init({
+            .task_scheduler = backend_scheduler,
+        });
+        SdUpdater::get_instance().start();
 
         /* Start profiler */
         Profiler::get_instance().init({

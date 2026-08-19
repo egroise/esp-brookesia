@@ -103,4 +103,22 @@ menu "Example Configuration"
                 Base URL of the CustomIA HTTP backend, as reachable from the device (LAN address of the
                 machine running it). Must not have a trailing slash.
     endif
+
+    menuconfig EXAMPLE_SD_UPDATE_ENABLE
+        bool "Enable SD card update from web service"
+        default n
+        help
+            On the first Wi-Fi connection, fetch the list of files to update from the SD update
+            server ("{URL}/update", GET), compare them (by MD5) against what's already under
+            /sdcard/update, and download any missing/changed file ("{URL}/update", POST) into that
+            folder, creating sub-folders as needed.
+
+    if EXAMPLE_SD_UPDATE_ENABLE
+        config EXAMPLE_SD_UPDATE_SERVER_URL
+            string "SD update server URL"
+            default "http://192.168.1.100:4000"
+            help
+                Base URL of the SD update HTTP backend, as reachable from the device (LAN address of
+                the machine running it). Must not have a trailing slash.
+    endif
 endmenu
