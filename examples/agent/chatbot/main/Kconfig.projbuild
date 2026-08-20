@@ -121,4 +121,24 @@ menu "Example Configuration"
                 Base URL of the SD update HTTP backend, as reachable from the device (LAN address of
                 the machine running it). Must not have a trailing slash.
     endif
+
+    menuconfig EXAMPLE_FW_UPDATE_ENABLE
+        bool "Enable firmware OTA update from web service"
+        default n
+        help
+            On the first Wi-Fi connection, fetch the current firmware version from the firmware
+            update server ("{URL}/firmware", GET -> {"version": ..., "md5": ...}), compare it
+            against the version recorded in /sdcard/VERSION (created with "0" if missing), and if
+            the server's version is higher: download the firmware ("{URL}/firmware/{version}", GET)
+            to the SD card verifying its MD5, copy it into the inactive ota_0/ota_1 partition
+            verifying the MD5 again, switch the bootloader to that partition, and reboot.
+
+    if EXAMPLE_FW_UPDATE_ENABLE
+        config EXAMPLE_FW_UPDATE_SERVER_URL
+            string "Firmware update server URL"
+            default "http://192.168.1.100:4000"
+            help
+                Base URL of the firmware update HTTP backend, as reachable from the device (LAN
+                address of the machine running it). Must not have a trailing slash.
+    endif
 endmenu

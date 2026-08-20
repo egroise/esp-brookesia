@@ -12,6 +12,7 @@
 #include "brookesia/service_manager.hpp"
 #include "modules/wifi_provisioning.hpp"
 #include "modules/sd_updater.hpp"
+#include "modules/fw_updater.hpp"
 #include "modules/ai_agents.hpp"
 #include "modules/general_services.hpp"
 #include "modules/profiler.hpp"
@@ -97,6 +98,12 @@ extern "C" void app_main(void)
             .task_scheduler = backend_scheduler,
         });
         SdUpdater::get_instance().start();
+
+        /* Start firmware OTA updater: checks for a new firmware version on the first WiFi connection */
+        FwUpdater::get_instance().init({
+            .task_scheduler = backend_scheduler,
+        });
+        FwUpdater::get_instance().start();
 
         /* Start profiler */
         Profiler::get_instance().init({
