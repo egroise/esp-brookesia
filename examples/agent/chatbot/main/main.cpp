@@ -17,12 +17,16 @@
 #include "modules/general_services.hpp"
 #include "modules/profiler.hpp"
 #include "modules/display/display.hpp"
+#include <esp_app_desc.h>
 
 using namespace esp_brookesia;
 
 extern "C" void app_main(void)
 {
-    BROOKESIA_LOGI("\n\n=== Agent Chatbot Example ===\n");
+
+    const esp_app_desc_t *app_desc = esp_app_get_description();
+    BROOKESIA_LOGI("\n\n=== Chatbot ===\n");
+    BROOKESIA_LOGI("App version: %1%", app_desc->version);
 
     // Set log level to warning for some components to reduce log output
     esp_log_level_set("ESP_GMF_TASK", ESP_LOG_WARN);
@@ -39,8 +43,6 @@ extern "C" void app_main(void)
     esp_log_level_set("AUD_SDEC", ESP_LOG_WARN);
     esp_log_level_set("AFE_CONFIG", ESP_LOG_WARN);
     esp_log_level_set("NEW_DATA_BUS", ESP_LOG_WARN);
-    esp_log_level_set("ESP_XIAOZHI_MQTT", ESP_LOG_WARN);
-    esp_log_level_set("ESP_XIAOZHI_CHAT", ESP_LOG_WARN);
     esp_log_level_set("AFE", ESP_LOG_ERROR);
 
     /* Create a task scheduler for backend usage */
